@@ -1,7 +1,7 @@
-from flask import Flask, jsonify
+from flask import Blueprint, jsonify
 from datetime import datetime
 
-app = Flask(__name__)
+from . import notes_bp
 
 notes = [
     {
@@ -31,10 +31,6 @@ notes = [
 ]
 
 
-@app.route("/api/notes")
+@notes_bp.route("/")
 def notes_index():
     return jsonify(notes)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
