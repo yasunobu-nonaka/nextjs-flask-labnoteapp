@@ -1,5 +1,6 @@
 from flask import jsonify, request
-from app.model.note import db, Note
+from app.extensions import db
+from app.model import Note
 
 from . import notes_bp
 
