@@ -1,36 +1,22 @@
-from flask import Blueprint, jsonify
-from datetime import datetime
+from flask import jsonify
+from app.model.note import db, Note
 
 from . import notes_bp
-
-notes = [
-    {
-        "id": 1,
-        "user_id": 1,
-        "title": "note1",
-        "content_md": "note content 1",
-        "created_at": datetime(2026, 4, 1),
-        "updated_at": datetime(2026, 4, 2),
-    },
-    {
-        "id": 2,
-        "user_id": 2,
-        "title": "note1",
-        "content_md": "note content 2",
-        "created_at": datetime(2026, 4, 10),
-        "updated_at": datetime(2026, 4, 11),
-    },
-    {
-        "id": 3,
-        "user_id": 1,
-        "title": "note1",
-        "content_md": "note content 3",
-        "created_at": datetime(2026, 5, 1),
-        "updated_at": datetime(2026, 5, 2),
-    },
-]
 
 
 @notes_bp.route("/")
 def notes_index():
-    return jsonify(notes)
+    notes = db.session.execute(db.select(Note).order_by(Note.id)).scalars()
+    notes_list = [
+        {
+            "id": note.id,
+            "user_id": note.user_id,
+            "title": note.title,
+            "content_md": note.content_md,
+            "created_at": note.created_at,
+            "updated_at": note.updated_at,
+        }
+        for note in notes
+    ]
+    print(len(notes_list))
+    return jsonify(notes_list)
