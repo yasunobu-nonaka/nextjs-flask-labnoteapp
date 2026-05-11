@@ -87,3 +87,24 @@ def edit_note(note_id):
             },
         }
     )
+
+
+@notes_bp.route("/<int:note_id>/delete", methods=["DELETE"])
+def delete_note(note_id):
+    note = db.get_or_404(Note, note_id)
+    db.session.delete(note)
+    db.session.commit()
+
+    return jsonify(
+        {
+            "message": "Note deleted successfully!",
+            "note": {
+                "id": note.id,
+                "user_id": note.user_id,
+                "title": note.title,
+                "content_md": note.content_md,
+                "created_at": note.created_at,
+                "updated_at": note.updated_at,
+            },
+        }
+    )
