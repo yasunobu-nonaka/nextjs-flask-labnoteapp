@@ -4,7 +4,7 @@ from app.model.note import db, Note
 from . import notes_bp
 
 
-@notes_bp.route("/")
+@notes_bp.route("/", methods=["GET"])
 def notes_index():
     notes = db.session.execute(db.select(Note).order_by(Note.id)).scalars()
     notes_list = [
@@ -22,7 +22,7 @@ def notes_index():
     return jsonify(notes_list)
 
 
-@notes_bp.route("/new", methods=["POST"])
+@notes_bp.route("/", methods=["POST"])
 def create_note():
     data = request.get_json()
     note = Note(
@@ -46,7 +46,7 @@ def create_note():
     )
 
 
-@notes_bp.route("/<int:note_id>")
+@notes_bp.route("/<int:note_id>", methods=["GET"])
 def get_note(note_id):
     note = db.get_or_404(Note, note_id)
     return jsonify(
@@ -61,7 +61,7 @@ def get_note(note_id):
     )
 
 
-@notes_bp.route("/<int:note_id>/edit", methods=["PATCH"])
+@notes_bp.route("/<int:note_id>", methods=["PATCH"])
 def edit_note(note_id):
     data = request.get_json()
     note = db.get_or_404(Note, note_id)
@@ -89,7 +89,7 @@ def edit_note(note_id):
     )
 
 
-@notes_bp.route("/<int:note_id>/delete", methods=["DELETE"])
+@notes_bp.route("/<int:note_id>", methods=["DELETE"])
 def delete_note(note_id):
     note = db.get_or_404(Note, note_id)
     db.session.delete(note)
