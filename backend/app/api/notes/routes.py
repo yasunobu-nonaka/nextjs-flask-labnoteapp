@@ -44,3 +44,18 @@ def create_note():
             },
         }
     )
+
+
+@notes_bp.route("/<int:note_id>")
+def get_note(note_id):
+    note = db.get_or_404(Note, note_id)
+    return jsonify(
+        {
+            "id": note.id,
+            "user_id": note.user_id,
+            "title": note.title,
+            "content_md": note.content_md,
+            "created_at": note.created_at,
+            "updated_at": note.updated_at,
+        }
+    )
