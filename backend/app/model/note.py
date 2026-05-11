@@ -1,14 +1,8 @@
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Text, DateTime, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timedelta, timezone
+from app.extensions import db
 
-
-class Base(DeclarativeBase):
-    pass
-
-
-db = SQLAlchemy(model_class=Base)
 jst = timezone(timedelta(hours=9))
 
 
