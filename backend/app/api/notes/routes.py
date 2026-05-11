@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, request
 from app.model.note import db, Note
 
 from . import notes_bp
@@ -20,3 +20,27 @@ def notes_index():
     ]
     print(len(notes_list))
     return jsonify(notes_list)
+
+
+@notes_bp.route("/new", methods=["POST"])
+def create_note():
+    data = request.get_json()
+    note = Note(
+        user_id=data["user_id"], title=data["title"], content_md=data["content_md"]
+    )
+    db.session.add(note)
+    db.session.commit()
+
+    return jsonify(
+        {
+            "message": "Note created successfully!",
+            "note": {
+                "id": note.id,
+                "user_id": note.user_id,
+                "title": note.title,
+                "content_md": note.content_md,
+                "created_at": note.created_at,
+                "updated_at": note.updated_at,
+            },
+        }
+    )
