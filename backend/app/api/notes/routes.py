@@ -8,7 +8,14 @@ from . import notes_bp
 
 @notes_bp.route("/", methods=["GET"])
 def notes_index():
-    notes = db.session.execute(db.select(Note).order_by(Note.id)).scalars()
+    query_word = request.args.get("q")
+
+    if query_word:
+        query = db.select(Note).filter(Note.title.ilike(f"%{query_word}%"))
+    else:
+        query = db.select(Note)
+
+    notes = db.session.execute(query.order_by(Note.id)).scalars()
 
     schema = NoteSchema(many=True)
     result = schema.dump(notes)
