@@ -18,14 +18,14 @@ def notes_index():
 
 @notes_bp.route("/", methods=["POST"])
 def create_note():
-    data = request.get_json()
-    note = Note(
-        user_id=data["user_id"], title=data["title"], content_md=data["content_md"]
-    )
+    schema = NoteSchema()
+
+    data = schema.load(request.get_json())
+    note = Note(**data)
+
     db.session.add(note)
     db.session.commit()
 
-    schema = NoteSchema()
     result = schema.dump(note)
 
     return jsonify(
@@ -48,18 +48,16 @@ def get_note(note_id):
 
 @notes_bp.route("/<int:note_id>", methods=["PATCH"])
 def edit_note(note_id):
-    data = request.get_json()
     note = db.get_or_404(Note, note_id)
 
-    if "title" in data:
-        note.title = data["title"]
+    schema = NoteSchema()
+    data = schema.load(request.get_json(), partial=True)
 
-    if "content_md" in data:
-        note.content_md = data["content_md"]
+    for key, value in data.items():
+        setattr(note, key, value)
 
     db.session.commit()
 
-    schema = NoteSchema()
     result = schema.dump(note)
 
     return jsonify(
