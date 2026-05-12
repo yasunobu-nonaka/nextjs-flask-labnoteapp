@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: flask-backend-api
+    restart: always
+    ports:
+      - '8000:5000'
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: flask run --host=0.0.0.0 --port=5000
+
+  db:
+    image: postgres:16
+    container_name: postgresql-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./backend/.env
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -t 1']
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:
