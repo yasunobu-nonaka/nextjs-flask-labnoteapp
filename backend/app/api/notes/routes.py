@@ -1,7 +1,7 @@
 from flask import jsonify, request
 from app.extensions import db
 from app.model import Note
-from app.schema import NoteSchema
+from app.schema import NoteCreateSchema, NoteResponseSchema
 
 from . import notes_bp
 
@@ -17,23 +17,24 @@ def notes_index():
 
     notes = db.session.execute(query.order_by(Note.id)).scalars()
 
-    schema = NoteSchema(many=True)
-    result = schema.dump(notes)
+    res_schema = NoteResponseSchema(many=True)
+    result = res_schema.dump(notes)
 
     return result
 
 
 @notes_bp.route("/", methods=["POST"])
 def create_note():
-    schema = NoteSchema()
+    create_schema = NoteCreateSchema()
 
-    data = schema.load(request.get_json())
-    note = Note(**data)
+    data = create_schema.load(request.get_json())
+    note = Note(user_id=1, title=data["title"], content_md=data["content_md"])
 
     db.session.add(note)
     db.session.commit()
 
-    result = schema.dump(note)
+    res_schema = NoteCreateSchema()
+    result = res_schema.dump(note)
 
     return jsonify(
         {
@@ -47,8 +48,8 @@ def create_note():
 def get_note(note_id):
     note = db.get_or_404(Note, note_id)
 
-    schema = NoteSchema()
-    result = schema.dump(note)
+    res_schema = NoteResponseSchema()
+    result = res_schema.dump(note)
 
     return result
 
@@ -57,15 +58,16 @@ def get_note(note_id):
 def edit_note(note_id):
     note = db.get_or_404(Note, note_id)
 
-    schema = NoteSchema()
-    data = schema.load(request.get_json(), partial=True)
+    create_schema = NoteCreateSchema()
+    data = create_schema.load(request.get_json(), partial=True)
 
     for key, value in data.items():
         setattr(note, key, value)
 
     db.session.commit()
 
-    result = schema.dump(note)
+    res_schema = NoteResponseSchema()
+    result = res_schema.dump(note)
 
     return jsonify(
         {
@@ -81,8 +83,8 @@ def delete_note(note_id):
     db.session.delete(note)
     db.session.commit()
 
-    schema = NoteSchema()
-    result = schema.dump(note)
+    res_schema = NoteCreateSchema()
+    result = res_schema.dump(note)
 
     return jsonify(
         {

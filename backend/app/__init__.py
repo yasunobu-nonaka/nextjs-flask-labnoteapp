@@ -1,11 +1,8 @@
 from flask import Flask
-from flask_migrate import Migrate
 
 from app.api import api_bp
 from app.config import config
-from app.extensions import db
-
-migrate = Migrate()
+from app.extensions import db, migrate
 
 
 def create_app(config_name="development"):
