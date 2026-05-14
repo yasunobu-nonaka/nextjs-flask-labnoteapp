@@ -17,6 +17,14 @@ def register():
     schema = RegistrationSchema()
     validated_user_input = schema.load(user_input)
 
+    # ユーザー名の重複チェック
+    existing_user = db.session.execute(
+        db.select(User).filter_by(username=validated_user_input["username"])
+    ).scalar_one_or_none()
+
+    if existing_user:
+        return jsonify({"message": "Username already exists"}), 409
+
     # ユーザーモデル定義
     user = User(username=validated_user_input["username"])
 
