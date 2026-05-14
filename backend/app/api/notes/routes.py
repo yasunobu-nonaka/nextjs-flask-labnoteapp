@@ -39,7 +39,7 @@ def create_note():
     db.session.add(note)
     db.session.commit()
 
-    res_schema = NoteCreateSchema()
+    res_schema = NoteResponseSchema()
     result = res_schema.dump(note)
 
     return jsonify(
@@ -93,7 +93,7 @@ def delete_note(note_id):
     db.session.delete(note)
     db.session.commit()
 
-    res_schema = NoteCreateSchema()
+    res_schema = NoteResponseSchema()
     result = res_schema.dump(note)
 
     return jsonify(
