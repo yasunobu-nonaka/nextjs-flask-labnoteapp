@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from flask_jwt_extended import jwt_required, current_user, get_jwt_identity
+from flask_jwt_extended import jwt_required, current_user
 
 from app.extensions import db
 from app.model import Note
@@ -42,11 +42,14 @@ def create_note():
     res_schema = NoteResponseSchema()
     result = res_schema.dump(note)
 
-    return jsonify(
-        {
-            "message": "Note created successfully!",
-            "note": result,
-        }
+    return (
+        jsonify(
+            {
+                "message": "Note created successfully!",
+                "note": result,
+            }
+        ),
+        201,
     )
 
 
@@ -96,9 +99,12 @@ def delete_note(note_id):
     res_schema = NoteResponseSchema()
     result = res_schema.dump(note)
 
-    return jsonify(
-        {
-            "message": "Note deleted successfully!",
-            "note": result,
-        }
+    return (
+        jsonify(
+            {
+                "message": "Note deleted successfully!",
+                "note": result,
+            }
+        ),
+        204,
     )
