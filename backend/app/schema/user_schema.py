@@ -21,3 +21,8 @@ class RegistrationSchema(Schema):
     def validate_password(self, data, **kwargs):
         if data["password"] != data["confirm"]:
             raise ValidationError("パスワードが合致しません", "confirm")
+
+
+class LoginSchema(Schema):
+    username = fields.Str(required=True)
+    password = fields.Str(required=True, load_only=True)
