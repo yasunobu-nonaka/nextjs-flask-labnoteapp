@@ -57,10 +57,3 @@ def login():
         return jsonify(access_token=access_token)
 
     return jsonify({"message": "Username or Password did not match"}), 401
-
-
-@auth_bp.route("/users", methods=["GET"])
-def get_users():
-    users = db.session.execute(db.select(User).order_by(User.id)).scalars()
-    result = [{"username": user.username} for user in users]
-    return jsonify(result)
