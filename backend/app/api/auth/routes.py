@@ -1,5 +1,6 @@
 from flask import jsonify
 from flask import request
+from marshmallow import ValidationError
 from flask_jwt_extended import create_access_token
 
 from . import auth_bp
@@ -13,9 +14,12 @@ def register():
     # 入力値受け取り
     user_input = request.get_json()
 
-    # バリデーション
+    # 入力のバリデーション
     schema = RegistrationSchema()
-    validated_user_input = schema.load(user_input)
+    try:
+        validated_user_input = schema.load(user_input)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
 
     # ユーザー名の重複チェック
     existing_user = db.session.execute(
@@ -48,7 +52,10 @@ def login():
 
     # バリデーション
     schema = LoginSchema()
-    validated_user_input = schema.load(user_input)
+    try:
+        validated_user_input = schema.load(user_input)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
 
     username = validated_user_input["username"]
     password = validated_user_input["password"]
