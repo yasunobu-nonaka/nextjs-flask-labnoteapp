@@ -1,6 +1,3 @@
-from app.extensions import db
-from app.model import User
-
 #############################################
 # tests for register
 #############################################
