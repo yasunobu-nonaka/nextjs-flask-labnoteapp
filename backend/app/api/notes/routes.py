@@ -1,4 +1,5 @@
 from flask import jsonify, request
+from marshmallow import ValidationError
 from flask_jwt_extended import jwt_required, current_user
 
 from app.extensions import db
@@ -29,13 +30,19 @@ def notes_index():
 @notes_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_note():
+    # 入力のバリデーション
     create_schema = NoteCreateSchema()
+    try:
+        data = create_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
 
-    data = create_schema.load(request.get_json())
+    # ノートモデル作成
     note = Note(
         user_id=current_user.id, title=data["title"], content_md=data["content_md"]
     )
 
+    # 保存
     db.session.add(note)
     db.session.commit()
 
@@ -67,10 +74,14 @@ def get_note(note_id):
 @notes_bp.route("/<int:note_id>", methods=["PATCH"])
 @jwt_required()
 def edit_note(note_id):
-    note = db.one_or_404(db.select(Note).filter_by(id=note_id, user_id=current_user.id))
-
+    # 入力のバリデーション
     create_schema = NoteCreateSchema()
-    data = create_schema.load(request.get_json(), partial=True)
+    try:
+        data = create_schema.load(request.get_json(), partial=True)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    note = db.one_or_404(db.select(Note).filter_by(id=note_id, user_id=current_user.id))
 
     for key, value in data.items():
         setattr(note, key, value)
