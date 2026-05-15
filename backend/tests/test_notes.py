@@ -153,3 +153,71 @@ def test_note_ownership_in_note_index(client, auth_headers):
         assert note["user_id"] == second_user_id
         assert note["title"] == "2nd User's Note"
         assert note["content_md"] == "2nd User's Note Content Here!"
+
+
+#############################################
+# tests for note detail
+#############################################
+def test_note_detail(client, auth_headers):
+    # ノートを作成
+    res_note_creation = create_note(
+        client, auth_headers, "My Note", "Note Content Here!"
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # ノートの詳細を取得
+    res_note_detail = client.get(
+        f"/api/notes/{note_id}",
+        headers=auth_headers["headers"],
+    )
+
+    data = res_note_detail.get_json()
+
+    # ノートのユーザーIDを確認
+    assert data["user_id"] == auth_headers["user_id"]
+
+    assert data["title"] == "My Note"
+    assert data["content_md"] == "Note Content Here!"
+    assert res_note_detail.status_code == 200
+
+
+def test_no_header_note_detail_failed(client, auth_headers):
+    # ノートを作成
+    res_note_creation = create_note(
+        client, auth_headers, "My Note", "Note Content Here!"
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # ノートの詳細を取得
+    res_note_detail = client.get(
+        f"/api/notes/{note_id}",
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert res_note_detail.get_json()["msg"] == "Missing Authorization Header"
+    assert res_note_detail.status_code == 401
+
+
+def test_others_note_cannot_see(client, auth_headers):
+    # register 2nd user and get token
+    register_user(client, "seconduser", "seconduser1234")
+    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+
+    # create note by 2nd user
+    res_note_creation = client.post(
+        "/api/notes",
+        json={
+            "title": "2nd User's Note",
+            "content_md": "2nd User's Note Content Here!",
+        },
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token_2nd_user}",
+        },
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # try to get note as testuser
+    res = client.get(f"api/notes/{note_id}", headers=auth_headers["headers"])
+
+    assert "404 Not Found" in res.text
