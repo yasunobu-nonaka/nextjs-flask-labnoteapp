@@ -1,17 +1,13 @@
+from conftest import register_user, login_and_get_token
+
 #############################################
 # tests for register
 #############################################
 
 
 def test_register(client):
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    res = register_user(client, "testuser", "testuser1234")
+
     assert res.get_json()["message"] == "User registration success"
     assert res.get_json()["username"] == "testuser"
     assert res.status_code == 200
@@ -44,14 +40,8 @@ def test_no_confirm_register_failed(client):
 
 
 def test_too_short_username_register_failed(client):
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "username": "tes",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    res = register_user(client, "tes", "testuser1234")
+
     assert res.get_json()["message"] == "validation error"
     assert (
         res.get_json()["errors"]["username"][0]
@@ -61,14 +51,8 @@ def test_too_short_username_register_failed(client):
 
 
 def test_too_long_username_register_failed(client):
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser12" * 10 + "x",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    res = register_user(client, "testuser12" * 10 + "x", "testuser1234")
+
     assert res.get_json()["message"] == "validation error"
     assert (
         res.get_json()["errors"]["username"][0]
@@ -78,14 +62,8 @@ def test_too_long_username_register_failed(client):
 
 
 def test_too_short_password_register_failed(client):
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser123",
-            "confirm": "testuser123",
-        },
-    )
+    res = register_user(client, "testuser", "testuser123")
+
     assert res.get_json()["message"] == "validation error"
     assert (
         res.get_json()["errors"]["password"][0]
@@ -95,14 +73,8 @@ def test_too_short_password_register_failed(client):
 
 
 def test_too_long_password_register_failed(client):
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser" * 8 + "1",
-            "confirm": "testuser" * 8 + "1",
-        },
-    )
+    res = register_user(client, "testuser", "testuser" * 8 + "1")
+
     assert res.get_json()["message"] == "validation error"
     assert (
         res.get_json()["errors"]["password"][0]
@@ -117,14 +89,7 @@ def test_too_long_password_register_failed(client):
 
 
 def test_login(client):
-    client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    register_user(client, "testuser", "testuser1234")
 
     res = client.post(
         "/api/auth/login", json={"username": "testuser", "password": "testuser1234"}
@@ -135,14 +100,7 @@ def test_login(client):
 
 
 def test_no_username_login_failed(client):
-    client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    register_user(client, "testuser", "testuser1234")
 
     res = client.post("/api/auth/login", json={"password": "testuser1234"})
 
@@ -152,14 +110,7 @@ def test_no_username_login_failed(client):
 
 
 def test_no_password_login_failed(client):
-    client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    register_user(client, "testuser", "testuser1234")
 
     res = client.post("/api/auth/login", json={"username": "testuser"})
 

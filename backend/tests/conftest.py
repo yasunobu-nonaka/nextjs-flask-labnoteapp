@@ -8,6 +8,27 @@ from app.extensions import db
 from app.model import User
 
 
+def register_user(client, username="testuser", password="testuser1234"):
+    res = client.post(
+        "/api/auth/register",
+        json={
+            "username": username,
+            "password": password,
+            "confirm": password,
+        },
+    )
+
+    return res
+
+
+def login_and_get_token(client, username="testuser", password="password"):
+    res = client.post(
+        "/api/auth/login", json={"username": username, "password": password}
+    )
+
+    return res.get_json()["access_token"]
+
+
 @pytest.fixture()
 def app():
     app = create_app(config_name="testing")

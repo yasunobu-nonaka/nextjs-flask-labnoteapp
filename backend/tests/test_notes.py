@@ -1,5 +1,6 @@
 from app.extensions import db
 from app.model import User
+from conftest import register_user, login_and_get_token
 
 #############################################
 # tests for note creation
@@ -112,22 +113,9 @@ def test_no_token_rejected_in_note_index(client):
 
 
 def test_note_ownership_in_note_index(client, auth_headers):
-    # register 2nd user
-    client.post(
-        "/api/auth/register",
-        json={
-            "username": "seconduser",
-            "password": "seconduser1234",
-            "confirm": "seconduser1234",
-        },
-    )
-
-    # get 2nd user's token
-    res_2nd_user_login = client.post(
-        "/api/auth/login", json={"username": "seconduser", "password": "seconduser1234"}
-    )
-
-    token_2nd_user = res_2nd_user_login.get_json()["access_token"]
+    # register 2nd user and get token
+    register_user(client, "seconduser", "seconduser1234")
+    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
 
     # get 2nd uesr's id
     second_user_id = (
