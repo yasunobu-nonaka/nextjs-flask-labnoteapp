@@ -221,3 +221,78 @@ def test_others_note_cannot_see(client, auth_headers):
     res = client.get(f"api/notes/{note_id}", headers=auth_headers["headers"])
 
     assert "404 Not Found" in res.text
+
+
+#############################################
+# tests for note edit
+#############################################
+def test_note_edit(client, auth_headers):
+    # ノートを作成
+    res_note_creation = create_note(
+        client, auth_headers, "My Note", "Note Content Here!"
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # ノートを編集
+    res_note_edit = client.patch(
+        f"/api/notes/{note_id}",
+        json={"title": "Updated Title", "content_md": "updated note content"},
+        headers=auth_headers["headers"],
+    )
+
+    assert res_note_edit.get_json()["message"] == "Note updated successfully!"
+    assert res_note_edit.get_json()["note"]["title"] == "Updated Title"
+    assert res_note_edit.get_json()["note"]["content_md"] == "updated note content"
+    assert res_note_edit.status_code == 200
+
+
+def test_no_token_note_edit_failed(client, auth_headers):
+    # ノートを作成
+    res_note_creation = create_note(
+        client, auth_headers, "My Note", "Note Content Here!"
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # ノートを編集
+    res = client.patch(
+        f"/api/notes/{note_id}",
+        json={"title": "Updated Title", "content_md": "updated note content"},
+        headers={
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert res.get_json()["msg"] == "Missing Authorization Header"
+    assert res.status_code == 401
+
+
+def test_others_note_cannot_edit(client, auth_headers):
+    # register 2nd user and get token
+    register_user(client, "seconduser", "seconduser1234")
+    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+
+    # create note by 2nd user
+    res_note_creation = client.post(
+        "/api/notes",
+        json={
+            "title": "2nd User's Note",
+            "content_md": "2nd User's Note Content Here!",
+        },
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token_2nd_user}",
+        },
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # try to edit note as testuser
+    res_note_edit = client.patch(
+        f"/api/notes/{note_id}",
+        json={
+            "title": "Updated 2nd User's Note",
+            "content_md": "Updated 2nd User's Note Content Here!",
+        },
+        headers=auth_headers["headers"],
+    )
+
+    assert "404 Not Found" in res_note_edit.text
