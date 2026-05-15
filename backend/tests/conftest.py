@@ -20,3 +20,23 @@ def app():
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def auth_headers(client):
+    client.post(
+        "/api/auth/register",
+        json={
+            "username": "testuser",
+            "password": "testuser1234",
+            "confirm": "testuser1234",
+        },
+    )
+
+    res = client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "testuser1234"}
+    )
+
+    token = res.get_json()["access_token"]
+
+    return {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
