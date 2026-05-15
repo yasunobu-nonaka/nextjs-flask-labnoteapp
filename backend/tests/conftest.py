@@ -5,6 +5,7 @@ load_dotenv()
 import pytest
 from app import create_app
 from app.extensions import db
+from app.model import User
 
 
 @pytest.fixture()
@@ -39,4 +40,14 @@ def auth_headers(client):
 
     token = res.get_json()["access_token"]
 
-    return {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+    user = db.session.execute(
+        db.select(User).filter_by(username="testuser")
+    ).scalar_one_or_none()
+
+    return {
+        "user_id": user.id,
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    }
