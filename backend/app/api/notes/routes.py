@@ -9,7 +9,7 @@ from app.schema import NoteCreateSchema, NoteResponseSchema
 from . import notes_bp
 
 
-@notes_bp.route("/", methods=["GET"])
+@notes_bp.route("", methods=["GET"])
 @jwt_required()
 def notes_index():
     query_word = request.args.get("q")
@@ -27,7 +27,7 @@ def notes_index():
     return result
 
 
-@notes_bp.route("/", methods=["POST"])
+@notes_bp.route("", methods=["POST"])
 @jwt_required()
 def create_note():
     # 入力のバリデーション

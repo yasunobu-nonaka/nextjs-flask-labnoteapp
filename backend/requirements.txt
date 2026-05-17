@@ -11,6 +11,9 @@ marshmallow==4.3.0
 # Authentication
 Flask-JWT-Extended==4.7.3
 
+# Test
+pytest==9.0.3
+
 # Gunicorn
 gunicorn==25.3.0
 

@@ -3,6 +3,9 @@
 __pycache__/
 .pytest_cache/
 
+# visual studio code
+.vscode/
+
 # Pycharm
 .idea/
 
