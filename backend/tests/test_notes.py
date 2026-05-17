@@ -296,3 +296,59 @@ def test_others_note_cannot_edit(client, auth_headers):
     )
 
     assert "404 Not Found" in res_note_edit.text
+    assert res_note_edit.status_code == 404
+
+
+#############################################
+# tests for delete note
+#############################################
+def test_delete_note(client, auth_headers):
+    # ノートを作成
+    res_note_creation = create_note(
+        client, auth_headers, "My Note", "Note Content Here!"
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # ノートを削除
+    res_delete_note = client.delete(
+        f"/api/notes/{note_id}",
+        headers=auth_headers["headers"],
+    )
+
+    assert res_delete_note.status_code == 204
+    assert res_delete_note.data == b""
+
+    # 削除されたことを確認
+    res_get_note = client.get(f"/api/notes/{note_id}", headers=auth_headers["headers"])
+
+    assert "404 Not Found" in res_get_note.text
+    assert res_get_note.status_code == 404
+
+
+def test_others_note_cannot_delete(client, auth_headers):
+    # register 2nd user and get token
+    register_user(client, "seconduser", "seconduser1234")
+    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+
+    # create note by 2nd user
+    res_note_creation = client.post(
+        "/api/notes",
+        json={
+            "title": "2nd User's Note",
+            "content_md": "2nd User's Note Content Here!",
+        },
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token_2nd_user}",
+        },
+    )
+    note_id = res_note_creation.get_json()["note"]["id"]
+
+    # try to edit note as testuser
+    res_note_delete = client.delete(
+        f"/api/notes/{note_id}",
+        headers=auth_headers["headers"],
+    )
+
+    assert "404 Not Found" in res_note_delete.text
+    assert res_note_delete.status_code == 404
