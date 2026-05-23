@@ -1,3 +1,3 @@
-from .db import db
+from .db import db, Base
 from .migrate import migrate
 from .jwt import jwt
