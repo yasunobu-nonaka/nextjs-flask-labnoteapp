@@ -8,6 +8,16 @@ class NoteCreateSchema(Schema):
     content_md = fields.Str(
         required=True, validate=validate.Length(min=1), load_only=True
     )
+    tags = fields.List(
+        fields.Str(
+            validate=validate.Length(
+                min=1, max=20, error="タグ名は20文字以内で入力してください"
+            ),
+        ),
+        required=False,
+        load_default=list,
+        validate=validate.Length(max=10, error="タグは最大10個までです"),
+    )
 
 
 class NoteResponseSchema(Schema):
@@ -17,3 +27,7 @@ class NoteResponseSchema(Schema):
     content_md = fields.Str(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+    tags = fields.Method("get_tags", dump_only=True)
+
+    def get_tags(self, obj):
+        return [tag.tagname for tag in obj.tags]
