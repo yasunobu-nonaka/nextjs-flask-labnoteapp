@@ -1,15 +1,11 @@
-from flask import jsonify
 from flask_jwt_extended import create_access_token
 
 from app.extensions import db
 from app.model import User
+from app.api.auth.exception import UsernameAlreadyExistsError
 
 
-def search_user_service(username):
-    """
-    ユーザー存在確認
-    """
-
+def get_user_by_username(username):
     user = db.session.execute(
         db.select(User).filter_by(username=username)
     ).scalar_one_or_none()
@@ -17,14 +13,15 @@ def search_user_service(username):
     return user
 
 
-def register_user_service(username, password):
-    """
-    ユーザー登録
-    """
+def register_user(username, password):
+    # ユーザー名の重複チェック
+    existing_user = get_user_by_username(username)
 
+    if existing_user:
+        raise UsernameAlreadyExistsError()
+
+    # ユーザーモデル作成
     user = User(username=username)
-
-    # パスワードハッシュ化
     user.set_password(password)
 
     # ユーザー登録
@@ -38,7 +35,6 @@ def authenticate_user_and_get_token(user, password):
     # パスワード照合
     if user and user.check_password(password):
         # JWTトークン発行
-        access_token = create_access_token(identity=user)
-        return jsonify(access_token=access_token)
+        return create_access_token(identity=user)
 
     return None

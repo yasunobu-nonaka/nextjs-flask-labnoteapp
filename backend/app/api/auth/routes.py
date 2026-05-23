@@ -4,10 +4,11 @@ from marshmallow import ValidationError
 from . import auth_bp
 from app.schema import RegistrationSchema, LoginSchema
 from app.api.auth.user_service import (
-    search_user_service,
-    register_user_service,
+    get_user_by_username,
+    register_user,
     authenticate_user_and_get_token,
 )
+from app.api.auth.exception import UsernameAlreadyExistsError
 
 register_schema = RegistrationSchema()
 login_schema = LoginSchema()
@@ -24,17 +25,13 @@ def register():
     except ValidationError as err:
         return jsonify({"message": "validation error", "errors": err.messages}), 400
 
-    username = validated_user_input["username"]
-    password = validated_user_input["password"]
-
-    # ユーザー名の重複チェック
-    existing_user = search_user_service(username)
-
-    if existing_user:
-        return jsonify({"message": "Username already exists"}), 409
-
     # ユーザー登録
-    user = register_user_service(username, password)
+    try:
+        user = register_user(
+            validated_user_input["username"], validated_user_input["password"]
+        )
+    except UsernameAlreadyExistsError:
+        return jsonify({"message": "Username already exists"}), 409
 
     return (
         jsonify({"message": "User registration success", "username": user.username}),
@@ -57,11 +54,11 @@ def login():
     password = validated_user_input["password"]
 
     # ユーザー名で検索
-    user = search_user_service(username)
+    user = get_user_by_username(username)
 
-    token_json = authenticate_user_and_get_token(user, password)
+    access_token = authenticate_user_and_get_token(user, password)
 
-    if token_json is None:
+    if access_token is None:
         return jsonify({"message": "Username or Password did not match"}), 401
 
-    return token_json
+    return jsonify(access_token=access_token)
