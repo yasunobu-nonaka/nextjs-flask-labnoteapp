@@ -3,7 +3,7 @@ from marshmallow import ValidationError
 
 from . import auth_bp
 from app.schema import RegistrationSchema, LoginSchema
-from app.api.auth.user_service import (
+from app.api.auth.auth_service import (
     get_user_by_username,
     register_user,
     authenticate_user_and_get_token,
