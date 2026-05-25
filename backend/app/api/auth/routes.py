@@ -3,10 +3,11 @@ from marshmallow import ValidationError
 
 from . import auth_bp
 from app.schema import RegistrationSchema, LoginSchema
+from app.services.mail_service import send_welcome_email
 from app.api.auth.auth_service import (
-    get_user_by_username,
+    get_user_by_username_or_email,
     register_user,
-    authenticate_user_and_get_token,
+    check_password_and_get_token,
 )
 from app.api.auth.exception import UsernameAlreadyExistsError
 
@@ -27,9 +28,7 @@ def register():
 
     # ユーザー登録
     try:
-        user = register_user(
-            validated_user_input["username"], validated_user_input["password"]
-        )
+        user = register_user(validated_user_input)
     except UsernameAlreadyExistsError:
         return jsonify({"message": "Username already exists"}), 409
 
@@ -50,13 +49,13 @@ def login():
     except ValidationError as err:
         return jsonify({"message": "validation error", "errors": err.messages}), 400
 
-    username = validated_user_input["username"]
+    identifier = validated_user_input["identifier"]
     password = validated_user_input["password"]
 
     # ユーザー名で検索
-    user = get_user_by_username(username)
+    user = get_user_by_username_or_email(identifier)
 
-    access_token = authenticate_user_and_get_token(user, password)
+    access_token = check_password_and_get_token(user, password)
 
     if access_token is None:
         return jsonify({"message": "Username or Password did not match"}), 401
