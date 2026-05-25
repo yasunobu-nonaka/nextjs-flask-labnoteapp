@@ -191,8 +191,15 @@ def test_no_token_rejected_in_note_index(client):
 
 def test_note_ownership_in_note_index(client, auth_headers):
     # register 2nd user and get token
-    register_user(client, "seconduser", "seconduser1234")
-    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+    register_user(
+        client,
+        username="seconduser",
+        email="seconduser@example.com",
+        password="seconduser1234",
+    )
+    token_2nd_user = login_and_get_token(
+        client, identifier="seconduser", password="seconduser1234"
+    )
 
     # get 2nd uesr's id
     second_user_id = (
@@ -303,8 +310,15 @@ def test_no_header_note_detail_failed(client, auth_headers):
 
 def test_others_note_cannot_see(client, auth_headers):
     # register 2nd user and get token
-    register_user(client, "seconduser", "seconduser1234")
-    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+    register_user(
+        client,
+        username="seconduser",
+        email="seconduser@example.com",
+        password="seconduser1234",
+    )
+    token_2nd_user = login_and_get_token(
+        client, identifier="seconduser", password="seconduser1234"
+    )
 
     # create note by 2nd user
     res_note_creation = client.post(
@@ -390,8 +404,15 @@ def test_no_token_note_edit_failed(client, auth_headers):
 
 def test_others_note_cannot_edit(client, auth_headers):
     # register 2nd user and get token
-    register_user(client, "seconduser", "seconduser1234")
-    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+    register_user(
+        client,
+        username="seconduser",
+        email="seconduser@example.com",
+        password="seconduser1234",
+    )
+    token_2nd_user = login_and_get_token(
+        client, identifier="seconduser", password="seconduser1234"
+    )
 
     # create note by 2nd user
     res_note_creation = client.post(
@@ -454,8 +475,15 @@ def test_delete_note(client, auth_headers):
 
 def test_others_note_cannot_delete(client, auth_headers):
     # register 2nd user and get token
-    register_user(client, "seconduser", "seconduser1234")
-    token_2nd_user = login_and_get_token(client, "seconduser", "seconduser1234")
+    register_user(
+        client,
+        username="seconduser",
+        email="seconduser@example.com",
+        password="seconduser1234",
+    )
+    token_2nd_user = login_and_get_token(
+        client, identifier="seconduser", password="seconduser1234"
+    )
 
     # create note by 2nd user
     res_note_creation = client.post(
