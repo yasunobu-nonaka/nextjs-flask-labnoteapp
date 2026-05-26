@@ -3,16 +3,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import pytest
+from sqlalchemy import or_
 from app import create_app
 from app.extensions import db
 from app.model import User
 
 
-def register_user(client, username="testuser", password="testuser1234"):
+def register_user(
+    client, username="testuser", email="testuser@example.com", password="testuser1234"
+):
     res = client.post(
         "/api/auth/register",
         json={
             "username": username,
+            "email": email,
             "password": password,
             "confirm": password,
         },
@@ -21,10 +25,18 @@ def register_user(client, username="testuser", password="testuser1234"):
     return res
 
 
-def login_and_get_token(client, username="testuser", password="password"):
+def login_user(client, identifier="testuser@example.com", password="testuser1234"):
     res = client.post(
-        "/api/auth/login", json={"username": username, "password": password}
+        "/api/auth/login", json={"identifier": identifier, "password": password}
     )
+
+    return res
+
+
+def login_and_get_token(
+    client, identifier="testuser@example.com", password="testuser1234"
+):
+    res = login_user(client, identifier, password)
 
     return res.get_json()["access_token"]
 
@@ -46,23 +58,14 @@ def client(app):
 
 @pytest.fixture
 def auth_headers(client):
-    client.post(
-        "/api/auth/register",
-        json={
-            "username": "testuser",
-            "password": "testuser1234",
-            "confirm": "testuser1234",
-        },
-    )
+    register_user(client)
 
-    res = client.post(
-        "/api/auth/login", json={"username": "testuser", "password": "testuser1234"}
-    )
-
-    token = res.get_json()["access_token"]
+    token = login_and_get_token(client)
 
     user = db.session.execute(
-        db.select(User).filter_by(username="testuser")
+        db.select(User).filter(
+            or_(User.username == "testuser", User.email == "testuser@example.com")
+        )
     ).scalar_one_or_none()
 
     return {
