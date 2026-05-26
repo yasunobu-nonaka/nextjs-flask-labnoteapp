@@ -2,7 +2,7 @@ from flask import Flask
 
 from app.api import api_bp
 from app.config import config
-from app.extensions import db, migrate, jwt
+from app.extensions import db, migrate, jwt, mail
 from app.model import User
 
 
@@ -15,6 +15,7 @@ def create_app(config_name="development"):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    mail.init_app(app)
 
     @jwt.user_identity_loader
     def user_identity_lookup(user):

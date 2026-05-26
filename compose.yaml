@@ -10,7 +10,7 @@ services:
     volumes:
       - ./backend:/app
     env_file:
-      - ./backend/.env
+      - ./backend/.env.development
     depends_on:
       db:
         condition: service_healthy
@@ -23,7 +23,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
-      - ./backend/.env
+      - ./backend/.env.development
     ports:
       - '5432:5432'
     healthcheck:

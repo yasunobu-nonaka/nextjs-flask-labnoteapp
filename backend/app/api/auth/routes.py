@@ -32,6 +32,9 @@ def register():
     except UsernameAlreadyExistsError:
         return jsonify({"message": "Username already exists"}), 409
 
+    # メール送信
+    send_welcome_email(user.email, user.username)
+
     return (
         jsonify({"message": "User registration success", "username": user.username}),
         200,
