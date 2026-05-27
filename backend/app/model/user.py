@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text, DateTime, ForeignKey
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
 
@@ -10,8 +10,12 @@ from app.extensions import db
 jst = timezone(timedelta(hours=9))
 
 
-def now_jst():
-    return datetime.now(jst)
+UTC = timezone.utc
+JST = timezone(timedelta(hours=9))
+
+
+def now_utc():
+    return datetime.now(UTC)
 
 
 class User(db.Model):
@@ -21,6 +25,10 @@ class User(db.Model):
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc  # UTCで保存
+    )
 
     # リレーション
     notes: Mapped[List["Note"]] = relationship(back_populates="user")
@@ -36,3 +44,10 @@ class User(db.Model):
     def check_password(self, password):
         # パスワードをハッシュ化して比較
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def created_at_jst(self):
+        """表示用にJSTに変換"""
+        if self.created_at and self.created_at.tzinfo:
+            return self.created_at.astimezone(JST)
+        return self.created_at
