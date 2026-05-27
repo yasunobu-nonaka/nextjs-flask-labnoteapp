@@ -6,6 +6,14 @@ from app.model import User
 from app.api.auth.exception import UsernameAlreadyExistsError
 
 
+def get_user_by_email(email):
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+
+    return user
+
+
 def get_user_by_username_or_email(identifier):
     user = db.session.execute(
         db.select(User).filter(
@@ -38,6 +46,14 @@ def register_user(user_input):
     return user
 
 
+def verify_user(user):
+    # ユーザーを認証済みに更新
+    user.verified = True
+    db.session.commit()
+
+    return user
+
+
 def check_password_and_get_token(user, password):
     # パスワード照合
     if user and user.check_password(password):
@@ -45,3 +61,8 @@ def check_password_and_get_token(user, password):
         return create_access_token(identity=user)
 
     return None
+
+
+def delete_user(user):
+    db.session.delete(user)
+    db.session.commit()
