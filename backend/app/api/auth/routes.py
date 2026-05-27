@@ -12,7 +12,7 @@ from app.api.auth.auth_service import (
     check_password_and_get_token,
     delete_user,
 )
-from app.api.auth.exception import UsernameAlreadyExistsError
+from app.api.auth.exception import UsernameAlreadyExistsError, EmailAlreadyExistsError
 
 register_schema = RegistrationSchema()
 login_schema = LoginSchema()
@@ -33,13 +33,18 @@ def register():
     try:
         user = register_user(validated_user_input)
     except UsernameAlreadyExistsError:
-        return jsonify({"message": "Username already exists"}), 409
+        return jsonify({"message": "ユーザー名はすでに存在します"}), 409
+    except EmailAlreadyExistsError:
+        return jsonify({"message": "メールアドレスはすでに存在します"}), 409
 
     # 確認メール送信
     if send_verification_email(user.email):
         return (
             jsonify(
-                {"message": "User registration success", "username": user.username}
+                {
+                    "message": "ユーザー登録が完了しました。確認メールを送信しました。",
+                    "username": user.username,
+                }
             ),
             201,
         )
