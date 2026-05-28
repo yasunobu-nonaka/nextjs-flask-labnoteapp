@@ -302,42 +302,41 @@ class TestTokenGeneration:
 #############################################
 
 
-def test_login(client):
-    register_user(client)
+class TestUserLogin:
+    def test_login(self, client):
+        register_user(client)
 
-    res = login_user(client)
+        res = login_user(client)
 
-    assert "access_token" in res.get_json()
-    assert res.status_code == 200
+        assert "access_token" in res.get_json()
+        assert res.status_code == 200
 
+    def test_no_identifier_login_failed(self, client):
+        register_user(client)
 
-def test_no_identifier_login_failed(client):
-    register_user(client)
+        res = client.post(
+            "/api/auth/login",
+            json={"password": "testuser1234"},
+        )
 
-    res = client.post(
-        "/api/auth/login",
-        json={"password": "testuser1234"},
-    )
+        assert "access_token" not in res.get_json()
+        assert (
+            res.get_json()["errors"]["identifier"][0]
+            == "ユーザー名またはメールアドレスを入力してください"
+        )
+        assert res.status_code == 400
 
-    assert "access_token" not in res.get_json()
-    assert (
-        res.get_json()["errors"]["identifier"][0]
-        == "ユーザー名またはメールアドレスを入力してください"
-    )
-    assert res.status_code == 400
+    def test_no_password_login_failed(self, client):
+        register_user(client)
 
+        res = client.post(
+            "/api/auth/login",
+            json={
+                "identifier": "testuser@example.com",
+                "email": "testuser@example.com",
+            },
+        )
 
-def test_no_password_login_failed(client):
-    register_user(client)
-
-    res = client.post(
-        "/api/auth/login",
-        json={
-            "identifier": "testuser@example.com",
-            "email": "testuser@example.com",
-        },
-    )
-
-    assert "access_token" not in res.get_json()
-    assert res.get_json()["errors"]["password"][0] == "パスワードを入力してください"
-    assert res.status_code == 400
+        assert "access_token" not in res.get_json()
+        assert res.get_json()["errors"]["password"][0] == "パスワードを入力してください"
+        assert res.status_code == 400
