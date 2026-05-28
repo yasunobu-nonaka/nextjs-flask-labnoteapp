@@ -1,7 +1,10 @@
 from unittest.mock import patch
 
 from conftest import register_user, login_user
-from app.services.mail_service import generate_verification_token
+from app.services.mail_service import (
+    generate_verification_token,
+    verify_verification_token,
+)
 from app.api.auth.auth_service import get_user_by_email
 from app.extensions import db
 from app.model import User
@@ -219,6 +222,79 @@ class TestEmailVerification:
 
         assert res.status_code == 404
         assert "ユーザーが見つかりません" in res.get_json()["error"]
+
+
+#############################################
+# tests for resend verification token
+#############################################
+class TestResendVerification:
+    """認証メール再送信のテスト"""
+
+    def test_resend_verification_missing_email(self, client):
+        """メールアドレスなしの再送信テスト"""
+        response = client.post("/api/auth/resend-verification", json={})
+
+        assert response.status_code == 400
+        assert "メールアドレスが必要" in response.get_json()["error"]
+
+    def test_resend_verification_nonexistent_user(self, client):
+        """存在しないユーザーの再送信テスト"""
+        response = client.post(
+            "/api/auth/resend-verification", json={"email": "doesnotexist@example.com"}
+        )
+
+        assert response.status_code == 404
+        assert "ユーザーが見つかりません" in response.get_json()["error"]
+
+    def test_resend_verification_already_verified(self, client, test_user):
+        """既に認証済みユーザーの再送信テスト"""
+        test_user.verified = True
+
+        db.session.commit()
+
+        response = client.post(
+            "/api/auth/resend-verification", json={"email": "testuser@example.com"}
+        )
+
+        assert response.status_code == 200
+        assert "既に認証済み" in response.get_json()["message"]
+
+
+#############################################
+# tests for token generation
+#############################################
+class TestTokenGeneration:
+    """トークン生成・検証のテスト"""
+
+    def test_generate_and_verify_token(self, app):
+        """トークン生成と検証の正常系テスト"""
+        with app.app_context():
+            email = "testuser@example.com"
+            token = generate_verification_token(email)
+
+            # トークンが文字列であることを確認
+            assert isinstance(token, str)
+            assert len(token) > 0
+
+            # トークンの検証
+            verified_email = verify_verification_token(token)
+            assert verified_email == email
+
+    def test_verify_expired_token(self, app):
+        """期限切れトークンの検証テスト"""
+        with app.app_context():
+            email = "testuser@example.com"
+            token = generate_verification_token(email)
+
+            # トークンを期限切れとして検証（0秒後に期限切れ）
+            verified_email = verify_verification_token(token, expiration=-1)
+            assert verified_email is None
+
+    def test_verify_invalid_token(self, app):
+        """無効なトークンの検証テスト"""
+        with app.app_context():
+            verified_email = verify_verification_token("invalid-token-xyz")
+            assert verified_email is None
 
 
 #############################################
