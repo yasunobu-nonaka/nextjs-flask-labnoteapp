@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(".env.development")
 
 import pytest
 from sqlalchemy import or_
@@ -48,12 +48,32 @@ def app():
     with app.app_context():
         db.create_all()
         yield app
+        db.session.remove()
         db.drop_all()
 
 
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def db_session(app):
+    """データベースセッションのフィクスチャ"""
+    with app.app_context():
+        yield db.session
+        db.session.rollback()
+
+
+@pytest.fixture
+def test_user(db_session):
+    """テストユーザーを作成するフィクスチャ"""
+    user = User(username="testuser", email="testuser@example.com")
+    user.set_password("testuser1234")
+    user.verified = False
+    db_session.add(user)
+    db_session.commit()
+    return user
 
 
 @pytest.fixture
