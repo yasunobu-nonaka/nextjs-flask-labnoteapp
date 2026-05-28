@@ -1,4 +1,10 @@
+from unittest.mock import patch
+
 from conftest import register_user, login_user
+from app.services.mail_service import generate_verification_token
+from app.api.auth.auth_service import get_user_by_email
+from app.extensions import db
+from app.model import User
 
 #############################################
 # tests for register
@@ -152,6 +158,67 @@ class TestUserRegistration:
             == "パスワードは12文字以上64字以下にしてください"
         )
         assert res.status_code == 400
+
+
+#############################################
+# tests for Email verification
+#############################################
+
+
+class TestEmailVerification:
+    def test_successful_verification(self, client, test_user):
+        """正常なメール認証のテスト"""
+        token = generate_verification_token(test_user.email)
+
+        res = client.get(f"/api/auth/verify/{token}")
+
+        assert res.status_code == 200
+        assert "メールアドレスが確認されました" in res.get_json()["message"]
+
+        # ユーザーが認証済みになったことを確認
+        user = get_user_by_email(test_user.email)
+        assert user.verified == True
+
+    def test_verification_already_verified(self, client, test_user):
+        """既に認証済みユーザーの認証テスト"""
+        # まずユーザーを認証済みに設定
+        test_user.verified = True
+
+        db.session.commit()
+
+        token = generate_verification_token(test_user.email)
+        res = client.get(f"/api/auth/verify/{token}")
+
+        assert res.status_code == 200
+        assert "既に認証済み" in res.get_json()["message"]
+
+    def test_verification_expired_token(self, client, test_user):
+        """期限切れトークンのテスト"""
+        with patch(
+            "app.services.mail_service.verify_verification_token"
+        ) as mock_verify:
+            mock_verify.return_value = None
+
+            res = client.get("/api/auth/verify/invalid-token")
+
+            assert res.status_code == 400
+            assert "有効期限が切れている" in res.get_json()["error"]
+
+    def test_verification_invalid_token(self, client):
+        """無効なトークンのテスト"""
+        res = client.get("/api/auth/verify/definitely-invalid-token")
+
+        assert res.status_code == 400
+        assert "無効です" in res.get_json()["error"]
+
+    def test_verification_nonexistent_user(self, client):
+        """存在しないユーザーの認証テスト"""
+        token = generate_verification_token("nonexistent@example.com")
+
+        res = client.get(f"/api/auth/verify/{token}")
+
+        assert res.status_code == 404
+        assert "ユーザーが見つかりません" in res.get_json()["error"]
 
 
 #############################################
