@@ -47,22 +47,15 @@ def send_verification_email(user_email):
     try:
         token = generate_verification_token(user_email)
         verify_url = url_for("api.auth.verify_email", token=token, _external=True)
+        html_body = render_template(
+            "email/verification_email.html", verify_url=verify_url
+        )
 
         msg = Message(
             subject="メールアドレスの確認",
             sender="noreply@example.com",
             recipients=[user_email],
-            html=f"""
-            <html>
-                <body>
-                    <h2>メールアドレスの確認</h2>
-                    <p>ご登録ありがとうございます。以下のリンクをクリックしてメールアドレスを確認してください。</p>
-                    <p><a href="{verify_url}">{verify_url}</a></p>
-                    <p>このリンクの有効期限は30分です。</p>
-                    <p>心当たりがない場合は、このメールを無視してください。</p>
-                </body>
-            </html>
-            """,
+            html=html_body,
             body=f"以下のリンクをコピーしてブラウザに貼り付けてください：\n\n{verify_url}\n\nこのリンクの有効期限は1時間です。",
         )
 
