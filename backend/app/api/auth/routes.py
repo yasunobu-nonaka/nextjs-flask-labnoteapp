@@ -2,7 +2,7 @@ from flask import jsonify, request
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema
+from app.schema import RegistrationSchema, LoginSchema, EmailSchema
 from app.services.mail_service import send_verification_email, verify_verification_token
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
@@ -16,6 +16,7 @@ from app.api.auth.exception import UsernameAlreadyExistsError, EmailAlreadyExist
 
 register_schema = RegistrationSchema()
 login_schema = LoginSchema()
+email_schema = EmailSchema()
 
 
 @auth_bp.route("/register", methods=["POST"])
@@ -103,12 +104,14 @@ def check_verification_status():
 @auth_bp.route("/resend-verification", methods=["POST"])
 def resend_verification():
     """認証メール再送信エンドポイント"""
-    data = request.get_json()
-    email = data.get("email")
+    user_input = request.get_json()
 
-    if not email:
-        return jsonify({"error": "メールアドレスが必要です"}), 400
+    try:
+        validated_user_input = email_schema.load(user_input)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
 
+    email = validated_user_input["email"]
     user = get_user_by_email(email)
 
     if not user:

@@ -85,3 +85,13 @@ class LoginSchema(Schema):
             # 簡易emailバリデーション
             if not re.match(r"^[^@]+@[^@]+\.[^@]+$", data):
                 raise ValidationError("Invalid email format")
+
+
+class EmailSchema(Schema):
+    email = fields.Email(
+        required=True,
+        validate=validate.Length(
+            min=4, max=100, error="メールアドレスは4文字以上100字以下にしてください"
+        ),
+        error_messages={"required": "メールアドレスを入力してください"},
+    )

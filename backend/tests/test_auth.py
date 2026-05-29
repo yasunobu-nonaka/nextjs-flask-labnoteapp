@@ -235,7 +235,10 @@ class TestResendVerification:
         response = client.post("/api/auth/resend-verification", json={})
 
         assert response.status_code == 400
-        assert "メールアドレスが必要" in response.get_json()["error"]
+        assert (
+            response.get_json()["errors"]["email"][0]
+            == "メールアドレスを入力してください"
+        )
 
     def test_resend_verification_nonexistent_user(self, client):
         """存在しないユーザーの再送信テスト"""
