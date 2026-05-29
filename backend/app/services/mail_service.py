@@ -1,3 +1,4 @@
+from flask import render_template
 from flask_mail import Message
 import logging
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
@@ -62,6 +63,29 @@ def send_verification_email(user_email):
                 </body>
             </html>
             """,
+            body=f"以下のリンクをコピーしてブラウザに貼り付けてください：\n\n{verify_url}\n\nこのリンクの有効期限は1時間です。",
+        )
+
+        mail.send(msg)
+        logging.info(f"Verification email sent to {user_email}")
+        return True
+
+    except Exception as e:
+        logging.error(f"Failed to send email to {user_email}: {str(e)}")
+        return False
+
+
+def send_password_reset_email(user_email):
+    try:
+        token = generate_verification_token(user_email)
+        verify_url = url_for("api.auth.reset_password", token=token, _external=True)
+        html_body = render_template("email/reset_password.html", verify_url=verify_url)
+
+        msg = Message(
+            subject="メールアドレスの確認",
+            sender="noreply@example.com",
+            recipients=[user_email],
+            html=html_body,
             body=f"以下のリンクをコピーしてブラウザに貼り付けてください：\n\n{verify_url}\n\nこのリンクの有効期限は1時間です。",
         )
 

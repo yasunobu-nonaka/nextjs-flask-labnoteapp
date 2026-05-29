@@ -343,3 +343,16 @@ class TestUserLogin:
         assert "access_token" not in res.get_json()
         assert res.get_json()["errors"]["password"][0] == "パスワードを入力してください"
         assert res.status_code == 400
+
+
+class TestPasswordReset:
+    def test_send_reset_email(self, client, test_user):
+        res = client.post(
+            "/api/auth/forgot-password",
+            json={"email": test_user.email},
+        )
+
+        assert res.status_code == 201
+        assert (
+            res.get_json()["message"] == "パスワードリセット用のメールを送信しました。"
+        )

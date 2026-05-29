@@ -3,7 +3,11 @@ from marshmallow import ValidationError
 
 from . import auth_bp
 from app.schema import RegistrationSchema, LoginSchema, EmailSchema
-from app.services.mail_service import send_verification_email, verify_verification_token
+from app.services.mail_service import (
+    send_verification_email,
+    send_password_reset_email,
+    verify_verification_token,
+)
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
     get_user_by_email,
@@ -150,3 +154,42 @@ def login():
         return jsonify({"message": "Username or Password did not match"}), 401
 
     return jsonify(access_token=access_token)
+
+
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    # メールアドレスの存在を確認
+    user_input = request.get_json()
+
+    try:
+        validated_user_input = email_schema.load(user_input)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    email = validated_user_input["email"]
+    user = get_user_by_email(email)
+
+    if not user:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+
+    # 存在すれば、トークン付きURLをメールで送付
+    # 確認メール送信
+    if send_password_reset_email(user.email):
+        return (
+            jsonify(
+                {
+                    "message": "パスワードリセット用のメールを送信しました。",
+                    "username": user.username,
+                }
+            ),
+            201,
+        )
+    else:
+        # メール送信失敗時はユーザーを削除（オプション）
+        delete_user(user)
+        return jsonify({"error": "パスワードリセット用メールの送信に失敗しました"}), 500
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    return None
