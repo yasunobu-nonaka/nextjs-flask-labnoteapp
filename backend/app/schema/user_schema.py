@@ -95,3 +95,30 @@ class EmailSchema(Schema):
         ),
         error_messages={"required": "メールアドレスを入力してください"},
     )
+
+
+class PasswordResetSchema(Schema):
+    token = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=1, max=1000, error="トークンは1文字以上1000字以下で入力してください"
+        ),
+        error_messages={"required": "トークンを入力してください"},
+        load_only=True,
+    )
+    password = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "パスワードを入力してください"},
+        load_only=True,
+    )
+    confirm = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "パスワード確認を入力してください"},
+        load_only=True,
+    )

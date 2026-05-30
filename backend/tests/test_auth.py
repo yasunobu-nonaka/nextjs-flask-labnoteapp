@@ -356,3 +356,18 @@ class TestPasswordReset:
         assert (
             res.get_json()["message"] == "パスワードリセット用のメールを送信しました。"
         )
+
+    def test_reset_password(self, client, test_user):
+        token = generate_verification_token(test_user.email)
+
+        res = client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": token,
+                "password": "updatedpassword1234",
+                "confirm": "updatedpassword1234",
+            },
+        )
+
+        assert res.status_code == 201
+        assert res.get_json()["message"] == "パスワードを更新しました"

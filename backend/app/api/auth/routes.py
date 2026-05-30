@@ -2,7 +2,7 @@ from flask import jsonify, request
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema, EmailSchema
+from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema
 from app.services.mail_service import (
     send_verification_email,
     send_password_reset_email,
@@ -14,6 +14,7 @@ from app.api.auth.auth_service import (
     register_user,
     verify_user,
     check_password_and_get_token,
+    update_user_password,
     delete_user,
 )
 from app.api.auth.exception import UsernameAlreadyExistsError, EmailAlreadyExistsError
@@ -21,6 +22,7 @@ from app.api.auth.exception import UsernameAlreadyExistsError, EmailAlreadyExist
 register_schema = RegistrationSchema()
 login_schema = LoginSchema()
 email_schema = EmailSchema()
+password_reset_schema = PasswordResetSchema()
 
 
 @auth_bp.route("/register", methods=["POST"])
@@ -192,4 +194,30 @@ def forgot_password():
 
 @auth_bp.route("/reset-password", methods=["POST"])
 def reset_password():
-    return None
+    # 入力のバリデーション
+    user_input = request.get_json()
+
+    try:
+        validated_user_input = password_reset_schema.load(user_input)
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    # トークン認証
+    email = verify_verification_token(validated_user_input["token"])
+
+    if not email:
+        return jsonify({"error": "リンクの有効期限が切れているか、無効です"}), 400
+
+    # ユーザー確認
+    user = get_user_by_email(email)
+
+    if not user:
+        return jsonify({"error": "ユーザーが見つかりません"}), 404
+
+    # パスワード更新
+    try:
+        update_user_password(user, validated_user_input["password"])
+    except Exception as err:
+        return jsonify({"message": "パスワードの更新に失敗しました"}), 500
+
+    return jsonify({"message": "パスワードを更新しました"}), 201

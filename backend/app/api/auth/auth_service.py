@@ -77,6 +77,13 @@ def check_password_and_get_token(user, password):
     return None
 
 
+def update_user_password(user, new_password):
+    user.set_password(new_password)
+    db.session.commit()
+
+    return user
+
+
 def delete_user(user):
     db.session.delete(user)
     db.session.commit()
