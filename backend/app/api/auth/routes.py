@@ -201,7 +201,7 @@ def forgot_password():
                     "username": user.username,
                 }
             ),
-            201,
+            200,
         )
     else:
         # メール送信失敗時はユーザーを削除（オプション）
@@ -267,7 +267,7 @@ def reset_password():
     except Exception as err:
         return jsonify({"message": "パスワードの更新に失敗しました"}), 500
 
-    return jsonify({"message": "パスワードを更新しました"}), 201
+    return jsonify({"message": "パスワードを更新しました"}), 200
 
 
 @auth_bp.route("/reset-password/validate-token", methods=["POST"])

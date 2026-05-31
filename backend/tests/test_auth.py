@@ -354,7 +354,7 @@ class TestPasswordReset:
             json={"email": test_user.email},
         )
 
-        assert res.status_code == 201
+        assert res.status_code == 200
         assert (
             res.get_json()["message"] == "パスワードリセット用のメールを送信しました。"
         )
@@ -390,7 +390,7 @@ class TestPasswordReset:
             },
         )
 
-        assert res.status_code == 201
+        assert res.status_code == 200
         assert res.get_json()["message"] == "パスワードを更新しました"
 
         # パスワードが実際に変更されたことを確認
@@ -499,3 +499,81 @@ class TestPasswordReset:
         assert response.status_code == 200
         assert response.get_json()["valid"] == True
         assert response.get_json()["email"] == test_user.email
+
+
+class TestPasswordResetIntegration:
+    """パスワードリセットの統合テスト"""
+
+    def test_complete_reset_flow(self, client, test_user):
+        """完全なパスワードリセットフローのテスト"""
+
+        # Step 1: パスワードリセットをリクエスト
+        with patch("app.api.auth.routes.send_password_reset_email") as mock_send:
+            mock_send.return_value = True
+
+            forgot_response = client.post(
+                "/api/auth/forgot-password", json={"email": test_user.email}
+            )
+            assert forgot_response.status_code == 200
+
+            # メール送信関数が呼ばれたことを確認
+            assert mock_send.called
+
+        # Step 2: トークンを生成（実際のフローではメールから取得）
+        token = generate_reset_password_token(test_user.email)
+
+        # Step 3: トークンの有効性を確認
+        verify_response = client.get(f"/api/auth/reset-password/{token}")
+        assert verify_response.status_code == 200
+
+        # Step 4: 新しいパスワードを設定
+        reset_response = client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": token,
+                "password": "IntegrationTestPass123!",
+                "confirm": "IntegrationTestPass123!",
+            },
+        )
+        assert reset_response.status_code == 200
+
+        # Step 5: 新しいパスワードでログインできることを確認
+        # （ログイン機能がある場合）
+        login_response = client.post(
+            "/api/auth/login",
+            json={
+                "identifier": test_user.email,
+                "password": "IntegrationTestPass123!",
+            },
+        )
+        assert login_response.status_code == 200
+
+    def test_reset_password_twice_with_same_token(self, client, test_user):
+        """同じトークンで2回リセットしようとした場合のテスト"""
+        token = generate_reset_password_token(test_user.email)
+
+        # 1回目のリセット
+        response1 = client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": token,
+                "password": "FirstPass123!",
+                "confirm": "FirstPass123!",
+            },
+        )
+        assert response1.status_code == 200
+
+        # 2回目のリセット（同じトークン）
+        # 実装によってはトークンを無効化するべき
+        response2 = client.post(
+            "/api/auth/reset-password",
+            json={
+                "token": token,
+                "password": "SecondPass123!",
+                "confirm": "SecondPass123!",
+            },
+        )
+
+        # トークンは使い捨てにするのがベストプラクティス
+        # その場合、2回目は失敗するべき
+        assert response2.status_code == 400
