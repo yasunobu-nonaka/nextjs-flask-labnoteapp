@@ -1,16 +1,27 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { UseFormRegisterReturn, FieldError } from "react-hook-form";
 import Link from "next/link";
 import { useState } from "react";
+import { z } from "zod";
 
-type FormValues = {
-  username: string;
-  email: string;
-  password: string;
-  confirm: string;
-};
+const schema = z
+  .object({
+    username: z.string().min(1, "ユーザー名は必須です"),
+    email: z
+      .email("有効なメールアドレスを入力してください")
+      .min(1, "メールアドレスは必須です"),
+    password: z.string().min(12, "パスワードは12文字以上で入力してください"),
+    confirm: z.string().min(1, "パスワード（確認）は必須です"),
+  })
+  .refine((data) => data.password === data.confirm, {
+    message: "パスワードが一致しません",
+    path: ["confirm"],
+  });
+
+type FormValues = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -20,9 +31,8 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     setError,
-    getValues,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>();
+  } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   async function onSubmit(data: FormValues) {
     setGlobalError(null);
@@ -34,12 +44,15 @@ export default function RegisterPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
-        }
+        },
       );
       const json = await res.json();
 
       if (res.status === 400 && json.errors) {
-        for (const [field, messages] of Object.entries(json.errors) as [keyof FormValues, string[]][]) {
+        for (const [field, messages] of Object.entries(json.errors) as [
+          keyof FormValues,
+          string[],
+        ][]) {
           setError(field, { message: (messages as string[]).join(" ") });
         }
       } else if (!res.ok) {
@@ -73,57 +86,40 @@ export default function RegisterPage() {
       <div className="w-full max-w-md flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold">アカウント登録</h1>
-          <p className="text-gray-500 text-sm">
-            Lab Note App へようこそ。
-          </p>
+          <p className="text-gray-500 text-sm">Lab Note App へようこそ。</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field
             label="ユーザー名"
-            registration={register("username", { required: "ユーザー名は必須です" })}
+            registration={register("username")}
             type="text"
             autoComplete="username"
             error={errors.username}
           />
           <Field
             label="メールアドレス"
-            registration={register("email", {
-              required: "メールアドレスは必須です",
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: "有効なメールアドレスを入力してください",
-              },
-            })}
+            registration={register("email")}
             type="email"
             autoComplete="email"
             error={errors.email}
           />
           <Field
             label="パスワード"
-            registration={register("password", {
-              required: "パスワードは必須です",
-              minLength: { value: 8, message: "パスワードは8文字以上で入力してください" },
-            })}
+            registration={register("password")}
             type="password"
             autoComplete="new-password"
             error={errors.password}
           />
           <Field
             label="パスワード（確認）"
-            registration={register("confirm", {
-              required: "パスワード（確認）は必須です",
-              validate: (value) =>
-                value === getValues("password") || "パスワードが一致しません",
-            })}
+            registration={register("confirm")}
             type="password"
             autoComplete="new-password"
             error={errors.confirm}
           />
 
-          {globalError && (
-            <p className="text-sm text-red-500">{globalError}</p>
-          )}
+          {globalError && <p className="text-sm text-red-500">{globalError}</p>}
 
           <button
             type="submit"
@@ -170,9 +166,7 @@ function Field({
         autoComplete={autoComplete}
         className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground"
       />
-      {error && (
-        <p className="text-xs text-red-500">{error.message}</p>
-      )}
+      {error && <p className="text-xs text-red-500">{error.message}</p>}
     </div>
   );
 }
