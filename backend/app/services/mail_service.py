@@ -62,7 +62,7 @@ def send_verification_email(user_email):
     """認証メールを送信"""
     try:
         token = generate_email_verification_token(user_email)
-        verify_url = url_for("api.auth.verify_email", token=token, _external=True)
+        verify_url = f"{current_app.config['FRONTEND_URL']}/verify-email/{token}"
         html_body = render_template(
             "email/verification_email.html", verify_url=verify_url
         )
