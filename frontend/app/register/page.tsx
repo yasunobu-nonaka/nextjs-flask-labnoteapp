@@ -9,12 +9,22 @@ import { z } from "zod";
 
 const schema = z
   .object({
-    username: z.string().min(1, "ユーザー名は必須です"),
+    username: z
+      .string()
+      .min(1, "ユーザー名は必須です")
+      .max(100, "ユーザー名は100文字以内で入力してください"),
     email: z
       .email("有効なメールアドレスを入力してください")
-      .min(1, "メールアドレスは必須です"),
-    password: z.string().min(12, "パスワードは12文字以上で入力してください"),
-    confirm: z.string().min(1, "パスワード（確認）は必須です"),
+      .min(1, "メールアドレスは必須です")
+      .max(100, "メールアドレスは100文字以内で入力してください"),
+    password: z
+      .string()
+      .min(12, "パスワードは12文字以上で入力してください")
+      .max(64, "パスワードは64文字以内で入力してください"),
+    confirm: z
+      .string()
+      .min(1, "パスワード（確認）は必須です")
+      .max(64, "パスワード（確認）は64文字以内で入力してください"),
   })
   .refine((data) => data.password === data.confirm, {
     message: "パスワードが一致しません",
