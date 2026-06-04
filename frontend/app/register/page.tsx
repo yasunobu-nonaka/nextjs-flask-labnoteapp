@@ -1,29 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import type { UseFormRegisterReturn, FieldError } from "react-hook-form";
 import Link from "next/link";
+import { useState } from "react";
 
-type FieldErrors = Partial<Record<"username" | "email" | "password" | "confirm", string[]>>;
+type FormValues = {
+  username: string;
+  email: string;
+  password: string;
+  confirm: string;
+};
 
 export default function RegisterPage() {
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setFieldErrors({});
+  const {
+    register,
+    handleSubmit,
+    setError,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>();
+
+  async function onSubmit(data: FormValues) {
     setGlobalError(null);
-    setIsSubmitting(true);
-
-    const formData = new FormData(e.currentTarget);
-    const body = {
-      username: formData.get("username"),
-      email: formData.get("email"),
-      password: formData.get("password"),
-      confirm: formData.get("confirm"),
-    };
 
     try {
       const res = await fetch(
@@ -31,22 +33,22 @@ export default function RegisterPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(data),
         }
       );
-      const data = await res.json();
+      const json = await res.json();
 
-      if (res.status === 400 && data.errors) {
-        setFieldErrors(data.errors);
+      if (res.status === 400 && json.errors) {
+        for (const [field, messages] of Object.entries(json.errors) as [keyof FormValues, string[]][]) {
+          setError(field, { message: (messages as string[]).join(" ") });
+        }
       } else if (!res.ok) {
-        setGlobalError(data.message ?? "エラーが発生しました");
+        setGlobalError(json.message ?? "エラーが発生しました");
       } else {
         setSuccess(true);
       }
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -76,34 +78,47 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field
             label="ユーザー名"
-            name="username"
+            registration={register("username", { required: "ユーザー名は必須です" })}
             type="text"
             autoComplete="username"
-            errors={fieldErrors.username}
+            error={errors.username}
           />
           <Field
             label="メールアドレス"
-            name="email"
+            registration={register("email", {
+              required: "メールアドレスは必須です",
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "有効なメールアドレスを入力してください",
+              },
+            })}
             type="email"
             autoComplete="email"
-            errors={fieldErrors.email}
+            error={errors.email}
           />
           <Field
             label="パスワード"
-            name="password"
+            registration={register("password", {
+              required: "パスワードは必須です",
+              minLength: { value: 8, message: "パスワードは8文字以上で入力してください" },
+            })}
             type="password"
             autoComplete="new-password"
-            errors={fieldErrors.password}
+            error={errors.password}
           />
           <Field
             label="パスワード（確認）"
-            name="confirm"
+            registration={register("confirm", {
+              required: "パスワード（確認）は必須です",
+              validate: (value) =>
+                value === getValues("password") || "パスワードが一致しません",
+            })}
             type="password"
             autoComplete="new-password"
-            errors={fieldErrors.confirm}
+            error={errors.confirm}
           />
 
           {globalError && (
@@ -132,35 +147,32 @@ export default function RegisterPage() {
 
 function Field({
   label,
-  name,
+  registration,
   type,
   autoComplete,
-  errors,
+  error,
 }: {
   label: string;
-  name: string;
+  registration: UseFormRegisterReturn;
   type: string;
   autoComplete?: string;
-  errors?: string[];
+  error?: FieldError;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={name} className="text-sm font-medium">
+      <label htmlFor={registration.name} className="text-sm font-medium">
         {label}
       </label>
       <input
-        id={name}
-        name={name}
+        id={registration.name}
+        {...registration}
         type={type}
         autoComplete={autoComplete}
-        required
         className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground"
       />
-      {errors?.map((err, i) => (
-        <p key={i} className="text-xs text-red-500">
-          {err}
-        </p>
-      ))}
+      {error && (
+        <p className="text-xs text-red-500">{error.message}</p>
+      )}
     </div>
   );
 }
