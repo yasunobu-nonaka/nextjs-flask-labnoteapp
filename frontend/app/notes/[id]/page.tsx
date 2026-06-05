@@ -25,6 +25,7 @@ export default function NoteDetailPage({
   const [note, setNote] = useState<Note | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -70,6 +71,43 @@ export default function NoteDetailPage({
     fetchNote();
   }, [id, router]);
 
+  async function handleDelete() {
+    if (!confirm("このノートを削除しますか？")) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+
+      if (!res.ok) {
+        setError("削除に失敗しました");
+        return;
+      }
+
+      router.push("/notes");
+    } catch {
+      setError("サーバーへの接続に失敗しました");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   if (status === "loading") {
     return (
       <main className="flex items-center justify-center min-h-screen bg-background text-foreground">
@@ -109,12 +147,21 @@ export default function NoteDetailPage({
           <Link href="/notes" className="text-sm text-gray-500 underline">
             ← 一覧へ戻る
           </Link>
-          <Link
-            href={`/notes/${note.id}/edit`}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            編集
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href={`/notes/${note.id}/edit`}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              編集
+            </Link>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? "削除中..." : "削除"}
+            </button>
+          </div>
         </div>
 
         {/* タイトル */}
