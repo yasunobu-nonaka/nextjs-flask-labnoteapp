@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { authFetch } from "@/lib/api";
 
 type Note = {
   id: number;
@@ -28,17 +29,8 @@ export default function NotesPage() {
 
   useEffect(() => {
     async function fetchNotes() {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const res = await authFetch("/api/notes");
 
         if (res.status === 401) {
           router.push("/login");

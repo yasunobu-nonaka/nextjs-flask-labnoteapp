@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, KeyboardEvent } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { authFetch } from "@/lib/api";
+import { useTagInput } from "@/lib/useTagInput";
 
 const schema = z.object({
   title: z
@@ -21,8 +23,6 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function NewNotePage() {
-  const [tagInput, setTagInput] = useState("");
-  const [tagError, setTagError] = useState<string | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -38,58 +38,15 @@ export default function NewNotePage() {
   });
 
   const tags = watch("tags");
-
-  function addTag() {
-    const trimmed = tagInput.trim();
-    if (!trimmed) return;
-    if (trimmed.length > 20) {
-      setTagError("タグ名は20文字以内で入力してください");
-      return;
-    }
-    if (tags.length >= 10) {
-      setTagError("タグは最大10個までです");
-      return;
-    }
-    if (tags.includes(trimmed)) {
-      setTagError("同じタグがすでに追加されています");
-      return;
-    }
-    setValue("tags", [...tags, trimmed], { shouldValidate: true });
-    setTagInput("");
-    setTagError(null);
-  }
-
-  function removeTag(tag: string) {
-    setValue(
-      "tags",
-      tags.filter((t) => t !== tag),
-      { shouldValidate: true },
-    );
-  }
-
-  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTag();
-    }
-  }
+  const { tagInput, setTagInput, tagError, setTagError, addTag, removeTag, handleTagKeyDown } =
+    useTagInput(tags, (newTags) => setValue("tags", newTags, { shouldValidate: true }));
 
   async function onSubmit(data: FormValues) {
     setGlobalError(null);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, {
+      const res = await authFetch("/api/notes", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 

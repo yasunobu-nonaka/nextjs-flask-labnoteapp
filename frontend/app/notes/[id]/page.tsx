@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
+import { authFetch } from "@/lib/api";
 
 type Note = {
   id: number;
@@ -30,17 +31,8 @@ export default function NoteDetailPage({
 
   useEffect(() => {
     async function fetchNote() {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const res = await authFetch(`/api/notes/${id}`);
 
         if (res.status === 401) {
           router.push("/login");
@@ -74,21 +66,9 @@ export default function NoteDetailPage({
   async function handleDelete() {
     if (!confirm("このノートを削除しますか？")) return;
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     setIsDeleting(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await authFetch(`/api/notes/${id}`, { method: "DELETE" });
 
       if (res.status === 401) {
         router.push("/login");
