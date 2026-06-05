@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Note = {
   id: number;
@@ -76,7 +77,15 @@ export default function NotesPage() {
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <h1 className="text-3xl font-bold">ノート一覧</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">ノート一覧</h1>
+          <Link
+            href="/notes/new"
+            className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+          >
+            新規作成
+          </Link>
+        </div>
 
         {notes.length === 0 ? (
           <p className="text-gray-500">ノートがありません。</p>
