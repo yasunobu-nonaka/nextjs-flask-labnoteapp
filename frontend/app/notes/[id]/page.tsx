@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import Markdown from "react-markdown";
 
 type Note = {
   id: number;
@@ -137,7 +137,7 @@ export default function NoteDetailPage({
 
         {/* コンテンツ */}
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown>{note.content_md}</ReactMarkdown>
+          <Markdown>{note.content_md}</Markdown>
         </div>
       </div>
     </main>
