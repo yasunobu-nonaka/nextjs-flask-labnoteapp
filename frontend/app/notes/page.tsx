@@ -111,7 +111,9 @@ function NoteCard({ note }: { note: Note }) {
   return (
     <li className="flex flex-col gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="font-semibold text-lg leading-snug">{note.title}</h2>
+        <Link href={`/notes/${note.id}`} className="font-semibold text-lg leading-snug hover:underline">
+          {note.title}
+        </Link>
         <span className="text-xs text-gray-400 shrink-0 mt-1">{date}</span>
       </div>
 
