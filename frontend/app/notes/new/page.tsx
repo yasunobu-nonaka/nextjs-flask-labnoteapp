@@ -84,17 +84,14 @@ export default function NewNotePage() {
     }
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/notes`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify(data),
+      });
 
       if (res.status === 401) {
         router.push("/login");
@@ -152,14 +149,16 @@ export default function NewNotePage() {
               className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground resize-y font-mono text-sm"
             />
             {errors.content_md && (
-              <p className="text-xs text-red-500">{errors.content_md.message}</p>
+              <p className="text-xs text-red-500">
+                {errors.content_md.message}
+              </p>
             )}
           </div>
 
           {/* タグ */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">タグ</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={tagInput}
@@ -179,9 +178,7 @@ export default function NewNotePage() {
                 追加
               </button>
             </div>
-            {tagError && (
-              <p className="text-xs text-red-500">{tagError}</p>
-            )}
+            {tagError && <p className="text-xs text-red-500">{tagError}</p>}
             {errors.tags && (
               <p className="text-xs text-red-500">{errors.tags.message}</p>
             )}
@@ -190,7 +187,7 @@ export default function NewNotePage() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                    className="flex items-center gap-1 px-3 py-1 text-base rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                   >
                     {tag}
                     <button
@@ -207,9 +204,7 @@ export default function NewNotePage() {
             )}
           </div>
 
-          {globalError && (
-            <p className="text-sm text-red-500">{globalError}</p>
-          )}
+          {globalError && <p className="text-sm text-red-500">{globalError}</p>}
 
           <button
             type="submit"

@@ -117,18 +117,18 @@ export default function NoteDetailPage({
         {/* メタ情報 */}
         <div className="flex flex-col gap-2">
           {note.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 mb-2">
               {note.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                  className="px-3 py-1 text-base rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                 >
                   {tag}
                 </span>
               ))}
             </div>
           )}
-          <p className="text-xs text-gray-400">
+          <p className="text-sm text-gray-400">
             作成日: {createdAt}　更新日: {updatedAt}
           </p>
         </div>
