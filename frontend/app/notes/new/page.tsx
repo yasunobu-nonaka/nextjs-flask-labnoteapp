@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { authFetch } from "@/lib/api";
 
 const schema = z.object({
   title: z
@@ -77,19 +78,9 @@ export default function NewNotePage() {
   async function onSubmit(data: FormValues) {
     setGlobalError(null);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notes`, {
+      const res = await authFetch("/api/notes", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(data),
       });
 

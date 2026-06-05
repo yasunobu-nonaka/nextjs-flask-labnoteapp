@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { authFetch } from "@/lib/api";
 
 const schema = z.object({
   title: z
@@ -51,17 +52,8 @@ export default function EditNotePage({
 
   useEffect(() => {
     async function fetchNote() {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${id}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const res = await authFetch(`/api/notes/${id}`);
 
         if (res.status === 401) {
           router.push("/login");
@@ -130,24 +122,11 @@ export default function EditNotePage({
   async function onSubmit(data: FormValues) {
     setGlobalError(null);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/notes/${id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(data),
-        },
-      );
+      const res = await authFetch(`/api/notes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
 
       if (res.status === 401) {
         router.push("/login");
