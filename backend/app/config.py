@@ -6,6 +6,7 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "fallback-secret")
     DEBUG = False
     TESTING = False
+    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")

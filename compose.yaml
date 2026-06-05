@@ -16,6 +16,22 @@ services:
         condition: service_healthy
     command: flask run --host=0.0.0.0 --port=5000
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: nextjs-frontend
+    restart: always
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
   db:
     image: postgres:16
     container_name: postgresql-db

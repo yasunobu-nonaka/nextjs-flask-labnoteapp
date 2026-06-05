@@ -2,7 +2,7 @@ from flask import Flask
 
 from app.api import api_bp
 from app.config import config
-from app.extensions import db, migrate, jwt, mail
+from app.extensions import db, migrate, jwt, mail, cors
 from app.model import User
 
 
@@ -16,6 +16,7 @@ def create_app(config_name="development"):
     migrate.init_app(app, db)
     jwt.init_app(app)
     mail.init_app(app)
+    cors.init_app(app, resources={r"/api/*": {"origins": app.config["FRONTEND_URL"]}})
 
     @jwt.user_identity_loader
     def user_identity_lookup(user):
