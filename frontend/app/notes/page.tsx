@@ -20,6 +20,8 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const router = useRouter();
 
   function handleLogout() {
@@ -27,10 +29,17 @@ export default function NotesPage() {
     router.push("/login");
   }
 
+  function handleClear() {
+    setQuery("");
+    setSubmittedQuery("");
+  }
+
   useEffect(() => {
     async function fetchNotes() {
+      setStatus("loading");
       try {
-        const res = await authFetch("/api/notes");
+        const params = submittedQuery ? `?q=${encodeURIComponent(submittedQuery)}` : "";
+        const res = await authFetch(`/api/notes${params}`);
 
         if (res.status === 401) {
           router.push("/login");
@@ -53,7 +62,7 @@ export default function NotesPage() {
     }
 
     fetchNotes();
-  }, [router]);
+  }, [router, submittedQuery]);
 
   if (status === "loading") {
     return (
@@ -92,8 +101,35 @@ export default function NotesPage() {
           </div>
         </div>
 
+        <form onSubmit={(e) => { e.preventDefault(); setSubmittedQuery(query.trim()); }} className="flex gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="タイトルで検索..."
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            検索
+          </button>
+        </form>
+
+        {submittedQuery && (
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <p>「{submittedQuery}」の検索結果 {notes.length}件</p>
+            <button onClick={handleClear} className="underline hover:text-foreground transition-colors">
+              クリア
+            </button>
+          </div>
+        )}
+
         {notes.length === 0 ? (
-          <p className="text-gray-500">ノートがありません。</p>
+          <p className="text-gray-500">
+            {submittedQuery ? "該当するノートが見つかりませんでした。" : "ノートがありません。"}
+          </p>
         ) : (
           <ul className="flex flex-col gap-4">
             {notes.map((note) => (
