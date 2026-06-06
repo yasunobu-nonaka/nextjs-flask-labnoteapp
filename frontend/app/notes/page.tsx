@@ -30,7 +30,7 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -44,17 +44,14 @@ export default function NotesPage() {
   function handleClear() {
     setQuery("");
     setSubmittedQuery("");
-    setSelectedTag("");
+    setSelectedTags([]);
     setCurrentPage(1);
   }
 
-  function handleTagClick(tag: string) {
-    setSelectedTag((prev) => (prev === tag ? "" : tag));
-    setCurrentPage(1);
-  }
-
-  function handleTagClear() {
-    setSelectedTag("");
+  function handleTagToggle(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
     setCurrentPage(1);
   }
 
@@ -75,7 +72,7 @@ export default function NotesPage() {
       try {
         const params = new URLSearchParams();
         if (submittedQuery) params.set("q", submittedQuery);
-        if (selectedTag) params.set("tag", selectedTag);
+        selectedTags.forEach((tag) => params.append("tag", tag));
         params.set("page", String(currentPage));
         const res = await authFetch(`/api/notes?${params.toString()}`);
 
@@ -101,7 +98,7 @@ export default function NotesPage() {
     }
 
     fetchNotes();
-  }, [router, submittedQuery, selectedTag, currentPage]);
+  }, [router, submittedQuery, selectedTags, currentPage]);
 
   if (status === "loading") {
     return (
@@ -119,7 +116,7 @@ export default function NotesPage() {
     );
   }
 
-  const isFiltering = !!submittedQuery || !!selectedTag;
+  const isFiltering = !!submittedQuery || selectedTags.length > 0;
 
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">
@@ -162,47 +159,48 @@ export default function NotesPage() {
         </form>
 
         {availableTags.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label htmlFor="tag-select" className="text-sm text-gray-500 shrink-0">タグ:</label>
-            <select
-              id="tag-select"
-              value={selectedTag}
-              onChange={(e) => { setSelectedTag(e.target.value); setCurrentPage(1); }}
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-foreground"
-            >
-              <option value="">すべて</option>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-gray-500">タグで絞り込む:</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
               {availableTags.map((tag) => (
-                <option key={tag} value={tag}>{tag}</option>
+                <label key={tag} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedTags.includes(tag)}
+                    onChange={() => handleTagToggle(tag)}
+                    className="rounded border-gray-300 dark:border-gray-700"
+                  />
+                  <span className="text-sm">{tag}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
         )}
 
-        {(submittedQuery || selectedTag) && (
+        {isFiltering && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             {submittedQuery && (
               <span>「{submittedQuery}」の検索結果</span>
             )}
-            {selectedTag && (
-              <div className="flex items-center gap-1">
+            {selectedTags.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap">
                 <span>タグ:</span>
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-foreground text-background text-xs">
-                  {selectedTag}
-                  <button
-                    onClick={handleTagClear}
-                    className="hover:opacity-70 transition-opacity"
-                    aria-label="タグフィルタを解除"
+                {selectedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-full bg-foreground text-background text-xs"
                   >
-                    ×
-                  </button>
-                </span>
+                    {tag}
+                  </span>
+                ))}
               </div>
             )}
-            {isFiltering && (
-              <button onClick={handleClear} className="underline hover:text-foreground transition-colors ml-auto">
-                すべてクリア
-              </button>
-            )}
+            <button
+              onClick={handleClear}
+              className="underline hover:text-foreground transition-colors ml-auto"
+            >
+              すべてクリア
+            </button>
           </div>
         )}
 
@@ -216,8 +214,8 @@ export default function NotesPage() {
               <NoteCard
                 key={note.id}
                 note={note}
-                selectedTag={selectedTag}
-                onTagClick={handleTagClick}
+                selectedTags={selectedTags}
+                onTagToggle={handleTagToggle}
               />
             ))}
           </ul>
@@ -249,12 +247,12 @@ export default function NotesPage() {
 
 function NoteCard({
   note,
-  selectedTag,
-  onTagClick,
+  selectedTags,
+  onTagToggle,
 }: {
   note: Note;
-  selectedTag: string;
-  onTagClick: (tag: string) => void;
+  selectedTags: string[];
+  onTagToggle: (tag: string) => void;
 }) {
   const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
     year: "numeric",
@@ -277,9 +275,9 @@ function NoteCard({
             <button
               key={tag}
               type="button"
-              onClick={() => onTagClick(tag)}
+              onClick={() => onTagToggle(tag)}
               className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
-                selectedTag === tag
+                selectedTags.includes(tag)
                   ? "bg-foreground text-background"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
