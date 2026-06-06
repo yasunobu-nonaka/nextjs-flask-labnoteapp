@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
+import FolderSidebar from "@/components/FolderSidebar";
 
 type Note = {
   id: number;
@@ -34,6 +35,7 @@ export default function NotesPage() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const router = useRouter();
 
   function handleLogout() {
@@ -45,6 +47,11 @@ export default function NotesPage() {
     setQuery("");
     setSubmittedQuery("");
     setSelectedTags([]);
+    setCurrentPage(1);
+  }
+
+  function handleSelectFolder(id: number | null) {
+    setSelectedFolderId(id);
     setCurrentPage(1);
   }
 
@@ -73,6 +80,7 @@ export default function NotesPage() {
         const params = new URLSearchParams();
         if (submittedQuery) params.set("q", submittedQuery);
         selectedTags.forEach((tag) => params.append("tag", tag));
+        if (selectedFolderId !== null) params.set("folder_id", String(selectedFolderId));
         params.set("page", String(currentPage));
         const res = await authFetch(`/api/notes?${params.toString()}`);
 
@@ -98,7 +106,7 @@ export default function NotesPage() {
     }
 
     fetchNotes();
-  }, [router, submittedQuery, selectedTags, currentPage]);
+  }, [router, submittedQuery, selectedTags, selectedFolderId, currentPage]);
 
   if (status === "loading") {
     return (
@@ -119,7 +127,9 @@ export default function NotesPage() {
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
 
   return (
-    <main className="min-h-screen bg-background text-foreground px-6 py-10">
+    <main className="min-h-screen bg-background text-foreground flex">
+      <FolderSidebar selectedFolderId={selectedFolderId} onSelectFolder={handleSelectFolder} />
+      <div className="flex-1 px-6 py-10">
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">ノート一覧</h1>
@@ -240,6 +250,7 @@ export default function NotesPage() {
             </button>
           </div>
         )}
+      </div>
       </div>
     </main>
   );

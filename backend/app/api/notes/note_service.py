@@ -6,7 +6,7 @@ from app.model import Note, Tag
 from app.api.notes.tag_service import get_or_create_tags
 
 
-def get_notes_service(user_id, query_word=None, tag_names=None, page=1, per_page=10):
+def get_notes_service(user_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10):
     """
     ノート一覧取得
     """
@@ -21,6 +21,10 @@ def get_notes_service(user_id, query_word=None, tag_names=None, page=1, per_page
     for tag_name in (tag_names or []):
         query = query.filter(Note.tags.any(Tag.tagname == tag_name))
         count_query = count_query.filter(Note.tags.any(Tag.tagname == tag_name))
+
+    if folder_id is not None:
+        query = query.filter(Note.folder_id == folder_id)
+        count_query = count_query.filter(Note.folder_id == folder_id)
 
     total = db.session.execute(count_query).scalar_one()
     offset = (page - 1) * per_page
