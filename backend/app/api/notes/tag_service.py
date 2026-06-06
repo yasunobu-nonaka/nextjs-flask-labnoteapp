@@ -23,6 +23,16 @@ def check_and_create_tag(tag_name, user_id):
     return tag
 
 
+def get_user_tags(user_id):
+    """
+    ユーザーが持つタグ名一覧を取得
+    """
+    tags = db.session.execute(
+        db.select(Tag).filter_by(user_id=user_id).order_by(Tag.tagname)
+    ).scalars().all()
+    return [tag.tagname for tag in tags]
+
+
 def get_or_create_tags(tag_names, user_id):
     """
     タグ一覧取得 or 作成

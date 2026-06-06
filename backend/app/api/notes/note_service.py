@@ -1,23 +1,34 @@
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.model import Note
+from app.model import Note, Tag
 from app.api.notes.tag_service import get_or_create_tags
 
 
-def get_notes_service(user_id, query_word=None):
+def get_notes_service(user_id, query_word=None, tag_names=None, page=1, per_page=10):
     """
     ノート一覧取得
     """
 
     query = db.select(Note).filter_by(user_id=user_id).options(selectinload(Note.tags))
+    count_query = db.select(func.count(Note.id)).filter_by(user_id=user_id)
 
     if query_word:
         query = query.filter(Note.title.ilike(f"%{query_word}%"))
+        count_query = count_query.filter(Note.title.ilike(f"%{query_word}%"))
 
-    notes = db.session.execute(query.order_by(Note.id)).scalars()
+    for tag_name in (tag_names or []):
+        query = query.filter(Note.tags.any(Tag.tagname == tag_name))
+        count_query = count_query.filter(Note.tags.any(Tag.tagname == tag_name))
 
-    return notes
+    total = db.session.execute(count_query).scalar_one()
+    offset = (page - 1) * per_page
+    notes = db.session.execute(
+        query.order_by(Note.id).offset(offset).limit(per_page)
+    ).scalars().all()
+
+    return notes, total
 
 
 def get_note_or_404_service(note_id, user_id):

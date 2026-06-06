@@ -1,3 +1,5 @@
+import math
+
 from flask import jsonify, request
 from marshmallow import ValidationError
 from flask_jwt_extended import jwt_required, current_user
@@ -5,6 +7,7 @@ from flask_jwt_extended import jwt_required, current_user
 from app.schema import NoteCreateSchema, NoteResponseSchema
 
 # from app.api.notes.service import check_and_create_tag
+from app.api.notes.tag_service import get_user_tags
 from app.api.notes.note_service import (
     get_notes_service,
     get_note_or_404_service,
@@ -20,17 +23,30 @@ res_schema_note = NoteResponseSchema()
 res_schema_notes = NoteResponseSchema(many=True)
 
 
+@notes_bp.route("/tags", methods=["GET"])
+@jwt_required()
+def list_tags():
+    tags = get_user_tags(current_user.id)
+    return jsonify(tags)
+
+
 @notes_bp.route("", methods=["GET"])
 @jwt_required()
 def notes_index():
     query_word = request.args.get("q")
+    tag_names = request.args.getlist("tag")
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
 
-    # ノート一覧取得
-    notes = get_notes_service(current_user.id, query_word)
+    notes, total = get_notes_service(current_user.id, query_word, tag_names, page, per_page)
 
-    result = res_schema_notes.dump(notes)
-
-    return result
+    return jsonify({
+        "notes": res_schema_notes.dump(notes),
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": max(1, math.ceil(total / per_page)),
+    })
 
 
 @notes_bp.route("", methods=["POST"])
