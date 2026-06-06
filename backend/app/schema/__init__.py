@@ -5,3 +5,4 @@ from .user_schema import (
     PasswordResetSchema,
 )
 from .note_schema import NoteCreateSchema, NoteResponseSchema
+from .folder_schema import FolderCreateSchema, FolderRenameSchema, FolderResponseSchema
