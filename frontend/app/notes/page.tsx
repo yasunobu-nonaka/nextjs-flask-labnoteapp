@@ -14,6 +14,14 @@ type Note = {
   tags: string[];
 };
 
+type NotesResponse = {
+  notes: Note[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+};
+
 type Status = "loading" | "success" | "error";
 
 export default function NotesPage() {
@@ -24,6 +32,8 @@ export default function NotesPage() {
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const router = useRouter();
 
   function handleLogout() {
@@ -35,14 +45,17 @@ export default function NotesPage() {
     setQuery("");
     setSubmittedQuery("");
     setSelectedTag("");
+    setCurrentPage(1);
   }
 
   function handleTagClick(tag: string) {
     setSelectedTag((prev) => (prev === tag ? "" : tag));
+    setCurrentPage(1);
   }
 
   function handleTagClear() {
     setSelectedTag("");
+    setCurrentPage(1);
   }
 
   useEffect(() => {
@@ -63,8 +76,8 @@ export default function NotesPage() {
         const params = new URLSearchParams();
         if (submittedQuery) params.set("q", submittedQuery);
         if (selectedTag) params.set("tag", selectedTag);
-        const qs = params.toString();
-        const res = await authFetch(qs ? `/api/notes?${qs}` : "/api/notes");
+        params.set("page", String(currentPage));
+        const res = await authFetch(`/api/notes?${params.toString()}`);
 
         if (res.status === 401) {
           router.push("/login");
@@ -77,8 +90,9 @@ export default function NotesPage() {
           return;
         }
 
-        const data: Note[] = await res.json();
-        setNotes(data);
+        const data: NotesResponse = await res.json();
+        setNotes(data.notes);
+        setTotalPages(data.total_pages);
         setStatus("success");
       } catch {
         setError("サーバーへの接続に失敗しました");
@@ -87,7 +101,7 @@ export default function NotesPage() {
     }
 
     fetchNotes();
-  }, [router, submittedQuery, selectedTag]);
+  }, [router, submittedQuery, selectedTag, currentPage]);
 
   if (status === "loading") {
     return (
@@ -128,7 +142,10 @@ export default function NotesPage() {
           </div>
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); setSubmittedQuery(query.trim()); }} className="flex gap-2">
+        <form
+          onSubmit={(e) => { e.preventDefault(); setSubmittedQuery(query.trim()); setCurrentPage(1); }}
+          className="flex gap-2"
+        >
           <input
             type="search"
             value={query}
@@ -150,7 +167,7 @@ export default function NotesPage() {
             <select
               id="tag-select"
               value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
+              onChange={(e) => { setSelectedTag(e.target.value); setCurrentPage(1); }}
               className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-foreground"
             >
               <option value="">すべて</option>
@@ -164,7 +181,7 @@ export default function NotesPage() {
         {(submittedQuery || selectedTag) && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             {submittedQuery && (
-              <span>「{submittedQuery}」の検索結果 {notes.length}件</span>
+              <span>「{submittedQuery}」の検索結果</span>
             )}
             {selectedTag && (
               <div className="flex items-center gap-1">
@@ -204,6 +221,26 @@ export default function NotesPage() {
               />
             ))}
           </ul>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setCurrentPage((p) => p - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              前へ
+            </button>
+            <span className="text-sm text-gray-500">{currentPage} / {totalPages} ページ</span>
+            <button
+              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              次へ
+            </button>
+          </div>
         )}
       </div>
     </main>

@@ -1,3 +1,5 @@
+import math
+
 from flask import jsonify, request
 from marshmallow import ValidationError
 from flask_jwt_extended import jwt_required, current_user
@@ -33,13 +35,18 @@ def list_tags():
 def notes_index():
     query_word = request.args.get("q")
     tag_name = request.args.get("tag")
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
 
-    # ノート一覧取得
-    notes = get_notes_service(current_user.id, query_word, tag_name)
+    notes, total = get_notes_service(current_user.id, query_word, tag_name, page, per_page)
 
-    result = res_schema_notes.dump(notes)
-
-    return result
+    return jsonify({
+        "notes": res_schema_notes.dump(notes),
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": max(1, math.ceil(total / per_page)),
+    })
 
 
 @notes_bp.route("", methods=["POST"])
