@@ -24,9 +24,10 @@ res_schema_notes = NoteResponseSchema(many=True)
 @jwt_required()
 def notes_index():
     query_word = request.args.get("q")
+    tag_name = request.args.get("tag")
 
     # ノート一覧取得
-    notes = get_notes_service(current_user.id, query_word)
+    notes = get_notes_service(current_user.id, query_word, tag_name)
 
     result = res_schema_notes.dump(notes)
 

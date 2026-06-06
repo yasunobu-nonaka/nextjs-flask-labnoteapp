@@ -22,6 +22,7 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState("");
   const router = useRouter();
 
   function handleLogout() {
@@ -32,14 +33,26 @@ export default function NotesPage() {
   function handleClear() {
     setQuery("");
     setSubmittedQuery("");
+    setSelectedTag("");
+  }
+
+  function handleTagClick(tag: string) {
+    setSelectedTag((prev) => (prev === tag ? "" : tag));
+  }
+
+  function handleTagClear() {
+    setSelectedTag("");
   }
 
   useEffect(() => {
     async function fetchNotes() {
       setStatus("loading");
       try {
-        const params = submittedQuery ? `?q=${encodeURIComponent(submittedQuery)}` : "";
-        const res = await authFetch(`/api/notes${params}`);
+        const params = new URLSearchParams();
+        if (submittedQuery) params.set("q", submittedQuery);
+        if (selectedTag) params.set("tag", selectedTag);
+        const qs = params.toString();
+        const res = await authFetch(qs ? `/api/notes?${qs}` : "/api/notes");
 
         if (res.status === 401) {
           router.push("/login");
@@ -62,7 +75,7 @@ export default function NotesPage() {
     }
 
     fetchNotes();
-  }, [router, submittedQuery]);
+  }, [router, submittedQuery, selectedTag]);
 
   if (status === "loading") {
     return (
@@ -79,6 +92,8 @@ export default function NotesPage() {
       </main>
     );
   }
+
+  const isFiltering = !!submittedQuery || !!selectedTag;
 
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">
@@ -117,23 +132,47 @@ export default function NotesPage() {
           </button>
         </form>
 
-        {submittedQuery && (
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <p>「{submittedQuery}」の検索結果 {notes.length}件</p>
-            <button onClick={handleClear} className="underline hover:text-foreground transition-colors">
-              クリア
-            </button>
+        {(submittedQuery || selectedTag) && (
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            {submittedQuery && (
+              <span>「{submittedQuery}」の検索結果 {notes.length}件</span>
+            )}
+            {selectedTag && (
+              <div className="flex items-center gap-1">
+                <span>タグ:</span>
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-foreground text-background text-xs">
+                  {selectedTag}
+                  <button
+                    onClick={handleTagClear}
+                    className="hover:opacity-70 transition-opacity"
+                    aria-label="タグフィルタを解除"
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            )}
+            {isFiltering && (
+              <button onClick={handleClear} className="underline hover:text-foreground transition-colors ml-auto">
+                すべてクリア
+              </button>
+            )}
           </div>
         )}
 
         {notes.length === 0 ? (
           <p className="text-gray-500">
-            {submittedQuery ? "該当するノートが見つかりませんでした。" : "ノートがありません。"}
+            {isFiltering ? "該当するノートが見つかりませんでした。" : "ノートがありません。"}
           </p>
         ) : (
           <ul className="flex flex-col gap-4">
             {notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
+              <NoteCard
+                key={note.id}
+                note={note}
+                selectedTag={selectedTag}
+                onTagClick={handleTagClick}
+              />
             ))}
           </ul>
         )}
@@ -142,7 +181,15 @@ export default function NotesPage() {
   );
 }
 
-function NoteCard({ note }: { note: Note }) {
+function NoteCard({
+  note,
+  selectedTag,
+  onTagClick,
+}: {
+  note: Note;
+  selectedTag: string;
+  onTagClick: (tag: string) => void;
+}) {
   const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "long",
@@ -161,12 +208,18 @@ function NoteCard({ note }: { note: Note }) {
       {note.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {note.tags.map((tag) => (
-            <span
+            <button
               key={tag}
-              className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+              type="button"
+              onClick={() => onTagClick(tag)}
+              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                selectedTag === tag
+                  ? "bg-foreground text-background"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
             >
               {tag}
-            </span>
+            </button>
           ))}
         </div>
       )}

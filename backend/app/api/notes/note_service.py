@@ -1,11 +1,11 @@
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.model import Note
+from app.model import Note, Tag
 from app.api.notes.tag_service import get_or_create_tags
 
 
-def get_notes_service(user_id, query_word=None):
+def get_notes_service(user_id, query_word=None, tag_name=None):
     """
     ノート一覧取得
     """
@@ -14,6 +14,9 @@ def get_notes_service(user_id, query_word=None):
 
     if query_word:
         query = query.filter(Note.title.ilike(f"%{query_word}%"))
+
+    if tag_name:
+        query = query.filter(Note.tags.any(Tag.tagname == tag_name))
 
     notes = db.session.execute(query.order_by(Note.id)).scalars()
 
