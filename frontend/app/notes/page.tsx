@@ -23,6 +23,7 @@ export default function NotesPage() {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const router = useRouter();
 
   function handleLogout() {
@@ -43,6 +44,17 @@ export default function NotesPage() {
   function handleTagClear() {
     setSelectedTag("");
   }
+
+  useEffect(() => {
+    async function fetchTags() {
+      const res = await authFetch("/api/notes/tags");
+      if (res.ok) {
+        const data: string[] = await res.json();
+        setAvailableTags(data);
+      }
+    }
+    fetchTags();
+  }, []);
 
   useEffect(() => {
     async function fetchNotes() {
@@ -131,6 +143,26 @@ export default function NotesPage() {
             検索
           </button>
         </form>
+
+        {availableTags.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-gray-500">タグ:</span>
+            {availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleTagClick(tag)}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  selectedTag === tag
+                    ? "bg-foreground text-background"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
 
         {(submittedQuery || selectedTag) && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">

@@ -5,6 +5,7 @@ from flask_jwt_extended import jwt_required, current_user
 from app.schema import NoteCreateSchema, NoteResponseSchema
 
 # from app.api.notes.service import check_and_create_tag
+from app.api.notes.tag_service import get_user_tags
 from app.api.notes.note_service import (
     get_notes_service,
     get_note_or_404_service,
@@ -18,6 +19,13 @@ from . import notes_bp
 create_schema = NoteCreateSchema()
 res_schema_note = NoteResponseSchema()
 res_schema_notes = NoteResponseSchema(many=True)
+
+
+@notes_bp.route("/tags", methods=["GET"])
+@jwt_required()
+def list_tags():
+    tags = get_user_tags(current_user.id)
+    return jsonify(tags)
 
 
 @notes_bp.route("", methods=["GET"])
