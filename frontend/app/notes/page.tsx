@@ -145,22 +145,19 @@ export default function NotesPage() {
         </form>
 
         {availableTags.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-gray-500">タグ:</span>
-            {availableTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => handleTagClick(tag)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  selectedTag === tag
-                    ? "bg-foreground text-background"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <label htmlFor="tag-select" className="text-sm text-gray-500 shrink-0">タグ:</label>
+            <select
+              id="tag-select"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-foreground"
+            >
+              <option value="">すべて</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
           </div>
         )}
 
