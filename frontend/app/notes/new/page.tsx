@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { authFetch } from "@/lib/api";
 import { useTagInput } from "@/lib/useTagInput";
+import { type Folder, buildFolderOptions } from "@/lib/folders";
 
 const schema = z.object({
   title: z
@@ -24,7 +25,20 @@ type FormValues = z.infer<typeof schema>;
 
 export default function NewNotePage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    async function fetchFolders() {
+      const res = await authFetch("/api/folders");
+      if (res.ok) {
+        const data: Folder[] = await res.json();
+        setFolders(data);
+      }
+    }
+    fetchFolders();
+  }, []);
 
   const {
     register,
@@ -38,8 +52,17 @@ export default function NewNotePage() {
   });
 
   const tags = watch("tags");
-  const { tagInput, setTagInput, tagError, setTagError, addTag, removeTag, handleTagKeyDown } =
-    useTagInput(tags, (newTags) => setValue("tags", newTags, { shouldValidate: true }));
+  const {
+    tagInput,
+    setTagInput,
+    tagError,
+    setTagError,
+    addTag,
+    removeTag,
+    handleTagKeyDown,
+  } = useTagInput(tags, (newTags) =>
+    setValue("tags", newTags, { shouldValidate: true }),
+  );
 
   async function onSubmit(data: FormValues) {
     setGlobalError(null);
@@ -47,7 +70,7 @@ export default function NewNotePage() {
     try {
       const res = await authFetch("/api/notes", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, folder_id: selectedFolderId }),
       });
 
       if (res.status === 401) {
@@ -93,6 +116,32 @@ export default function NewNotePage() {
               <p className="text-xs text-red-500">{errors.title.message}</p>
             )}
           </div>
+
+          {/* フォルダー */}
+          {folders.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="folder" className="text-sm font-medium">
+                フォルダー
+              </label>
+              <select
+                id="folder"
+                value={selectedFolderId ?? ""}
+                onChange={(e) =>
+                  setSelectedFolderId(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
+                }
+                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
+              >
+                <option value="">フォルダーなし</option>
+                {buildFolderOptions(folders).map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* 内容 */}
           <div className="flex flex-col gap-1">
