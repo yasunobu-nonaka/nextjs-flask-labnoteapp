@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { authFetch } from "@/lib/api";
 import { useTagInput } from "@/lib/useTagInput";
-import { type Folder, buildFolderOptions } from "@/lib/folders";
 
 const schema = z.object({
   title: z
@@ -25,19 +24,14 @@ type FormValues = z.infer<typeof schema>;
 
 export default function NewNotePage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [folderId, setFolderId] = useState<number | null>(null);
   const router = useRouter();
 
+  // URLクエリパラメータ folder_id を読み取り、フォルダー選択なしで作成するか指定フォルダーに作成するかを決める
   useEffect(() => {
-    async function fetchFolders() {
-      const res = await authFetch("/api/folders");
-      if (res.ok) {
-        const data: Folder[] = await res.json();
-        setFolders(data);
-      }
-    }
-    fetchFolders();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("folder_id");
+    if (id) setFolderId(Number(id));
   }, []);
 
   const {
@@ -70,7 +64,7 @@ export default function NewNotePage() {
     try {
       const res = await authFetch("/api/notes", {
         method: "POST",
-        body: JSON.stringify({ ...data, folder_id: selectedFolderId }),
+        body: JSON.stringify({ ...data, folder_id: folderId }),
       });
 
       if (res.status === 401) {
@@ -116,32 +110,6 @@ export default function NewNotePage() {
               <p className="text-xs text-red-500">{errors.title.message}</p>
             )}
           </div>
-
-          {/* フォルダー */}
-          {folders.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label htmlFor="folder" className="text-sm font-medium">
-                フォルダー
-              </label>
-              <select
-                id="folder"
-                value={selectedFolderId ?? ""}
-                onChange={(e) =>
-                  setSelectedFolderId(
-                    e.target.value ? Number(e.target.value) : null,
-                  )
-                }
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
-              >
-                <option value="">フォルダーなし</option>
-                {buildFolderOptions(folders).map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* 内容 */}
           <div className="flex flex-col gap-1">

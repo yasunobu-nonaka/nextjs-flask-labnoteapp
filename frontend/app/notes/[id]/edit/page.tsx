@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { authFetch } from "@/lib/api";
 import { useTagInput } from "@/lib/useTagInput";
-import { type Folder, buildFolderOptions } from "@/lib/folders";
 
 const schema = z.object({
   title: z
@@ -34,8 +33,6 @@ export default function EditNotePage({
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const router = useRouter();
 
   const {
@@ -62,17 +59,6 @@ export default function EditNotePage({
   } = useTagInput(tags, (newTags) =>
     setValue("tags", newTags, { shouldValidate: true }),
   );
-
-  useEffect(() => {
-    async function fetchFolders() {
-      const res = await authFetch("/api/folders");
-      if (res.ok) {
-        const data: Folder[] = await res.json();
-        setFolders(data);
-      }
-    }
-    fetchFolders();
-  }, []);
 
   useEffect(() => {
     async function fetchNote() {
@@ -102,7 +88,6 @@ export default function EditNotePage({
           content_md: note.content_md,
           tags: note.tags,
         });
-        setSelectedFolderId(note.folder_id ?? null);
         setLoadStatus("ready");
       } catch {
         setLoadError("サーバーへの接続に失敗しました");
@@ -119,7 +104,7 @@ export default function EditNotePage({
     try {
       const res = await authFetch(`/api/notes/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ ...data, folder_id: selectedFolderId }),
+        body: JSON.stringify(data),
       });
 
       if (res.status === 401) {
@@ -187,32 +172,6 @@ export default function EditNotePage({
               <p className="text-xs text-red-500">{errors.title.message}</p>
             )}
           </div>
-
-          {/* フォルダー */}
-          {folders.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label htmlFor="folder" className="text-sm font-medium">
-                フォルダー
-              </label>
-              <select
-                id="folder"
-                value={selectedFolderId ?? ""}
-                onChange={(e) =>
-                  setSelectedFolderId(
-                    e.target.value ? Number(e.target.value) : null,
-                  )
-                }
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
-              >
-                <option value="">フォルダーなし</option>
-                {buildFolderOptions(folders).map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* 内容 */}
           <div className="flex flex-col gap-1">
