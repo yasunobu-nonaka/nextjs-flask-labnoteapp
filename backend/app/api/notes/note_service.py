@@ -6,7 +6,9 @@ from app.model import Note, Tag
 from app.api.notes.tag_service import get_or_create_tags
 
 
-def get_notes_service(user_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10):
+def get_notes_service(
+    user_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10
+):
     """
     ノート一覧取得
     """
@@ -18,7 +20,7 @@ def get_notes_service(user_id, query_word=None, tag_names=None, folder_id=None, 
         query = query.filter(Note.title.ilike(f"%{query_word}%"))
         count_query = count_query.filter(Note.title.ilike(f"%{query_word}%"))
 
-    for tag_name in (tag_names or []):
+    for tag_name in tag_names or []:
         query = query.filter(Note.tags.any(Tag.tagname == tag_name))
         count_query = count_query.filter(Note.tags.any(Tag.tagname == tag_name))
 
@@ -28,9 +30,11 @@ def get_notes_service(user_id, query_word=None, tag_names=None, folder_id=None, 
 
     total = db.session.execute(count_query).scalar_one()
     offset = (page - 1) * per_page
-    notes = db.session.execute(
-        query.order_by(Note.id).offset(offset).limit(per_page)
-    ).scalars().all()
+    notes = (
+        db.session.execute(query.order_by(Note.id).offset(offset).limit(per_page))
+        .scalars()
+        .all()
+    )
 
     return notes, total
 
@@ -58,6 +62,7 @@ def create_note_service(data, user_id):
         user_id=user_id,
         title=data["title"],
         content_md=data["content_md"],
+        folder_id=data.get("folder_id"),
     )
 
     tags = get_or_create_tags(data.get("tags", []), user_id)
@@ -83,8 +88,10 @@ def update_note_service(note, data, user_id):
 
     if "tags" in data:
         tags = get_or_create_tags(data["tags"], user_id)
-
         note.tags = tags
+
+    if "folder_id" in data:
+        note.folder_id = data["folder_id"]
 
     db.session.commit()
 
