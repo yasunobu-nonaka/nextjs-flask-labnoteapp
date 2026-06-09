@@ -28,18 +28,34 @@ type NotesResponse = {
 type Status = "loading" | "success" | "error";
 
 export default function NotesPage() {
+  // ノート一覧と取得状態
   const [notes, setNotes] = useState<Note[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+
+  // キーワード検索: query は入力中の値、submittedQuery は検索ボタン押下時に確定した値。
+  // submittedQuery が変わったタイミングだけ API を叩くことで、キー入力のたびに
+  // リクエストが飛ぶのを防いでいる。
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+
+  // タグフィルター: selectedTags はチェック中のタグ、availableTags は選択肢一覧
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  // ページネーション
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // フォルダーフィルター: null は「すべてのノート」を意味する
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  // NoteCard の移動フォームで使うフォルダー一覧（FolderSidebar とは独立して取得）
   const [folders, setFolders] = useState<Folder[]>([]);
+
+  // ノート移動後にリストを再フェッチするためのトリガー。
+  // increment すると useEffect の依存配列が変わり、fetchNotes が再実行される。
   const [refreshKey, setRefreshKey] = useState(0);
+
   const router = useRouter();
 
   function handleLogout() {
@@ -59,6 +75,7 @@ export default function NotesPage() {
     setCurrentPage(1);
   }
 
+  // NoteCard からノート移動完了の通知を受け取り、リストを再フェッチする
   function handleNoteMoved() {
     setRefreshKey((k) => k + 1);
   }
@@ -70,6 +87,7 @@ export default function NotesPage() {
     setCurrentPage(1);
   }
 
+  // マウント時に一度だけタグ一覧とフォルダー一覧を取得する
   useEffect(() => {
     async function fetchTags() {
       const res = await authFetch("/api/notes/tags");
@@ -89,6 +107,7 @@ export default function NotesPage() {
     fetchFolders();
   }, []);
 
+  // 検索条件・フィルター・ページ・移動トリガーが変わるたびにノート一覧を再取得する
   useEffect(() => {
     async function fetchNotes() {
       setStatus("loading");
@@ -148,6 +167,7 @@ export default function NotesPage() {
     );
   }
 
+  // 検索・タグフィルターが有効かどうか（フィルターバナーの表示判定に使う）
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
 
   return (
@@ -311,8 +331,12 @@ function NoteCard({
   folders: Folder[];
   onMoved: () => void;
 }) {
-  // "idle" | "menu" | "moving" の3状態で表示を切り替える
+  // カードの表示モードを3状態で管理する
+  //   idle   : 通常表示
+  //   menu   : ··· ボタンを押したときのドロップダウン表示
+  //   moving : フォルダー移動フォームの表示
   const [mode, setMode] = useState<"idle" | "menu" | "moving">("idle");
+  // 移動先フォルダーの選択値（null = フォルダーなし）
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
 
   const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
@@ -334,13 +358,14 @@ function NoteCard({
 
   return (
     <li className="relative flex flex-col gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-      {/* メニュー表示中は背景オーバーレイでクリック外を検知して閉じる */}
+      {/* 透明オーバーレイ: メニュー外のクリックを検知して menu を閉じる */}
       {mode === "menu" && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMode("idle")} />
           <div className="absolute right-4 top-10 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-36">
             <button
               onClick={() => {
+                // 現在のフォルダーを初期値として移動フォームを開く
                 setTargetFolderId(note.folder_id);
                 setMode("moving");
               }}

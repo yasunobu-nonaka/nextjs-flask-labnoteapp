@@ -9,6 +9,7 @@ import { z } from "zod";
 import { authFetch } from "@/lib/api";
 import { useTagInput } from "@/lib/useTagInput";
 
+// フォームのバリデーションルールを Zod で定義する
 const schema = z.object({
   title: z
     .string()
@@ -20,6 +21,7 @@ const schema = z.object({
     .max(10, "タグは最大10個までです"),
 });
 
+// schema から TypeScript の型を自動生成する
 type FormValues = z.infer<typeof schema>;
 
 export default function NewNotePage() {
@@ -34,6 +36,7 @@ export default function NewNotePage() {
     if (id) setFolderId(Number(id));
   }, []);
 
+  // zodResolver で schema をバリデーターとして react-hook-form に渡す
   const {
     register,
     handleSubmit,
@@ -45,7 +48,10 @@ export default function NewNotePage() {
     defaultValues: { tags: [] },
   });
 
+  // tags フィールドを監視し、useTagInput に現在値を渡す
   const tags = watch("tags");
+  // useTagInput はタグ入力欄の状態を管理するカスタムフック。
+  // タグが追加・削除されると setValue で react-hook-form の値を更新する。
   const {
     tagInput,
     setTagInput,
@@ -62,6 +68,7 @@ export default function NewNotePage() {
     setGlobalError(null);
 
     try {
+      // folderId は URL パラメータ由来。フォームの値と合わせて送信する。
       const res = await authFetch("/api/notes", {
         method: "POST",
         body: JSON.stringify({ ...data, folder_id: folderId }),

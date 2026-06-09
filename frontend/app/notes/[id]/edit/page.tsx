@@ -9,6 +9,7 @@ import { z } from "zod";
 import { authFetch } from "@/lib/api";
 import { useTagInput } from "@/lib/useTagInput";
 
+// フォームのバリデーションルールを Zod で定義する
 const schema = z.object({
   title: z
     .string()
@@ -20,8 +21,10 @@ const schema = z.object({
     .max(10, "タグは最大10個までです"),
 });
 
+// schema から TypeScript の型を自動生成する
 type FormValues = z.infer<typeof schema>;
 
+// "ready" はフォームにノートデータが読み込まれて編集可能な状態を表す
 type LoadStatus = "loading" | "ready" | "error";
 
 export default function EditNotePage({
@@ -29,12 +32,16 @@ export default function EditNotePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Next.js 15 ではルートパラメータが Promise になるため use() で unwrap する
   const { id } = use(params);
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
+  // フォーム送信時のサーバーエラーを表示するための状態
   const [globalError, setGlobalError] = useState<string | null>(null);
   const router = useRouter();
 
+  // zodResolver で schema をバリデーターとして react-hook-form に渡す
+  // reset はノートデータ取得後にフォームの初期値を書き換えるために使う
   const {
     register,
     handleSubmit,
@@ -47,7 +54,10 @@ export default function EditNotePage({
     defaultValues: { tags: [] },
   });
 
+  // tags フィールドを監視し、useTagInput に現在値を渡す
   const tags = watch("tags");
+  // useTagInput はタグ入力欄の状態を管理するカスタムフック。
+  // タグが追加・削除されると setValue で react-hook-form の値を更新する。
   const {
     tagInput,
     setTagInput,
@@ -60,6 +70,7 @@ export default function EditNotePage({
     setValue("tags", newTags, { shouldValidate: true }),
   );
 
+  // マウント時（または id が変わったとき）に既存ノートのデータをフォームに読み込む
   useEffect(() => {
     async function fetchNote() {
       try {
@@ -83,6 +94,7 @@ export default function EditNotePage({
         }
 
         const note = await res.json();
+        // reset でフォームの各フィールドに取得したノートの値をセットする
         reset({
           title: note.title,
           content_md: note.content_md,
@@ -102,6 +114,7 @@ export default function EditNotePage({
     setGlobalError(null);
 
     try {
+      // folder_id はノート一覧の移動機能で変更するため、編集フォームには含めない
       const res = await authFetch(`/api/notes/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
