@@ -1,72 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
 import { authFetch } from "@/lib/api";
-import { useTagInput } from "@/lib/useTagInput";
-
-// フォームのバリデーションルールを Zod で定義する
-const schema = z.object({
-  title: z
-    .string()
-    .min(1, "タイトルは必須です")
-    .max(200, "タイトルは200文字以内で入力してください"),
-  content_md: z.string().min(1, "内容は必須です"),
-  tags: z
-    .array(z.string().min(1).max(20, "タグ名は20文字以内で入力してください"))
-    .max(10, "タグは最大10個までです"),
-});
-
-// schema から TypeScript の型を自動生成する
-type FormValues = z.infer<typeof schema>;
+import { type NoteFormValues } from "@/lib/noteSchema";
+import NoteForm from "@/components/NoteForm";
 
 export default function NewNotePage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<number | null>(null);
   const router = useRouter();
 
-  // URLクエリパラメータ folder_id を読み取り、フォルダー選択なしで作成するか指定フォルダーに作成するかを決める
+  // URLクエリパラメータ folder_id を読み取り、指定フォルダーにノートを作成するかどうかを決める
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("folder_id");
     if (id) setFolderId(Number(id));
   }, []);
 
-  // zodResolver で schema をバリデーターとして react-hook-form に渡す
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { tags: [] },
-  });
-
-  // tags フィールドを監視し、useTagInput に現在値を渡す
-  const tags = watch("tags");
-  // useTagInput はタグ入力欄の状態を管理するカスタムフック。
-  // タグが追加・削除されると setValue で react-hook-form の値を更新する。
-  const {
-    tagInput,
-    setTagInput,
-    tagError,
-    setTagError,
-    addTag,
-    removeTag,
-    handleTagKeyDown,
-  } = useTagInput(tags, (newTags) =>
-    setValue("tags", newTags, { shouldValidate: true }),
-  );
-
-  async function onSubmit(data: FormValues) {
+  async function onSubmit(data: NoteFormValues) {
     setGlobalError(null);
-
     try {
       // folderId は URL パラメータ由来。フォームの値と合わせて送信する。
       const res = await authFetch("/api/notes", {
@@ -101,100 +55,13 @@ export default function NewNotePage() {
           </Link>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-          {/* タイトル */}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="title" className="text-sm font-medium">
-              タイトル
-            </label>
-            <input
-              id="title"
-              {...register("title")}
-              type="text"
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground"
-            />
-            {errors.title && (
-              <p className="text-xs text-red-500">{errors.title.message}</p>
-            )}
-          </div>
-
-          {/* 内容 */}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="content_md" className="text-sm font-medium">
-              内容
-            </label>
-            <textarea
-              id="content_md"
-              {...register("content_md")}
-              rows={12}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground resize-y font-mono text-sm"
-            />
-            {errors.content_md && (
-              <p className="text-xs text-red-500">
-                {errors.content_md.message}
-              </p>
-            )}
-          </div>
-
-          {/* タグ */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">タグ</label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => {
-                  setTagInput(e.target.value);
-                  setTagError(null);
-                }}
-                onKeyDown={handleTagKeyDown}
-                placeholder="タグを入力して Enter"
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                追加
-              </button>
-            </div>
-            {tagError && <p className="text-xs text-red-500">{tagError}</p>}
-            {errors.tags && (
-              <p className="text-xs text-red-500">{errors.tags.message}</p>
-            )}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 px-3 py-1 text-base rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-red-500 transition-colors"
-                      aria-label={`${tag} を削除`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {globalError && <p className="text-sm text-red-500">{globalError}</p>}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="mt-2 px-6 py-3 rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-          >
-            {isSubmitting ? "作成中..." : "作成する"}
-          </button>
-        </form>
+        <NoteForm
+          defaultValues={{ title: "", content_md: "", tags: [] }}
+          onSubmit={onSubmit}
+          submitLabel="作成する"
+          submittingLabel="作成中..."
+          globalError={globalError}
+        />
       </div>
     </main>
   );

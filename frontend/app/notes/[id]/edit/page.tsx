@@ -1,28 +1,11 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
 import { authFetch } from "@/lib/api";
-import { useTagInput } from "@/lib/useTagInput";
-
-// フォームのバリデーションルールを Zod で定義する
-const schema = z.object({
-  title: z
-    .string()
-    .min(1, "タイトルは必須です")
-    .max(200, "タイトルは200文字以内で入力してください"),
-  content_md: z.string().min(1, "内容は必須です"),
-  tags: z
-    .array(z.string().min(1).max(20, "タグ名は20文字以内で入力してください"))
-    .max(10, "タグは最大10個までです"),
-});
-
-// schema から TypeScript の型を自動生成する
-type FormValues = z.infer<typeof schema>;
+import { type NoteFormValues } from "@/lib/noteSchema";
+import NoteForm from "@/components/NoteForm";
 
 // "ready" はフォームにノートデータが読み込まれて編集可能な状態を表す
 type LoadStatus = "loading" | "ready" | "error";
@@ -38,39 +21,11 @@ export default function EditNotePage({
   const [loadError, setLoadError] = useState<string | null>(null);
   // フォーム送信時のサーバーエラーを表示するための状態
   const [globalError, setGlobalError] = useState<string | null>(null);
+  // NoteForm に渡す初期値。API 取得後にセットする。
+  const [noteData, setNoteData] = useState<NoteFormValues | null>(null);
   const router = useRouter();
 
-  // zodResolver で schema をバリデーターとして react-hook-form に渡す
-  // reset はノートデータ取得後にフォームの初期値を書き換えるために使う
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { tags: [] },
-  });
-
-  // tags フィールドを監視し、useTagInput に現在値を渡す
-  const tags = watch("tags");
-  // useTagInput はタグ入力欄の状態を管理するカスタムフック。
-  // タグが追加・削除されると setValue で react-hook-form の値を更新する。
-  const {
-    tagInput,
-    setTagInput,
-    tagError,
-    setTagError,
-    addTag,
-    removeTag,
-    handleTagKeyDown,
-  } = useTagInput(tags, (newTags) =>
-    setValue("tags", newTags, { shouldValidate: true }),
-  );
-
-  // マウント時（または id が変わったとき）に既存ノートのデータをフォームに読み込む
+  // マウント時（または id が変わったとき）に既存ノートのデータを取得する
   useEffect(() => {
     async function fetchNote() {
       try {
@@ -94,12 +49,8 @@ export default function EditNotePage({
         }
 
         const note = await res.json();
-        // reset でフォームの各フィールドに取得したノートの値をセットする
-        reset({
-          title: note.title,
-          content_md: note.content_md,
-          tags: note.tags,
-        });
+        // noteData を state にセットし、NoteForm がマウントされる際の defaultValues として使う
+        setNoteData({ title: note.title, content_md: note.content_md, tags: note.tags });
         setLoadStatus("ready");
       } catch {
         setLoadError("サーバーへの接続に失敗しました");
@@ -108,11 +59,10 @@ export default function EditNotePage({
     }
 
     fetchNote();
-  }, [id, router, reset]);
+  }, [id, router]);
 
-  async function onSubmit(data: FormValues) {
+  async function onSubmit(data: NoteFormValues) {
     setGlobalError(null);
-
     try {
       // folder_id はノート一覧の移動機能で変更するため、編集フォームには含めない
       const res = await authFetch(`/api/notes/${id}`, {
@@ -161,108 +111,20 @@ export default function EditNotePage({
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">ノートを編集</h1>
-          <Link
-            href={`/notes/${id}`}
-            className="text-sm text-gray-500 underline"
-          >
+          <Link href={`/notes/${id}`} className="text-sm text-gray-500 underline">
             詳細へ戻る
           </Link>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-          {/* タイトル */}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="title" className="text-sm font-medium">
-              タイトル
-            </label>
-            <input
-              id="title"
-              {...register("title")}
-              type="text"
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground"
-            />
-            {errors.title && (
-              <p className="text-xs text-red-500">{errors.title.message}</p>
-            )}
-          </div>
-
-          {/* 内容 */}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="content_md" className="text-sm font-medium">
-              内容
-            </label>
-            <textarea
-              id="content_md"
-              {...register("content_md")}
-              rows={12}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground resize-y font-mono text-sm"
-            />
-            {errors.content_md && (
-              <p className="text-xs text-red-500">
-                {errors.content_md.message}
-              </p>
-            )}
-          </div>
-
-          {/* タグ */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium">タグ</label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => {
-                  setTagInput(e.target.value);
-                  setTagError(null);
-                }}
-                onKeyDown={handleTagKeyDown}
-                placeholder="タグを入力して Enter"
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                追加
-              </button>
-            </div>
-            {tagError && <p className="text-xs text-red-500">{tagError}</p>}
-            {errors.tags && (
-              <p className="text-xs text-red-500">{errors.tags.message}</p>
-            )}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 px-3 py-1 text-base rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-red-500 transition-colors"
-                      aria-label={`${tag} を削除`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {globalError && <p className="text-sm text-red-500">{globalError}</p>}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="mt-2 px-6 py-3 rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-          >
-            {isSubmitting ? "保存中..." : "保存する"}
-          </button>
-        </form>
+        {/* loadStatus === "ready" のときだけレンダリングするため、
+            noteData は必ず非 null。NoteForm は正しい defaultValues でマウントされる。 */}
+        <NoteForm
+          defaultValues={noteData!}
+          onSubmit={onSubmit}
+          submitLabel="保存する"
+          submittingLabel="保存中..."
+          globalError={globalError}
+        />
       </div>
     </main>
   );
