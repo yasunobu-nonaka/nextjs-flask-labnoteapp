@@ -3,6 +3,14 @@ from app.model import User
 from conftest import register_user, login_and_get_token
 
 
+def create_folder(client, auth_headers, name: str, parent_id: int | None = None):
+    return client.post(
+        "/api/folders",
+        json={"name": name, "parent_id": parent_id},
+        headers=auth_headers["headers"],
+    )
+
+
 def create_note(
     client,
     auth_headers,
@@ -132,6 +140,24 @@ class TestNoteCreation:
         assert res.get_json()["errors"]["tags"][0] == "Field may not be null."
         assert res.status_code == 400
 
+    def test_note_creation_with_folder_id(self, client, auth_headers):
+        # フォルダーを作成してからノートをそのフォルダーに作成
+        folder_id = create_folder(client, auth_headers, "My Folder").get_json()["id"]
+
+        res = client.post(
+            "/api/notes",
+            json={
+                "title": "Folder Note",
+                "content_md": "Note in folder",
+                "folder_id": folder_id,
+            },
+            headers=auth_headers["headers"],
+        )
+
+        data = res.get_json()
+        assert res.status_code == 201
+        assert data["note"]["folder_id"] == folder_id
+
 
 #############################################
 # tests for note index
@@ -188,6 +214,59 @@ class TestNoteIndex:
 
         assert res.get_json()["msg"] == "Missing Authorization Header"
         assert res.status_code == 401
+
+    def test_note_search_by_query(self, client, auth_headers):
+        create_note(client, auth_headers, "Flask Note", "flask content")
+        create_note(client, auth_headers, "React Note", "react content")
+
+        res = client.get("/api/notes?q=Flask", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 1
+        assert data["notes"][0]["title"] == "Flask Note"
+
+    def test_note_filter_by_tag(self, client, auth_headers):
+        create_note(client, auth_headers, "Tagged Note", "content", ["python"])
+        create_note(client, auth_headers, "Untagged Note", "content", ["java"])
+
+        res = client.get("/api/notes?tag=python", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 1
+        assert data["notes"][0]["title"] == "Tagged Note"
+
+    def test_note_filter_by_folder_id(self, client, auth_headers):
+        folder_id = create_folder(client, auth_headers, "My Folder").get_json()["id"]
+
+        # フォルダーに属するノートと属さないノートを作成
+        client.post(
+            "/api/notes",
+            json={"title": "In Folder", "content_md": "content", "folder_id": folder_id},
+            headers=auth_headers["headers"],
+        )
+        create_note(client, auth_headers, "No Folder", "content")
+
+        res = client.get(f"/api/notes?folder_id={folder_id}", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 1
+        assert data["notes"][0]["title"] == "In Folder"
+
+    def test_note_pagination(self, client, auth_headers):
+        create_note(client, auth_headers, "My Note 1", "content 1")
+        create_note(client, auth_headers, "My Note 2", "content 2")
+
+        # per_page=10 のためページ2は空になる
+        res = client.get("/api/notes?page=2", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["page"] == 2
+        assert data["total"] == 2
+        assert data["notes"] == []
 
     def test_note_ownership_in_note_index(self, client, auth_headers):
         # register 2nd user and get token
@@ -336,6 +415,7 @@ class TestNoteDetail:
         res = client.get(f"api/notes/{note_id}", headers=auth_headers["headers"])
 
         assert "404 Not Found" in res.text
+        assert res.status_code == 404
 
 
 #############################################
@@ -504,3 +584,63 @@ class TestNoteDelete:
 
         assert "404 Not Found" in res_note_delete.text
         assert res_note_delete.status_code == 404
+
+
+#############################################
+# tests for tags index
+#############################################
+class TestTagsIndex:
+    def test_tags_index(self, client, auth_headers):
+        create_note(client, auth_headers, "Note 1", "content", ["python", "flask"])
+        create_note(client, auth_headers, "Note 2", "content", ["react"])
+
+        res = client.get("/api/notes/tags", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        # タグは tagname の昇順で返される
+        assert data == ["flask", "python", "react"]
+
+    def test_tags_index_deduplication(self, client, auth_headers):
+        # 複数ノートで同じタグを使っても重複しない
+        create_note(client, auth_headers, "Note 1", "content", ["python"])
+        create_note(client, auth_headers, "Note 2", "content", ["python"])
+
+        res = client.get("/api/notes/tags", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data == ["python"]
+
+    def test_no_header_rejected_in_tags_index(self, client):
+        res = client.get("/api/notes/tags")
+
+        assert res.get_json()["msg"] == "Missing Authorization Header"
+        assert res.status_code == 401
+
+    def test_tags_ownership_in_tags_index(self, client, auth_headers):
+        # 2nd ユーザーを登録してタグ付きノートを作成
+        register_user(
+            client,
+            username="seconduser",
+            email="seconduser@example.com",
+            password="seconduser1234",
+        )
+        token_2nd_user = login_and_get_token(
+            client, identifier="seconduser", password="seconduser1234"
+        )
+
+        create_note(client, auth_headers, "Testuser Note", "content", ["testuser-tag"])
+        client.post(
+            "/api/notes",
+            json={"title": "2nd Note", "content_md": "content", "tags": ["seconduser-tag"]},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token_2nd_user}",
+            },
+        )
+
+        # testuser は自分のタグのみ取得できる
+        res = client.get("/api/notes/tags", headers=auth_headers["headers"])
+        assert res.status_code == 200
+        assert res.get_json() == ["testuser-tag"]
