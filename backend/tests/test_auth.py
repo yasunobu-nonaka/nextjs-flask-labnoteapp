@@ -6,6 +6,7 @@ from app.services.mail_service import (
     generate_reset_password_token,
     verify_email_verification_token,
     verify_reset_password_token,
+    hash_token,
 )
 from app.api.auth.auth_service import get_user_by_email
 from app.extensions import db
@@ -381,6 +382,10 @@ class TestPasswordReset:
     def test_reset_password(self, client, test_user):
         token = generate_reset_password_token(test_user.email)
 
+        # forgot-password ルートが行うハッシュ保存をテスト内で再現
+        test_user.reset_token_hash = hash_token(token)
+        db.session.commit()
+
         res = client.post(
             "/api/auth/reset-password",
             json={
@@ -508,6 +513,7 @@ class TestPasswordResetIntegration:
         """完全なパスワードリセットフローのテスト"""
 
         # Step 1: パスワードリセットをリクエスト
+        # send_password_reset_email をモックし、ルートが生成したトークンを取得する
         with patch("app.api.auth.routes.send_password_reset_email") as mock_send:
             mock_send.return_value = True
 
@@ -515,18 +521,17 @@ class TestPasswordResetIntegration:
                 "/api/auth/forgot-password", json={"email": test_user.email}
             )
             assert forgot_response.status_code == 200
-
-            # メール送信関数が呼ばれたことを確認
             assert mock_send.called
 
-        # Step 2: トークンを生成（実際のフローではメールから取得）
-        token = generate_reset_password_token(test_user.email)
+            # ルートが send_password_reset_email(user.email, token) を呼んでいるので
+            # 第2引数（token）を取り出す
+            token = mock_send.call_args.args[1]
 
-        # Step 3: トークンの有効性を確認
+        # Step 2: トークンの有効性を確認
         verify_response = client.get(f"/api/auth/reset-password/{token}")
         assert verify_response.status_code == 200
 
-        # Step 4: 新しいパスワードを設定
+        # Step 3: 新しいパスワードを設定
         reset_response = client.post(
             "/api/auth/reset-password",
             json={
@@ -537,8 +542,7 @@ class TestPasswordResetIntegration:
         )
         assert reset_response.status_code == 200
 
-        # Step 5: 新しいパスワードでログインできることを確認
-        # （ログイン機能がある場合）
+        # Step 4: 新しいパスワードでログインできることを確認
         login_response = client.post(
             "/api/auth/login",
             json={
@@ -552,7 +556,11 @@ class TestPasswordResetIntegration:
         """同じトークンで2回リセットしようとした場合のテスト"""
         token = generate_reset_password_token(test_user.email)
 
-        # 1回目のリセット
+        # forgot-password ルートが行うハッシュ保存をテスト内で再現
+        test_user.reset_token_hash = hash_token(token)
+        db.session.commit()
+
+        # 1回目のリセット（成功）
         response1 = client.post(
             "/api/auth/reset-password",
             json={
@@ -563,8 +571,7 @@ class TestPasswordResetIntegration:
         )
         assert response1.status_code == 200
 
-        # 2回目のリセット（同じトークン）
-        # 実装によってはトークンを無効化するべき
+        # 2回目のリセット（同じトークン）→ ハッシュがクリア済みなので失敗
         response2 = client.post(
             "/api/auth/reset-password",
             json={
@@ -573,7 +580,4 @@ class TestPasswordResetIntegration:
                 "confirm": "SecondPass123!",
             },
         )
-
-        # トークンは使い捨てにするのがベストプラクティス
-        # その場合、2回目は失敗するべき
         assert response2.status_code == 400

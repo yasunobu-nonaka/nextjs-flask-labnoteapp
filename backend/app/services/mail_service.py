@@ -1,5 +1,6 @@
 from flask import render_template
 from flask_mail import Message
+import hashlib
 import logging
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask import current_app, url_for
@@ -32,6 +33,11 @@ def generate_reset_password_token(email):
     """パスワードリセット用のトークンを生成"""
     serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
     return serializer.dumps(email, salt="password-reset")
+
+
+def hash_token(token: str) -> str:
+    """トークンを SHA-256 でハッシュ化して返す"""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def verify_email_verification_token(token, expiration=1800):
@@ -84,9 +90,8 @@ def send_verification_email(user_email):
         return False
 
 
-def send_password_reset_email(user_email):
+def send_password_reset_email(user_email, token):
     try:
-        token = generate_reset_password_token(user_email)
         verify_url = url_for("api.auth.reset_password", token=token, _external=True)
         html_body = render_template("email/reset_password.html", verify_url=verify_url)
 
