@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import String, Text, DateTime, ForeignKey, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List
+from typing import List, Optional
 
 from datetime import datetime, timedelta, timezone
 
@@ -39,6 +39,10 @@ class Note(db.Model):
     # リレーション
     # ユーザー：1対多
     user: Mapped["User"] = relationship(back_populates="notes")
+
+    # フォルダー：多対1
+    folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("folders.id"), nullable=True)
+    folder: Mapped[Optional["Folder"]] = relationship(back_populates="notes")
 
     # タグ：多対多
     tags: Mapped[List[Tag]] = relationship(secondary=notes_tags, back_populates="notes")

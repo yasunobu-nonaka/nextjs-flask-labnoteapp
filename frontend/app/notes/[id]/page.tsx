@@ -22,13 +22,16 @@ export default function NoteDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Next.js 15 ではルートパラメータが Promise になるため use() で unwrap する
   const { id } = use(params);
   const [note, setNote] = useState<Note | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  // 削除処理中はボタンを無効化するための状態
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
+  // id が変わるたびにノートを再取得する（別のノートへ遷移したとき）
   useEffect(() => {
     async function fetchNote() {
       try {
@@ -64,6 +67,7 @@ export default function NoteDetailPage({
   }, [id, router]);
 
   async function handleDelete() {
+    // confirm でユーザーに削除の意図を確認してから API を呼ぶ
     if (!confirm("このノートを削除しますか？")) return;
 
     setIsDeleting(true);
@@ -107,6 +111,7 @@ export default function NoteDetailPage({
     );
   }
 
+  // API は ISO 8601 文字列で日時を返すため、日本語表示に変換する
   const createdAt = new Date(note.created_at).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "long",

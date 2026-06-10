@@ -35,10 +35,11 @@ def list_tags():
 def notes_index():
     query_word = request.args.get("q")
     tag_names = request.args.getlist("tag")
+    folder_id = request.args.get("folder_id", type=int)
     page = request.args.get("page", 1, type=int)
     per_page = 10
 
-    notes, total = get_notes_service(current_user.id, query_word, tag_names, page, per_page)
+    notes, total = get_notes_service(current_user.id, query_word, tag_names, folder_id, page, per_page)
 
     return jsonify({
         "notes": res_schema_notes.dump(notes),

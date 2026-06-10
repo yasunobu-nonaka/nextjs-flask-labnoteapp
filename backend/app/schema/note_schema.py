@@ -18,6 +18,7 @@ class NoteCreateSchema(Schema):
         load_default=list,
         validate=validate.Length(max=10, error="タグは最大10個までです"),
     )
+    folder_id = fields.Int(load_default=None, allow_none=True)
 
 
 class NoteResponseSchema(Schema):
@@ -25,6 +26,7 @@ class NoteResponseSchema(Schema):
     user_id = fields.Int(dump_only=True)
     title = fields.Str(dump_only=True)
     content_md = fields.Str(dump_only=True)
+    folder_id = fields.Int(dump_only=True, allow_none=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
     tags = fields.Method("get_tags", dump_only=True)
