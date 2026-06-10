@@ -162,17 +162,25 @@ def test_note_index(client, auth_headers):
     res = client.get("/api/notes", headers=auth_headers["headers"])
     data = res.get_json()
     assert res.status_code == 200
-    assert len(data) == 2
 
-    assert data[0]["user_id"] == auth_headers["user_id"]
-    assert data[0]["title"] == "My Note 1"
-    assert data[0]["content_md"] == "Note Content 1"
-    assert data[0]["tags"] == ["tag 1-1", "tag 1-2", "tag 1-3"]
+    # レスポンスはページネーション付きオブジェクト
+    assert data["total"] == 2
+    assert data["page"] == 1
+    assert data["per_page"] == 10
+    assert data["total_pages"] == 1
 
-    assert data[1]["user_id"] == auth_headers["user_id"]
-    assert data[1]["title"] == "My Note 2"
-    assert data[1]["content_md"] == "Note Content 2"
-    assert data[1]["tags"] == ["tag 2-1", "tag 2-2", "tag 2-3"]
+    notes = data["notes"]
+    assert len(notes) == 2
+
+    assert notes[0]["user_id"] == auth_headers["user_id"]
+    assert notes[0]["title"] == "My Note 1"
+    assert notes[0]["content_md"] == "Note Content 1"
+    assert notes[0]["tags"] == ["tag 1-1", "tag 1-2", "tag 1-3"]
+
+    assert notes[1]["user_id"] == auth_headers["user_id"]
+    assert notes[1]["title"] == "My Note 2"
+    assert notes[1]["content_md"] == "Note Content 2"
+    assert notes[1]["tags"] == ["tag 2-1", "tag 2-2", "tag 2-3"]
 
 
 def test_no_header_rejected_in_note_index(client):
@@ -236,7 +244,7 @@ def test_note_ownership_in_note_index(client, auth_headers):
 
     assert res_testuser.status_code == 200
 
-    notes = res_testuser.get_json()
+    notes = res_testuser.get_json()["notes"]
     assert len(notes) != 0
     for note in notes:
         assert note["user_id"] == auth_headers["user_id"]
@@ -248,7 +256,7 @@ def test_note_ownership_in_note_index(client, auth_headers):
 
     assert res_2nduser.status_code == 200
 
-    notes = res_2nduser.get_json()
+    notes = res_2nduser.get_json()["notes"]
     assert len(notes) != 0
     for note in notes:
         assert note["user_id"] == second_user_id
