@@ -49,11 +49,13 @@ export default function NotesPage() {
 
   const router = useRouter();
 
+  // トークンを削除してログインページへ遷移する
   function handleLogout() {
     localStorage.removeItem("access_token");
     router.push("/login");
   }
 
+  // キーワード検索・タグフィルターをすべてリセットして1ページ目に戻る
   function handleClear() {
     setQuery("");
     setSubmittedQuery("");
@@ -61,6 +63,7 @@ export default function NotesPage() {
     setCurrentPage(1);
   }
 
+  // フォルダーを選択・解除して1ページ目に戻る（null = すべてのノート）
   function handleSelectFolder(id: number | null) {
     setSelectedFolderId(id);
     setCurrentPage(1);
@@ -71,10 +74,15 @@ export default function NotesPage() {
     setRefreshKey((k) => k + 1);
   }
 
+  // タグの選択状態を切り替えて1ページ目に戻る
+  // すでに選択中なら除去し、未選択なら追加する
   function handleTagToggle(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) {
+        return prev.filter((t) => t !== tag);
+      }
+      return [...prev, tag];
+    });
     setCurrentPage(1);
   }
 
@@ -103,12 +111,21 @@ export default function NotesPage() {
     async function fetchNotes() {
       setStatus("loading");
       try {
+        // APIクエリパラメータを組み立てる
         const params = new URLSearchParams();
-        if (submittedQuery) params.set("q", submittedQuery);
+
+        if (submittedQuery) {
+          params.set("q", submittedQuery);
+        }
+
         selectedTags.forEach((tag) => params.append("tag", tag));
-        if (selectedFolderId !== null)
+
+        if (selectedFolderId !== null) {
           params.set("folder_id", String(selectedFolderId));
+        }
+
         params.set("page", String(currentPage));
+
         const res = await authFetch(`/api/notes?${params.toString()}`);
 
         if (res.status === 401) {
@@ -172,7 +189,6 @@ export default function NotesPage() {
       {/* 右カラム: メインコンテンツ */}
       <div className="flex-1 px-6 py-10">
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
-
           {/* ページヘッダー: タイトル・新規作成ボタン・ログアウトボタン */}
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">ノート一覧</h1>
