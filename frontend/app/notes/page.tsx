@@ -5,17 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import FolderSidebar from "@/components/FolderSidebar";
-import { type Folder, buildFolderOptions } from "@/lib/folders";
-
-type Note = {
-  id: number;
-  title: string;
-  content_md: string;
-  created_at: string;
-  updated_at: string;
-  tags: string[];
-  folder_id: number | null;
-};
+import { type Folder } from "@/lib/folders";
+import NoteCard, { type Note } from "@/components/NoteCard";
 
 type NotesResponse = {
   notes: Note[];
@@ -172,12 +163,17 @@ export default function NotesPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground flex">
+      {/* 左カラム: フォルダーサイドバー */}
       <FolderSidebar
         selectedFolderId={selectedFolderId}
         onSelectFolder={handleSelectFolder}
       />
+
+      {/* 右カラム: メインコンテンツ */}
       <div className="flex-1 px-6 py-10">
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
+
+          {/* ページヘッダー: タイトル・新規作成ボタン・ログアウトボタン */}
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">ノート一覧</h1>
             <div className="flex gap-2">
@@ -200,6 +196,7 @@ export default function NotesPage() {
             </div>
           </div>
 
+          {/* キーワード検索フォーム */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -223,6 +220,7 @@ export default function NotesPage() {
             </button>
           </form>
 
+          {/* タグフィルター: チェックボックス一覧 */}
           {availableTags.length > 0 && (
             <div className="flex flex-col gap-2">
               <span className="text-sm text-gray-500">タグで絞り込む:</span>
@@ -245,6 +243,7 @@ export default function NotesPage() {
             </div>
           )}
 
+          {/* フィルター中バナー: 適用中の条件表示・クリアボタン */}
           {isFiltering && (
             <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
               {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
@@ -270,6 +269,7 @@ export default function NotesPage() {
             </div>
           )}
 
+          {/* ノート一覧 または 空状態メッセージ */}
           {notes.length === 0 ? (
             <p className="text-gray-500">
               {isFiltering
@@ -291,6 +291,7 @@ export default function NotesPage() {
             </ul>
           )}
 
+          {/* ページネーション: 複数ページあるときだけ表示 */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4">
               <button
@@ -315,137 +316,5 @@ export default function NotesPage() {
         </div>
       </div>
     </main>
-  );
-}
-
-function NoteCard({
-  note,
-  selectedTags,
-  onTagToggle,
-  folders,
-  onMoved,
-}: {
-  note: Note;
-  selectedTags: string[];
-  onTagToggle: (tag: string) => void;
-  folders: Folder[];
-  onMoved: () => void;
-}) {
-  // カードの表示モードを3状態で管理する
-  //   idle   : 通常表示
-  //   menu   : ··· ボタンを押したときのドロップダウン表示
-  //   moving : フォルダー移動フォームの表示
-  const [mode, setMode] = useState<"idle" | "menu" | "moving">("idle");
-  // 移動先フォルダーの選択値（null = フォルダーなし）
-  const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
-
-  const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  async function handleMove() {
-    const res = await authFetch(`/api/notes/${note.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ folder_id: targetFolderId }),
-    });
-    if (res.ok) {
-      setMode("idle");
-      onMoved();
-    }
-  }
-
-  return (
-    <li className="relative flex flex-col gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-      {/* 透明オーバーレイ: メニュー外のクリックを検知して menu を閉じる */}
-      {mode === "menu" && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setMode("idle")} />
-          <div className="absolute right-4 top-10 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-36">
-            <button
-              onClick={() => {
-                // 現在のフォルダーを初期値として移動フォームを開く
-                setTargetFolderId(note.folder_id);
-                setMode("moving");
-              }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              移動
-            </button>
-          </div>
-        </>
-      )}
-
-      <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/notes/${note.id}`}
-          className="font-semibold text-lg leading-snug hover:underline"
-        >
-          {note.title}
-        </Link>
-        <div className="flex items-center gap-1 shrink-0 mt-0.5">
-          <span className="text-xs text-gray-400">{date}</span>
-          <button
-            onClick={() => setMode(mode === "menu" ? "idle" : "menu")}
-            className="px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm leading-none"
-            title="メニュー"
-          >
-            ···
-          </button>
-        </div>
-      </div>
-
-      {/* 移動フォーム */}
-      {mode === "moving" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={targetFolderId ?? ""}
-            onChange={(e) =>
-              setTargetFolderId(e.target.value ? Number(e.target.value) : null)
-            }
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 focus:outline-none"
-          >
-            <option value="">Home</option>
-            {buildFolderOptions(folders).map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleMove}
-            className="px-3 py-1 text-sm rounded bg-foreground text-background hover:opacity-80 transition-opacity"
-          >
-            移動
-          </button>
-          <button
-            onClick={() => setMode("idle")}
-            className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            キャンセル
-          </button>
-        </div>
-      )}
-
-      {note.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {note.tags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => onTagToggle(tag)}
-              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
-                selectedTags.includes(tag)
-                  ? "bg-foreground text-background"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
-    </li>
   );
 }
