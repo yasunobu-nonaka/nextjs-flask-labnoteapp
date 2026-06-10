@@ -3,11 +3,14 @@ from marshmallow import ValidationError
 
 from . import auth_bp
 from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema
+from app.extensions import db
 from app.services.mail_service import (
     send_verification_email,
     send_password_reset_email,
+    generate_reset_password_token,
     verify_email_verification_token,
     verify_reset_password_token,
+    hash_token,
 )
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
@@ -173,6 +176,7 @@ def forgot_password():
     # メールアドレスの存在を確認
     user_input = request.get_json()
 
+    # 入力のバリデーション
     try:
         validated_user_input = email_schema.load(user_input)
     except ValidationError as err:
@@ -191,9 +195,13 @@ def forgot_password():
             200,
         )
 
-    # 存在すれば、トークン付きURLをメールで送付
-    # 確認メール送信
-    if send_password_reset_email(user.email):
+    # トークンを生成してハッシュをDBに保存（一回限り使用のため）
+    token = generate_reset_password_token(user.email)
+    user.reset_token_hash = hash_token(token)
+    db.session.commit()
+
+    # トークン付きURLをメールで送付
+    if send_password_reset_email(user.email, token):
         return (
             jsonify(
                 {
@@ -204,8 +212,6 @@ def forgot_password():
             200,
         )
     else:
-        # メール送信失敗時はユーザーを削除（オプション）
-        delete_user(user)
         return jsonify({"error": "パスワードリセット用メールの送信に失敗しました"}), 500
 
 
@@ -261,11 +267,14 @@ def reset_password():
     if not user:
         return jsonify({"error": "ユーザーが見つかりません"}), 404
 
-    # パスワード更新
-    try:
-        update_user_password(user, validated_user_input["password"])
-    except Exception as err:
-        return jsonify({"message": "パスワードの更新に失敗しました"}), 500
+    # トークンが使用済みまたは未発行の場合は拒否
+    token = validated_user_input["token"]
+    if user.reset_token_hash is None or user.reset_token_hash != hash_token(token):
+        return jsonify({"error": "このリンクはすでに使用済みか無効です"}), 400
+
+    # ハッシュをクリアしてパスワード更新（同一commitで反映）
+    user.reset_token_hash = None
+    update_user_password(user, validated_user_input["password"])
 
     return jsonify({"message": "パスワードを更新しました"}), 200
 
