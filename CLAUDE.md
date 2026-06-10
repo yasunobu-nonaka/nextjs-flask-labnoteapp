@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Coding Conventions
+
+- Prefer clarity over brevity. Slightly verbose code is acceptable if it makes the logic easier to follow.
+- Add comments to functions, classes, React hooks, and React component JSX to explain their role and the purpose of key elements within them.
+
 ## System Overview
 
 Lab note application for researchers. Users create Markdown notes, organize them with tags and folders, and search by keyword or tag.
