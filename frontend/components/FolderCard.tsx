@@ -25,6 +25,8 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   // 名称変更モーダルの開閉と入力値
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [editName, setEditName] = useState(folder.name);
+  // 削除確認モーダルの開閉
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   async function handleRename() {
     const trimmed = editName.trim();
@@ -40,16 +42,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   }
 
   async function handleDelete() {
-    if (
-      !confirm(
-        `「${folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。`,
-      )
-    )
-      return;
     const res = await authFetch(`/api/folders/${folder.id}`, {
       method: "DELETE",
     });
-    if (res.ok) onMutation();
+    if (res.ok) {
+      setIsDeleteModalOpen(false);
+      onMutation();
+    }
   }
 
   return (
@@ -101,7 +100,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsMenuOpen(false);
-                    handleDelete();
+                    setIsDeleteModalOpen(true);
                   }}
                   className="w-full text-left px-4 py-2 text-base text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
@@ -124,6 +123,38 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
           </button>
         </div>
       </div>
+
+      {/* 削除確認モーダル */}
+      {isDeleteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setIsDeleteModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold">フォルダーを削除</h2>
+            <p className="text-base text-gray-600 dark:text-gray-400">
+              「{folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-base rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+              >
+                削除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 名称変更モーダル */}
       {isRenameModalOpen && (
