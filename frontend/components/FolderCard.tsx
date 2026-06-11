@@ -14,9 +14,9 @@ type Props = {
 
 /**
  * FolderCard コンポーネント
- * ノート一覧内にフォルダーをカード形式で表示する。
- * クリックすると onNavigate でそのフォルダーに移動する。
- * ホバー時にリネーム・削除ボタンを表示する。
+ * タブ付きカード形式でフォルダーを表示する。
+ * カード本体をクリックするとそのフォルダーに移動し、
+ * ホバー時に右上のアクションボタンでリネーム・削除が可能。
  */
 export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   const [isEditing, setIsEditing] = useState(false);
@@ -51,77 +51,91 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   if (isEditing) {
     return (
       <li>
-        {/* リネームフォーム */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleRename();
-          }}
-          className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900"
-        >
-          <span className="text-sm text-gray-400 shrink-0">フォルダー</span>
-          <input
-            autoFocus
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            className="flex-1 px-2 py-0.5 text-base bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="text-sm text-blue-500 hover:underline shrink-0"
-          >
-            保存
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(false);
-              setEditName(folder.name);
+        <div className="flex flex-col">
+          {/* タブ（フォルダーの耳）*/}
+          <div className="self-start ml-3 h-4 w-20 rounded-t-lg bg-amber-300 dark:bg-amber-700" />
+          {/* リネームフォーム */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRename();
             }}
-            className="text-sm text-gray-400 hover:underline shrink-0"
+            className="rounded-lg rounded-tl-none border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 flex flex-col gap-3 min-h-24"
           >
-            ✕
-          </button>
-        </form>
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="text-base bg-transparent border-b border-amber-400 dark:border-amber-600 focus:outline-none w-full"
+            />
+            <div className="flex gap-2 justify-end mt-auto">
+              <button
+                type="submit"
+                className="text-sm text-blue-500 hover:underline"
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditName(folder.name);
+                }}
+                className="text-sm text-gray-400 hover:underline"
+              >
+                ✕
+              </button>
+            </div>
+          </form>
+        </div>
       </li>
     );
   }
 
   return (
-    <li>
-      {/*
-       * フォルダーカード本体
-       * ホバーで右端のアクションボタンを表示する。
-       * クリック領域（ボタン）はフォルダー名と矢印を含む。
-       */}
-      <div className="group flex items-center rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors bg-gray-50 dark:bg-gray-900/50">
-        <button
-          onClick={() => onNavigate(folder.id)}
-          className="flex-1 flex items-center gap-3 px-4 py-3 text-left"
-        >
-          <span className="text-xs font-mono text-gray-400 shrink-0">DIR</span>
-          <span className="text-base font-medium">{folder.name}</span>
-          <span className="ml-auto text-gray-400 text-base shrink-0">›</span>
-        </button>
-        {/* ホバー時のみ表示するアクションボタン */}
-        <div className="hidden group-hover:flex items-center gap-0.5 px-2 shrink-0">
+    <li className="group">
+      <div className="flex flex-col">
+        {/* タブ（フォルダーの耳） */}
+        <div className="self-start ml-3 h-4 w-20 rounded-t-lg bg-amber-300 dark:bg-amber-700" />
+        {/*
+         * カード本体: 琥珀色でフォルダーらしさを演出。
+         * 絶対配置のナビゲーションボタンがカード全体をクリック可能にし、
+         * アクションボタン（z-10）がその上に重なる。
+         */}
+        <div className="relative rounded-lg rounded-tl-none border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 min-h-24 overflow-hidden">
+          {/* カード全体をクリック可能にするナビゲーションボタン */}
           <button
-            onClick={() => {
-              setIsEditing(true);
-              setEditName(folder.name);
-            }}
-            title="名前を変更"
-            className="p-1 text-sm text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            onClick={() => onNavigate(folder.id)}
+            className="absolute inset-0 w-full h-full text-left p-4 flex items-end"
           >
-            ✎
+            <span className="text-base font-medium truncate w-full">
+              {folder.name}
+            </span>
           </button>
-          <button
-            onClick={handleDelete}
-            title="削除"
-            className="p-1 text-sm text-gray-400 hover:text-red-500"
-          >
-            ✕
-          </button>
+          {/* ホバー時に右上に表示するアクションボタン */}
+          <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1 z-10">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setEditName(folder.name);
+              }}
+              title="名前を変更"
+              className="p-1 text-sm rounded bg-amber-100 dark:bg-amber-900/80 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              ✎
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              title="削除"
+              className="p-1 text-sm rounded bg-amber-100 dark:bg-amber-900/80 text-gray-400 hover:text-red-500"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       </div>
     </li>
