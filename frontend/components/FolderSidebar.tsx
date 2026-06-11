@@ -27,7 +27,7 @@ export default function FolderSidebar({
   onTagToggle,
 }: Props) {
   return (
-    <aside className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
+    <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
       {/* キーワード検索フォーム */}
       <form
         onSubmit={(e) => {

@@ -353,7 +353,7 @@ export default function NotesPage() {
 
             {/* 現在のフォルダーレベルの直下フォルダー: グリッドで並べる */}
             {currentLevelFolders.length > 0 && (
-              <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <ul className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {currentLevelFolders.map((folder) => (
                   <FolderCard
                     key={folder.id}
@@ -378,7 +378,7 @@ export default function NotesPage() {
                   : "ノートがありません。"}
               </p>
             ) : notes.length > 0 ? (
-              <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <ul className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {notes.map((note) => (
                   <NoteCard
                     key={note.id}
