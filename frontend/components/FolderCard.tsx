@@ -15,11 +15,15 @@ type Props = {
 /**
  * FolderCard コンポーネント
  * タブ付きカード形式でフォルダーを表示する。
- * カード本体をクリックするとそのフォルダーに移動し、
- * ホバー時に右上のアクションボタンでリネーム・削除が可能。
+ * カード本体をクリックするとそのフォルダーに移動する。
+ * 右上の ··· ボタンでポップオーバーメニューを開き、名称変更・削除を行う。
+ * 名称変更はモーダルで入力する。
  */
 export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
-  const [isEditing, setIsEditing] = useState(false);
+  // ··· メニューポップオーバーの開閉
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // 名称変更モーダルの開閉と入力値
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [editName, setEditName] = useState(folder.name);
 
   async function handleRename() {
@@ -30,7 +34,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
       body: JSON.stringify({ name: trimmed }),
     });
     if (res.ok) {
-      setIsEditing(false);
+      setIsRenameModalOpen(false);
       onMutation();
     }
   }
@@ -38,7 +42,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   async function handleDelete() {
     if (
       !confirm(
-        `「${folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。`
+        `「${folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。`,
       )
     )
       return;
@@ -48,61 +52,17 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
     if (res.ok) onMutation();
   }
 
-  if (isEditing) {
-    return (
-      <li>
-        <div className="flex flex-col">
-          {/* タブ（フォルダーの耳）*/}
-          <div className="self-start h-4 w-20 rounded-t-lg bg-yellow-400 dark:bg-yellow-600" />
-          {/* リネームフォーム */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleRename();
-            }}
-            className="rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 p-3 flex flex-col gap-3 min-h-24"
-          >
-            <input
-              autoFocus
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="text-base bg-transparent border-b border-yellow-400 dark:border-yellow-600 focus:outline-none w-full"
-            />
-            <div className="flex gap-2 justify-end mt-auto">
-              <button
-                type="submit"
-                className="text-sm text-blue-500 hover:underline"
-              >
-                保存
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditName(folder.name);
-                }}
-                className="text-sm text-gray-400 hover:underline"
-              >
-                ✕
-              </button>
-            </div>
-          </form>
-        </div>
-      </li>
-    );
-  }
-
   return (
-    <li className="group">
+    <li>
       <div className="flex flex-col">
         {/* タブ（フォルダーの耳） */}
         <div className="self-start h-4 w-20 rounded-t-lg bg-yellow-400 dark:bg-yellow-600" />
         {/*
-         * カード本体: Windows フォルダー風の黄色系デザイン。
-         * 絶対配置のナビゲーションボタンがカード全体をクリック可能にし、
-         * アクションボタン（z-10）がその上に重なる。
+         * カード本体: relative を持ち、絶対配置の子要素の基準点になる。
+         * overflow-hidden を外しているのは、··· メニューのドロップダウンが
+         * カード下端を超えて表示できるようにするため。
          */}
-        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 min-h-24 overflow-hidden">
+        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 min-h-24">
           {/* カード全体をクリック可能にするナビゲーションボタン */}
           <button
             onClick={() => onNavigate(folder.id)}
@@ -112,32 +72,110 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
               {folder.name}
             </span>
           </button>
-          {/* ホバー時に右上に表示するアクションボタン */}
-          <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1 z-10">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditing(true);
-                setEditName(folder.name);
-              }}
-              title="名前を変更"
-              className="p-1 text-sm rounded bg-yellow-200 dark:bg-yellow-900/80 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
-            >
-              ✎
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              title="削除"
-              className="p-1 text-sm rounded bg-yellow-200 dark:bg-yellow-900/80 text-gray-400 hover:text-red-500"
-            >
-              ✕
-            </button>
-          </div>
+
+          {/*
+           * ドロップダウンメニュー: 透明オーバーレイとメニュー本体。
+           * ··· ボタンより先に DOM に置くことで、ボタンが重なったとき
+           * 後から描画される ··· ボタンが上に表示されるようにしている。
+           */}
+          {isMenuOpen && (
+            <>
+              {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsMenuOpen(false)}
+              />
+              <div className="absolute right-2 top-9 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMenuOpen(false);
+                    setEditName(folder.name);
+                    setIsRenameModalOpen(true);
+                  }}
+                  className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  名称変更
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMenuOpen(false);
+                    handleDelete();
+                  }}
+                  className="w-full text-left px-4 py-2 text-base text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  削除
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ··· メニューボタン（右上に固定） */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMenuOpen((v) => !v);
+            }}
+            className="absolute top-2 right-2 px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-base leading-none z-10"
+            title="メニュー"
+          >
+            ···
+          </button>
         </div>
       </div>
+
+      {/* 名称変更モーダル */}
+      {isRenameModalOpen && (
+        /* バックドロップ: クリックでモーダルを閉じる */
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => {
+            setIsRenameModalOpen(false);
+            setEditName(folder.name);
+          }}
+        >
+          {/* モーダル本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold">名称変更</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleRename();
+              }}
+              className="flex flex-col gap-4"
+            >
+              <input
+                autoFocus
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRenameModalOpen(false);
+                    setEditName(folder.name);
+                  }}
+                  className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+                >
+                  変更
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </li>
   );
 }
