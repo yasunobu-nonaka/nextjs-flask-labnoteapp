@@ -225,7 +225,7 @@ export default function NotesPage() {
 
       {/* 右カラム: メインコンテンツ */}
       <div className="flex-1 px-6 py-10">
-        <div className="max-w-2xl mx-auto flex flex-col gap-6">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
           {/* ページヘッダー: タイトル・新規作成ボタン・フォルダー作成ボタン・ログアウトボタン */}
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">ノート一覧</h1>
@@ -353,7 +353,7 @@ export default function NotesPage() {
 
             {/* 現在のフォルダーレベルの直下フォルダー: グリッドで並べる */}
             {currentLevelFolders.length > 0 && (
-              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {currentLevelFolders.map((folder) => (
                   <FolderCard
                     key={folder.id}
@@ -378,7 +378,7 @@ export default function NotesPage() {
                   : "ノートがありません。"}
               </p>
             ) : notes.length > 0 ? (
-              <ul className="grid grid-cols-2 gap-4">
+              <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {notes.map((note) => (
                   <NoteCard
                     key={note.id}
