@@ -180,10 +180,19 @@ export default function NotesPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground flex">
-      {/* 左カラム: フォルダーサイドバー */}
+      {/* 左カラム: フォルダーサイドバー（検索・タグフィルター含む） */}
       <FolderSidebar
         selectedFolderId={selectedFolderId}
         onSelectFolder={handleSelectFolder}
+        query={query}
+        onQueryChange={setQuery}
+        onSearch={() => {
+          setSubmittedQuery(query.trim());
+          setCurrentPage(1);
+        }}
+        selectedTags={selectedTags}
+        availableTags={availableTags}
+        onTagToggle={handleTagToggle}
       />
 
       {/* 右カラム: メインコンテンツ */}
@@ -211,53 +220,6 @@ export default function NotesPage() {
               </button>
             </div>
           </div>
-
-          {/* キーワード検索フォーム */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSubmittedQuery(query.trim());
-              setCurrentPage(1);
-            }}
-            className="flex gap-2"
-          >
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="タイトルで検索..."
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              検索
-            </button>
-          </form>
-
-          {/* タグフィルター: チェックボックス一覧 */}
-          {availableTags.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm text-gray-500">タグで絞り込む:</span>
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
-                {availableTags.map((tag) => (
-                  <label
-                    key={tag}
-                    className="flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTags.includes(tag)}
-                      onChange={() => handleTagToggle(tag)}
-                      className="rounded border-gray-300 dark:border-gray-700"
-                    />
-                    <span className="text-sm">{tag}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* フィルター中バナー: 適用中の条件表示・クリアボタン */}
           {isFiltering && (
