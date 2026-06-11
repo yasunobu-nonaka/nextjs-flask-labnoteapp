@@ -36,7 +36,7 @@ export default function FolderSidebar({
         }}
         className="flex flex-col gap-1.5"
       >
-        <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider px-2">
+        <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
           ノート検索
         </span>
         <div className="flex gap-1">
@@ -45,11 +45,11 @@ export default function FolderSidebar({
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="タイトルで検索..."
-            className="flex-1 min-w-0 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-sm"
+            className="flex-1 min-w-0 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
           />
           <button
             type="submit"
-            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
           >
             検索
           </button>

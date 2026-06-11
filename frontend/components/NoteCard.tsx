@@ -67,7 +67,7 @@ export default function NoteCard({
                 setTargetFolderId(note.folder_id);
                 setMode("moving");
               }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               移動
             </button>
@@ -84,10 +84,10 @@ export default function NoteCard({
           {note.title}
         </Link>
         <div className="flex items-center gap-1 shrink-0 mt-0.5">
-          <span className="text-xs text-gray-400">{date}</span>
+          <span className="text-base text-gray-400">{date}</span>
           <button
             onClick={() => setMode(mode === "menu" ? "idle" : "menu")}
-            className="px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm leading-none"
+            className="px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-base leading-none"
             title="メニュー"
           >
             ···
@@ -114,13 +114,13 @@ export default function NoteCard({
           </select>
           <button
             onClick={handleMove}
-            className="px-3 py-1 text-sm rounded bg-foreground text-background hover:opacity-80 transition-opacity"
+            className="px-3 py-1 text-base rounded bg-foreground text-background hover:opacity-80 transition-opacity"
           >
             移動
           </button>
           <button
             onClick={() => setMode("idle")}
-            className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="px-3 py-1 text-base rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             キャンセル
           </button>
@@ -135,7 +135,7 @@ export default function NoteCard({
               key={tag}
               type="button"
               onClick={() => onTagToggle(tag)}
-              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+              className={`px-2 py-0.5 text-base rounded-full transition-colors ${
                 selectedTags.includes(tag)
                   ? "bg-foreground text-background"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"

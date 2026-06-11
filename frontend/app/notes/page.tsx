@@ -127,10 +127,12 @@ export default function NotesPage() {
 
         selectedTags.forEach((tag) => params.append("tag", tag));
 
-        params.set(
-          "folder_id",
-          currentFolderId !== null ? String(currentFolderId) : "null",
-        );
+        if (currentFolderId === null) {
+          params.set("folder_id", "null");
+        } else {
+          params.set("folder_id", String(currentFolderId));
+        }
+
         params.set("page", String(currentPage));
 
         const res = await authFetch(`/api/notes?${params.toString()}`);
@@ -176,6 +178,8 @@ export default function NotesPage() {
   function getBreadcrumb(): Array<{ id: number | null; name: string }> {
     const path: Array<{ id: number | null; name: string }> = [];
     let current: number | null = currentFolderId;
+
+    // 現在地から出発して親をたどりながらルートまで逆順に登り、最終的に正順（ルートから現在地）の配列を返す
     while (current !== null) {
       const folder = allFolders.find((f) => f.id === current);
       if (!folder) break;
@@ -232,19 +236,19 @@ export default function NotesPage() {
                     ? `/notes/new?folder_id=${currentFolderId}`
                     : "/notes/new"
                 }
-                className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
               >
                 新規作成
               </Link>
               <button
                 onClick={() => setIsCreatingFolder(true)}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 + フォルダー
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 ログアウト
               </button>
@@ -254,7 +258,7 @@ export default function NotesPage() {
           {/* ブレッドクラム: ルート > フォルダー A > ... （階層を示し、クリックで上に戻れる） */}
           <nav
             aria-label="フォルダーの階層"
-            className="flex items-center gap-1 text-sm text-gray-500 flex-wrap"
+            className="flex items-center gap-1 text-base text-gray-500 flex-wrap"
           >
             {breadcrumb.map((item, index) => {
               const isLast = index === breadcrumb.length - 1;
@@ -286,7 +290,7 @@ export default function NotesPage() {
 
           {/* フィルター中バナー: 適用中の条件表示・クリアボタン */}
           {isFiltering && (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
               {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
               {selectedTags.length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap">
@@ -294,7 +298,7 @@ export default function NotesPage() {
                   {selectedTags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded-full bg-foreground text-background text-xs"
+                      className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
                     >
                       {tag}
                     </span>
@@ -326,11 +330,11 @@ export default function NotesPage() {
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   placeholder="フォルダー名"
-                  className="flex-1 px-2 py-0.5 text-sm bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
+                  className="flex-1 px-2 py-0.5 text-base bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
                 />
                 <button
                   type="submit"
-                  className="text-xs text-blue-500 hover:underline shrink-0"
+                  className="text-sm text-blue-500 hover:underline shrink-0"
                 >
                   作成
                 </button>
@@ -340,7 +344,7 @@ export default function NotesPage() {
                     setIsCreatingFolder(false);
                     setNewFolderName("");
                   }}
-                  className="text-xs text-gray-400 hover:underline shrink-0"
+                  className="text-sm text-gray-400 hover:underline shrink-0"
                 >
                   ✕
                 </button>
@@ -363,7 +367,7 @@ export default function NotesPage() {
 
             {/* ノート一覧（ローディング・エラー・空状態・カード） */}
             {notesLoading ? (
-              <p className="text-gray-500 text-sm">読み込み中...</p>
+              <p className="text-gray-500 text-base">読み込み中...</p>
             ) : notesError ? (
               <p className="text-red-500 text-sm">{notesError}</p>
             ) : notes.length === 0 && currentLevelFolders.length === 0 ? (
@@ -399,7 +403,7 @@ export default function NotesPage() {
               >
                 前へ
               </button>
-              <span className="text-sm text-gray-500">
+              <span className="text-base text-gray-500">
                 {currentPage} / {totalPages} ページ
               </span>
               <button

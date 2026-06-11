@@ -59,16 +59,16 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
           }}
           className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900"
         >
-          <span className="text-xs text-gray-400 shrink-0">フォルダー</span>
+          <span className="text-sm text-gray-400 shrink-0">フォルダー</span>
           <input
             autoFocus
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="flex-1 px-2 py-0.5 text-sm bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
+            className="flex-1 px-2 py-0.5 text-base bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none"
           />
           <button
             type="submit"
-            className="text-xs text-blue-500 hover:underline shrink-0"
+            className="text-sm text-blue-500 hover:underline shrink-0"
           >
             保存
           </button>
@@ -78,7 +78,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
               setIsEditing(false);
               setEditName(folder.name);
             }}
-            className="text-xs text-gray-400 hover:underline shrink-0"
+            className="text-sm text-gray-400 hover:underline shrink-0"
           >
             ✕
           </button>
@@ -100,8 +100,8 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
           className="flex-1 flex items-center gap-3 px-4 py-3 text-left"
         >
           <span className="text-xs font-mono text-gray-400 shrink-0">DIR</span>
-          <span className="text-sm font-medium">{folder.name}</span>
-          <span className="ml-auto text-gray-400 text-sm shrink-0">›</span>
+          <span className="text-base font-medium">{folder.name}</span>
+          <span className="ml-auto text-gray-400 text-base shrink-0">›</span>
         </button>
         {/* ホバー時のみ表示するアクションボタン */}
         <div className="hidden group-hover:flex items-center gap-0.5 px-2 shrink-0">
@@ -111,14 +111,14 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
               setEditName(folder.name);
             }}
             title="名前を変更"
-            className="p-1 text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            className="p-1 text-sm text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             ✎
           </button>
           <button
             onClick={handleDelete}
             title="削除"
-            className="p-1 text-xs text-gray-400 hover:text-red-500"
+            className="p-1 text-sm text-gray-400 hover:text-red-500"
           >
             ✕
           </button>
