@@ -53,20 +53,20 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
       <li>
         <div className="flex flex-col">
           {/* タブ（フォルダーの耳）*/}
-          <div className="self-start ml-3 h-4 w-20 rounded-t-lg bg-amber-300 dark:bg-amber-700" />
+          <div className="self-start h-4 w-20 rounded-t-lg bg-yellow-400 dark:bg-yellow-600" />
           {/* リネームフォーム */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleRename();
             }}
-            className="rounded-lg rounded-tl-none border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 flex flex-col gap-3 min-h-24"
+            className="rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 p-3 flex flex-col gap-3 min-h-24"
           >
             <input
               autoFocus
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="text-base bg-transparent border-b border-amber-400 dark:border-amber-600 focus:outline-none w-full"
+              className="text-base bg-transparent border-b border-yellow-400 dark:border-yellow-600 focus:outline-none w-full"
             />
             <div className="flex gap-2 justify-end mt-auto">
               <button
@@ -96,13 +96,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
     <li className="group">
       <div className="flex flex-col">
         {/* タブ（フォルダーの耳） */}
-        <div className="self-start ml-3 h-4 w-20 rounded-t-lg bg-amber-300 dark:bg-amber-700" />
+        <div className="self-start h-4 w-20 rounded-t-lg bg-yellow-400 dark:bg-yellow-600" />
         {/*
-         * カード本体: 琥珀色でフォルダーらしさを演出。
+         * カード本体: Windows フォルダー風の黄色系デザイン。
          * 絶対配置のナビゲーションボタンがカード全体をクリック可能にし、
          * アクションボタン（z-10）がその上に重なる。
          */}
-        <div className="relative rounded-lg rounded-tl-none border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 min-h-24 overflow-hidden">
+        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 min-h-24 overflow-hidden">
           {/* カード全体をクリック可能にするナビゲーションボタン */}
           <button
             onClick={() => onNavigate(folder.id)}
@@ -121,7 +121,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
                 setEditName(folder.name);
               }}
               title="名前を変更"
-              className="p-1 text-sm rounded bg-amber-100 dark:bg-amber-900/80 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
+              className="p-1 text-sm rounded bg-yellow-200 dark:bg-yellow-900/80 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
             >
               ✎
             </button>
@@ -131,7 +131,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
                 handleDelete();
               }}
               title="削除"
-              className="p-1 text-sm rounded bg-amber-100 dark:bg-amber-900/80 text-gray-400 hover:text-red-500"
+              className="p-1 text-sm rounded bg-yellow-200 dark:bg-yellow-900/80 text-gray-400 hover:text-red-500"
             >
               ✕
             </button>
