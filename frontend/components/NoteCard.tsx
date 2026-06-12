@@ -110,7 +110,7 @@ export default function NoteCard({
       {/* タグ一覧: 最大2件を表示し、超過分は「他X件」ボタンでポップオーバー表示 */}
       {note.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
-          {note.tags.slice(0, 2).map((tag) => (
+          {note.tags.slice(0, 3).map((tag) => (
             <button
               key={tag}
               type="button"
@@ -125,17 +125,17 @@ export default function NoteCard({
             </button>
           ))}
           {/* 3件目以降はポップオーバーで表示 */}
-          {note.tags.length > 2 && (
+          {note.tags.length > 3 && (
             <div className="relative group">
               <button
                 type="button"
                 className="px-2 py-0.5 text-base rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
-                他{note.tags.length - 2}件
+                他{note.tags.length - 3}件
               </button>
               {/* ホバーで表示される非表示タグのポップオーバー */}
               <div className="hidden group-hover:flex absolute bottom-full left-0 mb-1 z-30 flex-wrap gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 min-w-32 max-w-48">
-                {note.tags.slice(2).map((tag) => (
+                {note.tags.slice(3).map((tag) => (
                   <button
                     key={tag}
                     type="button"
