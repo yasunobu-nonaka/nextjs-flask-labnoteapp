@@ -24,7 +24,11 @@ def get_notes_service(
         query = query.filter(Note.tags.any(Tag.tagname == tag_name))
         count_query = count_query.filter(Note.tags.any(Tag.tagname == tag_name))
 
-    if folder_id is not None:
+    # "null" センチネルはフォルダー未所属ノートのみを返す
+    if folder_id == "null":
+        query = query.filter(Note.folder_id.is_(None))
+        count_query = count_query.filter(Note.folder_id.is_(None))
+    elif folder_id is not None:
         query = query.filter(Note.folder_id == folder_id)
         count_query = count_query.filter(Note.folder_id == folder_id)
 

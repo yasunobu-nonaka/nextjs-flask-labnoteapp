@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
+import Modal from "@/components/Modal";
 
 export type Note = {
   id: number;
@@ -15,6 +16,12 @@ export type Note = {
   folder_id: number | null;
 };
 
+/**
+ * NoteCard コンポーネント
+ * ノートを紙風のカード形式で表示する。
+ * タイトルをリンクとして表示し、タグはクリックでフィルター ON/OFF。
+ * ··· ボタンでフォルダー移動メニューを開く。
+ */
 export default function NoteCard({
   note,
   selectedTags,
@@ -54,7 +61,12 @@ export default function NoteCard({
   }
 
   return (
-    <li className="relative flex flex-col gap-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+    /*
+     * カード本体: 紙風デザイン。
+     * shadow-sm + hover:shadow-md で浮き上がり感を演出。
+     * flex-col で内部要素を縦に並べ、下部に日付・タグを固定する。
+     */
+    <li className="relative flex flex-col gap-2 p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow min-h-36">
       {/* ドロップダウンメニュー: 透明オーバーレイ + メニュー本体 */}
       {mode === "menu" && (
         <>
@@ -67,7 +79,7 @@ export default function NoteCard({
                 setTargetFolderId(note.folder_id);
                 setMode("moving");
               }}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               移動
             </button>
@@ -75,57 +87,28 @@ export default function NoteCard({
         </>
       )}
 
-      {/* ヘッダー行: タイトルリンク・更新日・メニューボタン */}
-      <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/notes/${note.id}`}
-          className="font-semibold text-lg leading-snug hover:underline"
-        >
-          {note.title}
-        </Link>
-        <div className="flex items-center gap-1 shrink-0 mt-0.5">
-          <span className="text-xs text-gray-400">{date}</span>
-          <button
-            onClick={() => setMode(mode === "menu" ? "idle" : "menu")}
-            className="px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm leading-none"
-            title="メニュー"
-          >
-            ···
-          </button>
-        </div>
-      </div>
+      {/* ··· メニューボタン（右上に固定） */}
+      <button
+        onClick={() => setMode(mode === "menu" ? "idle" : "menu")}
+        className="absolute top-3 right-3 px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-base leading-none"
+        title="メニュー"
+      >
+        ···
+      </button>
 
-      {/* フォルダー移動フォーム: 移動先選択 + 実行・キャンセルボタン */}
-      {mode === "moving" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={targetFolderId ?? ""}
-            onChange={(e) =>
-              setTargetFolderId(e.target.value ? Number(e.target.value) : null)
-            }
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 focus:outline-none"
-          >
-            <option value="">Home</option>
-            {buildFolderOptions(folders).map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleMove}
-            className="px-3 py-1 text-sm rounded bg-foreground text-background hover:opacity-80 transition-opacity"
-          >
-            移動
-          </button>
-          <button
-            onClick={() => setMode("idle")}
-            className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            キャンセル
-          </button>
-        </div>
-      )}
+      {/* タイトルリンク: 3行で折り返しを止めて省略 */}
+      <Link
+        href={`/notes/${note.id}`}
+        className="font-semibold text-base leading-snug hover:underline pr-6 line-clamp-3"
+      >
+        {note.title}
+      </Link>
+
+      {/* フレキシブルスペーサー: 下部コンテンツをカード底部に固定する */}
+      <div className="flex-1" />
+
+      {/* カード下部: 更新日 */}
+      <span className="text-sm text-gray-400">{date}</span>
 
       {/* タグ一覧: クリックでフィルター ON/OFF */}
       {note.tags.length > 0 && (
@@ -135,7 +118,7 @@ export default function NoteCard({
               key={tag}
               type="button"
               onClick={() => onTagToggle(tag)}
-              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+              className={`px-2 py-0.5 text-base rounded-full transition-colors ${
                 selectedTags.includes(tag)
                   ? "bg-foreground text-background"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -145,6 +128,39 @@ export default function NoteCard({
             </button>
           ))}
         </div>
+      )}
+      {/* フォルダー移動モーダル */}
+      {mode === "moving" && (
+        <Modal title="フォルダーへ移動" onClose={() => setMode("idle")}>
+          <select
+            value={targetFolderId ?? ""}
+            onChange={(e) =>
+              setTargetFolderId(e.target.value ? Number(e.target.value) : null)
+            }
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none text-base"
+          >
+            <option value="">Home</option>
+            {buildFolderOptions(folders).map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setMode("idle")}
+              className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleMove}
+              className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+            >
+              移動
+            </button>
+          </div>
+        </Modal>
       )}
     </li>
   );

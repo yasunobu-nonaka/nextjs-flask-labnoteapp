@@ -35,7 +35,14 @@ def list_tags():
 def notes_index():
     query_word = request.args.get("q")
     tag_names = request.args.getlist("tag")
-    folder_id = request.args.get("folder_id", type=int)
+    # folder_id は文字列で受け取り、"null" の場合はフォルダー未所属ノートを示すセンチネルとして扱う
+    _folder_id_str = request.args.get("folder_id")
+    if _folder_id_str is None:
+        folder_id = None
+    elif _folder_id_str == "null":
+        folder_id = "null"
+    else:
+        folder_id = int(_folder_id_str)
     page = request.args.get("page", 1, type=int)
     per_page = 10
 
