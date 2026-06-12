@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
+import Modal from "@/components/Modal";
 
 export type Note = {
   id: number;
@@ -130,47 +131,36 @@ export default function NoteCard({
       )}
       {/* フォルダー移動モーダル */}
       {mode === "moving" && (
-        /* バックドロップ: クリックでモーダルを閉じる */
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => setMode("idle")}
-        >
-          {/* モーダル本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
-          <div
-            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
+        <Modal title="フォルダーへ移動" onClose={() => setMode("idle")}>
+          <select
+            value={targetFolderId ?? ""}
+            onChange={(e) =>
+              setTargetFolderId(e.target.value ? Number(e.target.value) : null)
+            }
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none text-base"
           >
-            <h2 className="text-lg font-semibold">フォルダーへ移動</h2>
-            <select
-              value={targetFolderId ?? ""}
-              onChange={(e) =>
-                setTargetFolderId(e.target.value ? Number(e.target.value) : null)
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none text-base"
+            <option value="">Home</option>
+            {buildFolderOptions(folders).map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setMode("idle")}
+              className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              <option value="">Home</option>
-              {buildFolderOptions(folders).map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setMode("idle")}
-                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleMove}
-                className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
-              >
-                移動
-              </button>
-            </div>
+              キャンセル
+            </button>
+            <button
+              onClick={handleMove}
+              className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+            >
+              移動
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </li>
   );

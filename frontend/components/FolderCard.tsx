@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { authFetch } from "@/lib/api";
 import { type Folder } from "@/lib/folders";
+import Modal from "@/components/Modal";
 
 type Props = {
   folder: Folder;
@@ -126,86 +127,69 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
 
       {/* 削除確認モーダル */}
       {isDeleteModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => setIsDeleteModalOpen(false)}
+        <Modal title="フォルダーを削除" onClose={() => setIsDeleteModalOpen(false)}>
+          <p className="text-base text-gray-600 dark:text-gray-400">
+            「{folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 text-base rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+            >
+              削除
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* 名称変更モーダル */}
+      {isRenameModalOpen && (
+        <Modal
+          title="名称変更"
+          onClose={() => {
+            setIsRenameModalOpen(false);
+            setEditName(folder.name);
+          }}
         >
-          <div
-            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRename();
+            }}
+            className="flex flex-col gap-4"
           >
-            <h2 className="text-lg font-semibold">フォルダーを削除</h2>
-            <p className="text-base text-gray-600 dark:text-gray-400">
-              「{folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。
-            </p>
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+            />
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setIsDeleteModalOpen(false)}
+                type="button"
+                onClick={() => {
+                  setIsRenameModalOpen(false);
+                  setEditName(folder.name);
+                }}
                 className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 キャンセル
               </button>
               <button
-                onClick={handleDelete}
-                className="px-4 py-2 text-base rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+                type="submit"
+                className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
               >
-                削除
+                変更
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* 名称変更モーダル */}
-      {isRenameModalOpen && (
-        /* バックドロップ: クリックでモーダルを閉じる */
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => {
-            setIsRenameModalOpen(false);
-            setEditName(folder.name);
-          }}
-        >
-          {/* モーダル本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
-          <div
-            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold">名称変更</h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleRename();
-              }}
-              className="flex flex-col gap-4"
-            >
-              <input
-                autoFocus
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRenameModalOpen(false);
-                    setEditName(folder.name);
-                  }}
-                  className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
-                >
-                  変更
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
     </li>
   );

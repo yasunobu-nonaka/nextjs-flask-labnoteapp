@@ -7,6 +7,7 @@ import { authFetch } from "@/lib/api";
 import FolderSidebar from "@/components/FolderSidebar";
 import FolderCard from "@/components/FolderCard";
 import NoteCard, { type Note } from "@/components/NoteCard";
+import Modal from "@/components/Modal";
 import { type Folder } from "@/lib/folders";
 
 type NotesResponse = {
@@ -412,55 +413,47 @@ export default function NotesPage() {
 
       {/* フォルダー新規作成モーダル */}
       {isFolderModalOpen && (
-        /* バックドロップ: クリックでモーダルを閉じる */
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={() => {
+        <Modal
+          title="フォルダーを作成"
+          onClose={() => {
             setIsFolderModalOpen(false);
             setNewFolderName("");
           }}
         >
-          {/* モーダル本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
-          <div
-            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateFolder();
+            }}
+            className="flex flex-col gap-4"
           >
-            <h2 className="text-lg font-semibold">フォルダーを作成</h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleCreateFolder();
-              }}
-              className="flex flex-col gap-4"
-            >
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="フォルダー名"
-                className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsFolderModalOpen(false);
-                    setNewFolderName("");
-                  }}
-                  className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
-                >
-                  作成
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="フォルダー名"
+              className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFolderModalOpen(false);
+                  setNewFolderName("");
+                }}
+                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+              >
+                作成
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </main>
   );
