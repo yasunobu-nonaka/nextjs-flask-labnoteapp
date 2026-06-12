@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), {
   ssr: false,
   loading: () => (
-    <div className="h-[400px] rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900" />
+    <div className="h-[800px]rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900" />
   ),
 });
 
@@ -46,7 +46,7 @@ export default function MarkdownEditor({ value, onChange }: Props) {
       <MDEditor
         value={value}
         onChange={(val) => onChange(val ?? "")}
-        height={400}
+        height={800}
         preview="live"
       />
     </div>
