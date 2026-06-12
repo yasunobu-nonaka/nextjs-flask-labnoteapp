@@ -47,7 +47,7 @@ export default function NewNotePage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="max-w-full mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">ノートを作成</h1>
           <Link href="/notes" className="text-sm text-gray-500 underline">

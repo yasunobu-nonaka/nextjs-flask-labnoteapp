@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { noteSchema, type NoteFormValues } from "@/lib/noteSchema";
 import { useTagInput } from "@/lib/useTagInput";
+import MarkdownEditor from "@/components/MarkdownEditor";
 
 type Props = {
   // マウント時のフォーム初期値。編集ページでは取得したノートのデータを渡す。
@@ -33,6 +34,9 @@ export default function NoteForm({
     resolver: zodResolver(noteSchema),
     defaultValues,
   });
+
+  // content_md は MDEditor の onChange で直接 setValue するため watch で現在値を取得する
+  const contentMd = watch("content_md");
 
   // tags フィールドを監視し、useTagInput に現在値を渡す
   const tags = watch("tags");
@@ -67,16 +71,14 @@ export default function NoteForm({
         )}
       </div>
 
-      {/* 内容 */}
+      {/* 内容: MarkdownEditor でスプリットプレビュー付き入力 */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="content_md" className="text-sm font-medium">
-          内容
-        </label>
-        <textarea
-          id="content_md"
-          {...register("content_md")}
-          rows={12}
-          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-foreground resize-y font-mono text-sm"
+        <label className="text-sm font-medium">内容</label>
+        <MarkdownEditor
+          value={contentMd}
+          onChange={(val) =>
+            setValue("content_md", val, { shouldValidate: true })
+          }
         />
         {errors.content_md && (
           <p className="text-xs text-red-500">{errors.content_md.message}</p>
