@@ -107,12 +107,9 @@ export default function NoteCard({
       {/* フレキシブルスペーサー: 下部コンテンツをカード底部に固定する */}
       <div className="flex-1" />
 
-      {/* カード下部: 更新日 */}
-      <span className="text-sm text-gray-400">{date}</span>
-
       {/* タグ一覧: 最大2件を表示し、超過分は「他X件」ボタンでポップオーバー表示 */}
       {note.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 mb-2">
           {note.tags.slice(0, 2).map((tag) => (
             <button
               key={tag}
@@ -157,6 +154,10 @@ export default function NoteCard({
           )}
         </div>
       )}
+
+      {/* カード下部: 更新日 */}
+      <span className="text-sm text-gray-400">{date}</span>
+
       {/* フォルダー移動モーダル */}
       {mode === "moving" && (
         <Modal title="フォルダーへ移動" onClose={() => setMode("idle")}>
