@@ -83,14 +83,16 @@ Next.js 16 App Router. All pages under `frontend/app/` are Server Components by 
 ```
 app/
   notes/
-    page.tsx           # note list with folder sidebar, search, tag filter, pagination
+    page.tsx           # file-browser style note list; folder+note grid, breadcrumb, search, tag filter, pagination
     new/page.tsx       # create note
     [id]/page.tsx      # note detail (read-only)
     [id]/edit/page.tsx # edit note
 components/
-  FolderSidebar.tsx    # folder tree with inline CRUD
-  NoteCard.tsx         # note list item; owns menu + move-to-folder state machine
+  FolderSidebar.tsx    # left sidebar: keyword search form + tag filter checkboxes
+  FolderCard.tsx       # folder card (tab design); owns ··· menu popover, rename/delete modals
+  NoteCard.tsx         # note card; owns ··· menu popover + move-to-folder modal
   NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput
+  Modal.tsx            # generic modal shell (backdrop + dialog box); content passed as children
 lib/
   api.ts               # authFetch — wraps fetch with JWT Bearer header and base URL
   folders.ts           # Folder type, buildFolderOptions (flat list → <select> options)
@@ -102,6 +104,10 @@ lib/
 
 **Forms**: `NoteForm` owns `useForm<NoteFormValues>` with `zodResolver(noteSchema)`. Pass `defaultValues` as a prop. In the edit page, render `<NoteForm>` only after data loads so `defaultValues` are correct on mount — no `reset()` needed.
 
-**Folder select in new note**: the "新規作成" link appends `?folder_id=X` when a folder is selected. `new/page.tsx` reads this from `window.location.search` on mount and includes it in the POST body. No folder selector appears in the form itself.
+**Folder navigation**: `NotesPage` tracks position with `currentFolderId` (null = root). All folders are fetched once on mount into `allFolders`; `currentLevelFolders` is derived client-side by filtering `parent_id === currentFolderId`. Breadcrumb is built by traversing `parent_id` upward from `currentFolderId`. Root view shows top-level folders + notes with no folder (sends `folder_id=null` string sentinel to API).
 
-**Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. A fixed transparent overlay div closes the menu on outside click. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
+**New item creation**: The "新規作成" button opens a popover menu. "ノート" navigates to `/notes/new` (appending `?folder_id=X` when inside a folder); `new/page.tsx` reads this from `window.location.search` on mount. "フォルダー" opens a `Modal` for folder name input.
+
+**Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
+
+**Layout**: `notes/page.tsx` uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
