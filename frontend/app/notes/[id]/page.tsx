@@ -174,7 +174,7 @@ export default function NoteDetailPage({
         <hr className="border-gray-200 dark:border-gray-700" />
 
         {/* コンテンツ */}
-        <div className="prose prose-sm dark:prose-invert max-w-none">
+        <div className="prose prose-base dark:prose-invert max-w-none">
           <Markdown>{note.content_md}</Markdown>
         </div>
       </div>
