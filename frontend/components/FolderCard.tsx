@@ -62,7 +62,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
          * overflow-hidden を外しているのは、··· メニューのドロップダウンが
          * カード下端を超えて表示できるようにするため。
          */}
-        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 min-h-24">
+        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 aspect-4/3">
           {/* カード全体をクリック可能にするナビゲーションボタン */}
           <button
             onClick={() => onNavigate(folder.id)}
