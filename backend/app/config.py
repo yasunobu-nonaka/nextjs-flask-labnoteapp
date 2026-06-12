@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from urllib.parse import quote_plus
 
 
@@ -10,6 +11,10 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+    # アクセストークン：短命（APIリクエストに使う）
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=15)
+    # リフレッシュトークン：長命（新しいアクセストークンの取得のみに使う）
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
     MAIL_MAX_EMAILS = None

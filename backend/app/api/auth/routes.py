@@ -1,4 +1,5 @@
 from flask import jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from marshmallow import ValidationError
 
 from . import auth_bp
@@ -17,7 +18,7 @@ from app.api.auth.auth_service import (
     get_user_by_email,
     register_user,
     verify_user,
-    check_password_and_get_token,
+    check_password_and_get_tokens,
     update_user_password,
     delete_user,
 )
@@ -163,12 +164,22 @@ def login():
     # ユーザー名で検索
     user = get_user_by_username_or_email(identifier)
 
-    access_token = check_password_and_get_token(user, password)
+    access_token, refresh_token = check_password_and_get_tokens(user, password)
 
     if access_token is None:
         return jsonify({"message": "Username or Password did not match"}), 401
 
-    return jsonify(access_token=access_token)
+    return jsonify(access_token=access_token, refresh_token=refresh_token)
+
+
+@auth_bp.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    """リフレッシュトークンを使って新しいアクセストークンを発行する"""
+    # リフレッシュトークンからユーザーIDを取得して新しいアクセストークンを作成
+    identity = get_jwt_identity()
+    new_access_token = create_access_token(identity=identity)
+    return jsonify(access_token=new_access_token)
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])

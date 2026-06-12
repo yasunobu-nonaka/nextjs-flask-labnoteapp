@@ -1,5 +1,5 @@
 from sqlalchemy import or_
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, create_refresh_token
 
 from app.extensions import db
 from app.model import User
@@ -68,13 +68,15 @@ def verify_user(user):
     return user
 
 
-def check_password_and_get_token(user, password):
+def check_password_and_get_tokens(user, password):
     # パスワード照合
     if user and user.check_password(password):
-        # JWTトークン発行
-        return create_access_token(identity=user)
+        # アクセストークンとリフレッシュトークンを発行
+        access_token = create_access_token(identity=user)
+        refresh_token = create_refresh_token(identity=user)
+        return access_token, refresh_token
 
-    return None
+    return None, None
 
 
 def update_user_password(user, new_password):
