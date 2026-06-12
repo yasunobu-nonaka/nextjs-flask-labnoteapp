@@ -59,6 +59,7 @@ export default function LoginPage() {
         setGlobalError(json.message ?? "エラーが発生しました");
       } else {
         localStorage.setItem("access_token", json.access_token);
+        localStorage.setItem("refresh_token", json.refresh_token);
         router.push("/notes");
       }
     } catch {
