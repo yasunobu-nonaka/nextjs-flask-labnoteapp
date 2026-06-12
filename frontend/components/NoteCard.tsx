@@ -109,13 +109,13 @@ export default function NoteCard({
 
       {/* タグ一覧: 最大2件を表示し、超過分は「他X件」ボタンでポップオーバー表示 */}
       {note.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
+        <div className="flex flex-wrap gap-1 mb-2 overflow-hidden">
           {note.tags.slice(0, 3).map((tag) => (
             <button
               key={tag}
               type="button"
               onClick={() => onTagToggle(tag)}
-              className={`px-2 py-0.5 text-base rounded-full transition-colors ${
+              className={`px-2 py-0.5 text-base rounded-full transition-colors max-w-32 truncate ${
                 selectedTags.includes(tag)
                   ? "bg-foreground text-background"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
