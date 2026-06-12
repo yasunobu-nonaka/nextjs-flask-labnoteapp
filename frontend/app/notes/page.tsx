@@ -213,7 +213,7 @@ export default function NotesPage() {
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
 
   return (
-    <main className="min-h-screen bg-background text-foreground flex">
+    <main className="h-screen overflow-hidden bg-background text-foreground flex">
       {/* 左カラム: 検索・タグフィルターサイドバー */}
       <FolderSidebar
         query={query}
@@ -228,7 +228,7 @@ export default function NotesPage() {
       />
 
       {/* 右カラム: メインコンテンツ */}
-      <div className="flex-1 px-6 py-10">
+      <div className="flex-1 overflow-y-auto px-6 py-10">
         <div className="max-w-6xl mx-auto flex flex-col gap-6">
           {/* ページヘッダー: タイトル・新規作成ポップオーバー・ログアウトボタン */}
           <div className="flex items-center justify-between">
