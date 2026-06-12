@@ -126,7 +126,7 @@ export default function NoteDetailPage({
 
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="max-w-3xl mx-auto flex flex-col gap-6">
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
           <Link href="/notes" className="text-sm text-gray-500 underline">
