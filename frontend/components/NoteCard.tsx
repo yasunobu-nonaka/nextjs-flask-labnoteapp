@@ -103,38 +103,6 @@ export default function NoteCard({
         {note.title}
       </Link>
 
-      {/* フォルダー移動フォーム: 移動先選択 + 実行・キャンセルボタン */}
-      {mode === "moving" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={targetFolderId ?? ""}
-            onChange={(e) =>
-              setTargetFolderId(e.target.value ? Number(e.target.value) : null)
-            }
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 focus:outline-none text-base"
-          >
-            <option value="">Home</option>
-            {buildFolderOptions(folders).map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleMove}
-            className="px-3 py-1 text-base rounded bg-foreground text-background hover:opacity-80 transition-opacity"
-          >
-            移動
-          </button>
-          <button
-            onClick={() => setMode("idle")}
-            className="px-3 py-1 text-base rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            キャンセル
-          </button>
-        </div>
-      )}
-
       {/* フレキシブルスペーサー: 下部コンテンツをカード底部に固定する */}
       <div className="flex-1" />
 
@@ -158,6 +126,50 @@ export default function NoteCard({
               {tag}
             </button>
           ))}
+        </div>
+      )}
+      {/* フォルダー移動モーダル */}
+      {mode === "moving" && (
+        /* バックドロップ: クリックでモーダルを閉じる */
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setMode("idle")}
+        >
+          {/* モーダル本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold">フォルダーへ移動</h2>
+            <select
+              value={targetFolderId ?? ""}
+              onChange={(e) =>
+                setTargetFolderId(e.target.value ? Number(e.target.value) : null)
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:outline-none text-base"
+            >
+              <option value="">Home</option>
+              {buildFolderOptions(folders).map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setMode("idle")}
+                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleMove}
+                className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+              >
+                移動
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </li>
