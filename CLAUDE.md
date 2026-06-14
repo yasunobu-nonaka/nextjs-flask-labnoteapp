@@ -111,3 +111,74 @@ lib/
 **Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
 
 **Layout**: `notes/page.tsx` uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
+
+## Organization & Group Redesign
+
+The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 1 (backend models and API) is complete**.
+
+### Phase Plan
+
+| Phase | Status | Content |
+|-------|--------|---------|
+| 1 | ✅ Done | Organization & Group models, membership, basic API |
+| 2 | Pending | Full RBAC (RoleGlobal / RoleLocal / Permission models) |
+| 3 | Pending | Migrate Note / Tag / Folder ownership from User → Group |
+| 4 | Pending | Frontend — org creation UI, group management, member management |
+| 5 | Pending | Email invitations, audit log, advanced policies |
+
+### Domain Concepts
+
+- **Organization**: the largest sharing unit; notes are never exposed outside it
+- **Group**: a subset of an organization; notes are basically created inside a group
+- **OrganizationPolicy**: per-org settings (1:1); who can create groups, default join method, etc.
+- **GroupPolicy**: per-group settings (1:1); note visibility to org, join method, etc.
+- Group visibility defaults to public within the org; notes default to visible within the group
+
+### Roles
+
+**Organization-level** (`organization_members.role`): `owner` | `sys_admin` | `user_admin` | `member`
+
+**Group-level** (`group_members.role`): `admin` | `editor` | `viewer`
+
+Phase 1 stores roles as plain strings. Phase 2 will replace these with a proper Permission model.
+
+### DB Models (Phase 1 additions)
+
+```
+Organization         — name, created_by_user_id
+OrganizationMember   — user_id + organization_id (composite PK), role, joined_at
+OrganizationPolicy   — organization_id (unique FK), allow_private_groups,
+                       allow_private_notes, who_can_create_groups, default_join_method
+Group                — organization_id, name, is_private, created_by_user_id
+GroupMember          — user_id + group_id (composite PK), role, joined_at
+GroupPolicy          — group_id (unique FK), allow_private_notes,
+                       join_method, is_notes_visible_to_org
+```
+
+Note / Tag / Folder still carry `user_id` and are unchanged until Phase 3.
+
+### New API Blueprint (Phase 1)
+
+`app/api/organizations/` — registered as `/api/organizations`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/organizations` | JWT | List orgs the current user belongs to |
+| POST | `/api/organizations` | JWT | Create org (caller becomes `owner`) |
+| GET | `/api/organizations/<id>` | member | Org detail + policy |
+| PATCH | `/api/organizations/<id>` | owner/sys_admin | Update org name or policy |
+| GET | `/api/organizations/<id>/members` | member | List members |
+| POST | `/api/organizations/<id>/members` | owner/sys_admin/user_admin | Add member |
+| PATCH | `/api/organizations/<id>/members/<uid>` | owner/sys_admin | Change member role |
+| DELETE | `/api/organizations/<id>/members/<uid>` | owner/sys_admin/user_admin | Remove member |
+| GET | `/api/organizations/<id>/groups` | member | List accessible groups |
+| POST | `/api/organizations/<id>/groups` | policy-dependent | Create group (caller becomes `admin`) |
+| GET | `/api/organizations/<id>/groups/<gid>` | member (private: group member only) | Group detail + policy |
+| PATCH | `/api/organizations/<id>/groups/<gid>` | group admin / org sys_admin | Update group name, visibility, policy |
+| DELETE | `/api/organizations/<id>/groups/<gid>` | group admin / org sys_admin | Delete group |
+| GET | `/api/organizations/<id>/groups/<gid>/members` | group member | List group members |
+| POST | `/api/organizations/<id>/groups/<gid>/members` | group admin / org sys_admin | Add org member to group |
+| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role |
+| DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group |
+
+Service functions live in `organization_service.py` and `group_service.py` inside `app/api/organizations/`.
