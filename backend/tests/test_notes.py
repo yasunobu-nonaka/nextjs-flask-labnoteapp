@@ -158,6 +158,16 @@ class TestNoteCreation:
         assert res.status_code == 201
         assert data["note"]["folder_id"] == folder_id
 
+    def test_no_token_note_creation_failed(self, client):
+        res = client.post(
+            "/api/notes",
+            json={"title": "My Note", "content_md": "content"},
+            headers={"Content-Type": "application/json"},
+        )
+
+        assert res.get_json()["msg"] == "Missing Authorization Header"
+        assert res.status_code == 401
+
 
 #############################################
 # tests for note index
@@ -254,6 +264,25 @@ class TestNoteIndex:
         assert res.status_code == 200
         assert data["total"] == 1
         assert data["notes"][0]["title"] == "In Folder"
+
+    def test_note_filter_by_null_folder_id(self, client, auth_headers):
+        folder_id = create_folder(client, auth_headers, "My Folder").get_json()["id"]
+
+        # フォルダーに属するノートと属さないノートを作成
+        client.post(
+            "/api/notes",
+            json={"title": "In Folder", "content_md": "content", "folder_id": folder_id},
+            headers=auth_headers["headers"],
+        )
+        create_note(client, auth_headers, "No Folder", "content")
+
+        # folder_id=null でフォルダー未所属ノートのみ取得できる
+        res = client.get("/api/notes?folder_id=null", headers=auth_headers["headers"])
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 1
+        assert data["notes"][0]["title"] == "No Folder"
 
     def test_note_pagination(self, client, auth_headers):
         create_note(client, auth_headers, "My Note 1", "content 1")
@@ -384,6 +413,11 @@ class TestNoteDetail:
         assert res_note_detail.get_json()["msg"] == "Missing Authorization Header"
         assert res_note_detail.status_code == 401
 
+    def test_nonexistent_note_detail_failed(self, client, auth_headers):
+        res = client.get("/api/notes/99999", headers=auth_headers["headers"])
+
+        assert res.status_code == 404
+
     def test_others_note_cannot_see(self, client, auth_headers):
         # register 2nd user and get token
         register_user(
@@ -478,6 +512,15 @@ class TestNoteEdit:
         assert res.get_json()["msg"] == "Missing Authorization Header"
         assert res.status_code == 401
 
+    def test_nonexistent_note_edit_failed(self, client, auth_headers):
+        res = client.patch(
+            "/api/notes/99999",
+            json={"title": "Updated Title"},
+            headers=auth_headers["headers"],
+        )
+
+        assert res.status_code == 404
+
     def test_others_note_cannot_edit(self, client, auth_headers):
         # register 2nd user and get token
         register_user(
@@ -548,6 +591,23 @@ class TestNoteDelete:
 
         assert "404 Not Found" in res_get_note.text
         assert res_get_note.status_code == 404
+
+    def test_no_token_note_delete_failed(self, client, auth_headers):
+        res_note_creation = create_note(client, auth_headers, "My Note", "content")
+        note_id = res_note_creation.get_json()["note"]["id"]
+
+        res = client.delete(
+            f"/api/notes/{note_id}",
+            headers={"Content-Type": "application/json"},
+        )
+
+        assert res.get_json()["msg"] == "Missing Authorization Header"
+        assert res.status_code == 401
+
+    def test_nonexistent_note_delete_failed(self, client, auth_headers):
+        res = client.delete("/api/notes/99999", headers=auth_headers["headers"])
+
+        assert res.status_code == 404
 
     def test_others_note_cannot_delete(self, client, auth_headers):
         # register 2nd user and get token

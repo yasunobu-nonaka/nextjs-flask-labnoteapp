@@ -241,6 +241,15 @@ class TestFolderRename:
         assert res.get_json()["errors"]["name"][0] == "Length must be between 1 and 100."
         assert res.status_code == 400
 
+    def test_nonexistent_folder_rename_failed(self, client, auth_headers):
+        res = client.patch(
+            "/api/folders/99999",
+            json={"name": "New Name"},
+            headers=auth_headers["headers"],
+        )
+
+        assert res.status_code == 404
+
     def test_others_folder_cannot_rename(self, client, auth_headers):
         # 2nd ユーザーを登録してフォルダーを作成
         register_user(
@@ -325,6 +334,14 @@ class TestFolderDelete:
 
         assert res.get_json()["msg"] == "Missing Authorization Header"
         assert res.status_code == 401
+
+    def test_nonexistent_folder_delete_failed(self, client, auth_headers):
+        res = client.delete(
+            "/api/folders/99999",
+            headers=auth_headers["headers"],
+        )
+
+        assert res.status_code == 404
 
     def test_others_folder_cannot_delete(self, client, auth_headers):
         # 2nd ユーザーを登録してフォルダーを作成
