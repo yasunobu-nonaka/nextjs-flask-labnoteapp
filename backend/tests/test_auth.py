@@ -233,6 +233,16 @@ class TestEmailVerification:
 class TestResendVerification:
     """認証メール再送信のテスト"""
 
+    def test_resend_verification_success(self, client, test_user):
+        """未認証ユーザーへの再送信が成功する。"""
+        # test_user はデフォルトで verified=False
+        response = client.post(
+            "/api/auth/resend-verification", json={"email": test_user.email}
+        )
+
+        assert response.status_code == 200
+        assert "再送信しました" in response.get_json()["message"]
+
     def test_resend_verification_missing_email(self, client):
         """メールアドレスなしの再送信テスト"""
         response = client.post("/api/auth/resend-verification", json={})
@@ -314,8 +324,9 @@ class TestUserLogin:
 
         res = login_user(client)
 
-        assert "access_token" in res.get_json()
         assert res.status_code == 200
+        assert "access_token" in res.get_json()
+        assert "refresh_token" in res.get_json()
 
     def test_no_identifier_login_failed(self, client):
         register_user(client)
