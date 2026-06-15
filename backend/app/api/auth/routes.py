@@ -176,9 +176,16 @@ def login():
 @jwt_required(refresh=True)
 def refresh():
     """リフレッシュトークンを使って新しいアクセストークンを発行する"""
-    # リフレッシュトークンからユーザーIDを取得して新しいアクセストークンを作成
+    from app.extensions import db
+    from app.model import User
+
+    # get_jwt_identity() は user_identity_loader が返した文字列（str(user.id)）を返す
+    # create_access_token には User オブジェクトを渡す必要があるため、DBから引き直す
     identity = get_jwt_identity()
-    new_access_token = create_access_token(identity=identity)
+    user = db.session.get(User, int(identity))
+    if not user:
+        return jsonify({"message": "ユーザーが見つかりません"}), 404
+    new_access_token = create_access_token(identity=user)
     return jsonify(access_token=new_access_token)
 
 

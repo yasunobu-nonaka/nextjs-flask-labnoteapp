@@ -369,6 +369,65 @@ class TestUserLogin:
 
 
 #############################################
+# tests for token refresh
+#############################################
+
+
+class TestTokenRefresh:
+    def test_refresh_returns_new_access_token(self, client):
+        """リフレッシュトークンで新しいアクセストークンを取得できる。"""
+        register_user(client)
+        login_res = login_user(client)
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+
+        assert res.status_code == 200
+        assert "access_token" in res.get_json()
+
+    def test_refresh_new_token_works_for_protected_routes(self, client):
+        """リフレッシュで取得した新しいアクセストークンで保護ルートにアクセスできる。"""
+        register_user(client)
+        login_res = login_user(client)
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        # リフレッシュして新しいアクセストークンを取得
+        refresh_res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        new_access_token = refresh_res.get_json()["access_token"]
+
+        # 新しいアクセストークンで保護されたルートにアクセスできることを確認
+        res = client.get(
+            "/api/organizations",
+            headers={"Authorization": f"Bearer {new_access_token}"},
+        )
+        assert res.status_code == 200
+
+    def test_refresh_with_access_token_fails(self, client):
+        """アクセストークンをリフレッシュエンドポイントに使うと失敗する。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+
+        # リフレッシュエンドポイントにアクセストークンを渡す → 422
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert res.status_code == 422
+
+    def test_refresh_without_token_fails(self, client):
+        """トークンなしでリフレッシュエンドポイントを叩くと401になる。"""
+        res = client.post("/api/auth/refresh")
+        assert res.status_code == 401
+
+
+#############################################
 # tests for user status
 #############################################
 class TestUserStatus:
