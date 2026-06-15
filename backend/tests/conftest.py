@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from app import create_app
 from app.extensions import db
 from app.model import User
+from app.model.seed_rbac import seed_rbac
 
 
 def register_user(
@@ -47,6 +48,7 @@ def app():
 
     with app.app_context():
         db.create_all()
+        seed_rbac()  # RBAC初期データ（ロール・権限）を投入する
         yield app
         db.session.remove()
         db.drop_all()

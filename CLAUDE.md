@@ -121,7 +121,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 | Phase | Status | Content |
 |-------|--------|---------|
 | 1 | ✅ Done | Organization & Group models, membership, basic API |
-| 2 | Pending | Full RBAC (RoleGlobal / RoleLocal / Permission models) |
+| 2 | ✅ Done | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
 | 3 | Pending | Migrate Note / Tag / Folder ownership from User → Group |
 | 4 | Pending | Frontend — org creation UI, group management, member management |
 | 5 | Pending | Email invitations, audit log, advanced policies |
@@ -134,26 +134,44 @@ The app is being extended from a personal note tool to an organization/group-bas
 - **GroupPolicy**: per-group settings (1:1); note visibility to org, join method, etc.
 - Group visibility defaults to public within the org; notes default to visible within the group
 
-### Roles
+### Roles and Permissions (Phase 2 RBAC)
 
-**Organization-level** (`organization_members.role`): `owner` | `sys_admin` | `user_admin` | `member`
+**Organization-level roles** (`OrganizationMember.role_id → RoleGlobal`):
+`owner` | `sys_admin` | `user_admin` | `member`
 
-**Group-level** (`group_members.role`): `admin` | `editor` | `viewer`
+**Group-level roles** (`GroupMember.role_id → RoleLocal`):
+`admin` | `editor` | `viewer`
 
-Phase 1 stores roles as plain strings. Phase 2 will replace these with a proper Permission model.
+Roles store their permissions in `Permission` objects (code strings like `org:edit`, `note:read`).
+Use `member.role.name` for the string name; `member.role.has_permission(code)` for fine-grained checks.
+Helper functions `check_org_permission()` and `check_group_permission()` are available in the service files.
 
-### DB Models (Phase 1 additions)
+**Permission codes — organization level:**
+`org:read` / `org:edit` / `org:delete` / `org:member_add` / `org:member_remove` /
+`org:member_role_assign` / `org:group_create` / `org:group_manage_any`
+
+**Permission codes — group level:**
+`group:read` / `group:edit` / `group:delete` / `group:member_add` / `group:member_remove` /
+`group:member_role_assign` / `note:create` / `note:read` / `note:edit` / `note:delete`
+
+### DB Models (Phase 1 + 2 additions)
 
 ```
+Permission           — code (unique), description
+RoleGlobal           — name (unique), permissions (M2M via role_global_permissions)
+RoleLocal            — name (unique), permissions (M2M via role_local_permissions)
+
 Organization         — name, created_by_user_id
-OrganizationMember   — user_id + organization_id (composite PK), role, joined_at
+OrganizationMember   — user_id + organization_id (composite PK), role_id → RoleGlobal, joined_at
 OrganizationPolicy   — organization_id (unique FK), allow_private_groups,
                        allow_private_notes, who_can_create_groups, default_join_method
 Group                — organization_id, name, is_private, created_by_user_id
-GroupMember          — user_id + group_id (composite PK), role, joined_at
+GroupMember          — user_id + group_id (composite PK), role_id → RoleLocal, joined_at
 GroupPolicy          — group_id (unique FK), allow_private_notes,
                        join_method, is_notes_visible_to_org
 ```
+
+RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()` in `conftest.py` after `db.create_all()`. Production uses the Alembic migration `e006c8e3c75a`.
 
 Note / Tag / Folder still carry `user_id` and are unchanged until Phase 3.
 

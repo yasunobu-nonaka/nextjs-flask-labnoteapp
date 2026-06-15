@@ -6,6 +6,9 @@ from typing import List, Optional
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+# 前方参照のため文字列で型指定するが、実行時はこのimportが必要
+from app.model.rbac import RoleGlobal  # noqa: F401
+
 from app.extensions import db
 
 UTC = timezone.utc
@@ -53,7 +56,7 @@ class Organization(db.Model):
 
 
 class OrganizationMember(db.Model):
-    """組織とユーザーの中間テーブル。ロール（役割）を持つ。"""
+    """組織とユーザーの中間テーブル。RoleGlobal FK でロール（役割）を持つ。"""
 
     __tablename__ = "organization_members"
 
@@ -62,8 +65,9 @@ class OrganizationMember(db.Model):
     organization_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), primary_key=True
     )
-    # 'owner' | 'sys_admin' | 'user_admin' | 'member'
-    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
+    # Phase 2: 文字列ロールを RoleGlobal FK に変更
+    # member.role.name で 'owner'|'sys_admin'|'user_admin'|'member' を取得
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles_global.id"), nullable=False)
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc
     )
@@ -71,9 +75,12 @@ class OrganizationMember(db.Model):
     # リレーション
     user: Mapped["User"] = relationship(back_populates="organization_memberships")
     organization: Mapped["Organization"] = relationship(back_populates="members")
+    # joined ローディングでリクエストごとの追加クエリを避ける
+    role: Mapped["RoleGlobal"] = relationship(foreign_keys=[role_id], lazy="joined")
 
     def __repr__(self):
-        return f"<OrganizationMember user={self.user_id} org={self.organization_id} role={self.role}>"
+        role_name = self.role.name if self.role else "?"
+        return f"<OrganizationMember user={self.user_id} org={self.organization_id} role={role_name}>"
 
 
 class OrganizationPolicy(db.Model):

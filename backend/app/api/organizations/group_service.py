@@ -4,6 +4,18 @@ from app.extensions import db
 from app.model import User
 from app.model.group import Group, GroupMember, GroupPolicy
 from app.model.organization import OrganizationMember
+from app.model.rbac import RoleLocal
+
+
+def get_role_local(name: str) -> RoleLocal:
+    """ロール名からRoleLocalオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
+
+    role = db.session.execute(
+        db.select(RoleLocal).filter_by(name=name)
+    ).scalar_one_or_none()
+    if not role:
+        raise ValueError(f"グループロール '{name}' が見つかりません")
+    return role
 
 
 def can_user_create_group(user_id: int, org_id: int, who_can_create: str) -> bool:
@@ -16,14 +28,16 @@ def can_user_create_group(user_id: int, org_id: int, who_can_create: str) -> boo
     if not member:
         return False
 
+    role_name = member.role.name
+
     if who_can_create == "all":
         return True
     if who_can_create == "member":
-        return member.role in ["owner", "sys_admin", "user_admin", "member"]
+        return role_name in ["owner", "sys_admin", "user_admin", "member"]
     if who_can_create == "user_admin":
-        return member.role in ["owner", "sys_admin", "user_admin"]
+        return role_name in ["owner", "sys_admin", "user_admin"]
     if who_can_create == "sys_admin_only":
-        return member.role in ["owner", "sys_admin"]
+        return role_name in ["owner", "sys_admin"]
 
     return False
 
@@ -43,10 +57,11 @@ def create_group(
     db.session.flush()  # group.id を確定させる
 
     # 作成者をadminとして登録
+    admin_role = get_role_local("admin")
     member = GroupMember(
         user_id=user_id,
         group_id=group.id,
-        role="admin",
+        role_id=admin_role.id,
     )
     db.session.add(member)
 
@@ -104,7 +119,19 @@ def check_group_role(user_id: int, group_id: int, required_roles: List[str]) -> 
     """ユーザーが指定ロールのいずれかを持つかを確認する。"""
 
     member = check_group_membership(user_id, group_id)
-    return member is not None and member.role in required_roles
+    return member is not None and member.role.name in required_roles
+
+
+def check_group_permission(user_id: int, group_id: int, permission_code: str) -> bool:
+    """ユーザーが指定のパーミッションコードを持つかを確認する。
+
+    ロール名での判定 (check_group_role) より細粒度の権限チェックが必要な場合に使用する。
+    """
+
+    member = check_group_membership(user_id, group_id)
+    if not member or not member.role:
+        return False
+    return member.role.has_permission(permission_code)
 
 
 def add_group_member(group_id: int, user_id: int, role: str = "editor") -> GroupMember:
@@ -118,10 +145,11 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
     if not user:
         raise ValueError("ユーザーが見つかりません")
 
+    role_obj = get_role_local(role)
     member = GroupMember(
         user_id=user_id,
         group_id=group_id,
-        role=role,
+        role_id=role_obj.id,
     )
     db.session.add(member)
     db.session.commit()
@@ -131,7 +159,8 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
 def update_group_member_role(member: GroupMember, role: str) -> GroupMember:
     """グループメンバーのロールを変更する。"""
 
-    member.role = role
+    role_obj = get_role_local(role)
+    member.role_id = role_obj.id
     db.session.commit()
     return member
 
@@ -180,7 +209,7 @@ def build_group_member_response(member: GroupMember) -> dict:
     return {
         "user_id": member.user_id,
         "group_id": member.group_id,
-        "role": member.role,
+        "role": member.role.name,
         "joined_at": member.joined_at,
         "username": member.user.username,
         "email": member.user.email,

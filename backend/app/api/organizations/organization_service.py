@@ -3,6 +3,18 @@ from typing import List, Optional
 from app.extensions import db
 from app.model import User
 from app.model.organization import Organization, OrganizationMember, OrganizationPolicy
+from app.model.rbac import RoleGlobal
+
+
+def get_role_global(name: str) -> RoleGlobal:
+    """ロール名からRoleGlobalオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
+
+    role = db.session.execute(
+        db.select(RoleGlobal).filter_by(name=name)
+    ).scalar_one_or_none()
+    if not role:
+        raise ValueError(f"組織ロール '{name}' が見つかりません")
+    return role
 
 
 def create_organization(name: str, user_id: int) -> Organization:
@@ -13,10 +25,11 @@ def create_organization(name: str, user_id: int) -> Organization:
     db.session.flush()  # org.id を確定させる
 
     # 作成者をownerとして登録
+    owner_role = get_role_global("owner")
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org.id,
-        role="owner",
+        role_id=owner_role.id,
     )
     db.session.add(member)
 
@@ -67,7 +80,19 @@ def check_org_role(user_id: int, org_id: int, required_roles: List[str]) -> bool
     """ユーザーが指定ロールのいずれかを持つかを確認する。"""
 
     member = check_org_membership(user_id, org_id)
-    return member is not None and member.role in required_roles
+    return member is not None and member.role.name in required_roles
+
+
+def check_org_permission(user_id: int, org_id: int, permission_code: str) -> bool:
+    """ユーザーが指定のパーミッションコードを持つかを確認する。
+
+    ロール名での判定 (check_org_role) より細粒度の権限チェックが必要な場合に使用する。
+    """
+
+    member = check_org_membership(user_id, org_id)
+    if not member or not member.role:
+        return False
+    return member.role.has_permission(permission_code)
 
 
 def add_org_member(org_id: int, user_id: int, role: str = "member") -> OrganizationMember:
@@ -81,10 +106,11 @@ def add_org_member(org_id: int, user_id: int, role: str = "member") -> Organizat
     if not user:
         raise ValueError("ユーザーが見つかりません")
 
+    role_obj = get_role_global(role)
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org_id,
-        role=role,
+        role_id=role_obj.id,
     )
     db.session.add(member)
     db.session.commit()
@@ -96,7 +122,8 @@ def update_org_member_role(member: OrganizationMember, role: str) -> Organizatio
 
     if role == "owner":
         raise ValueError("ownerロールは直接付与できません")
-    member.role = role
+    role_obj = get_role_global(role)
+    member.role_id = role_obj.id
     db.session.commit()
     return member
 
@@ -104,7 +131,7 @@ def update_org_member_role(member: OrganizationMember, role: str) -> Organizatio
 def remove_org_member(member: OrganizationMember) -> None:
     """組織メンバーを削除する。ownerは削除不可。"""
 
-    if member.role == "owner":
+    if member.role.name == "owner":
         raise ValueError("組織のownerは削除できません")
     db.session.delete(member)
     db.session.commit()
@@ -140,7 +167,7 @@ def build_member_response(member: OrganizationMember) -> dict:
     return {
         "user_id": member.user_id,
         "organization_id": member.organization_id,
-        "role": member.role,
+        "role": member.role.name,
         "joined_at": member.joined_at,
         "username": member.user.username,
         "email": member.user.email,

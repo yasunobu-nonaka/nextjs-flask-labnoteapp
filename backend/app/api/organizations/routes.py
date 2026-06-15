@@ -77,7 +77,7 @@ def list_organizations():
     result = []
     for org in orgs:
         member = check_org_membership(current_user.id, org.id)
-        result.append(build_org_response(org, member.role if member else None))
+        result.append(build_org_response(org, member.role.name if member else None))
 
     return jsonify(result)
 
@@ -99,7 +99,7 @@ def create_org():
         jsonify(
             {
                 "message": "組織を作成しました",
-                "organization": build_org_response(org, member.role),
+                "organization": build_org_response(org, member.role.name),
             }
         ),
         201,
@@ -117,7 +117,7 @@ def get_org(org_id):
     if not member:
         return jsonify({"message": "この組織へのアクセス権がありません"}), 403
 
-    return jsonify(build_org_response(org, member.role))
+    return jsonify(build_org_response(org, member.role.name))
 
 
 @organizations_bp.route("/<int:org_id>", methods=["PATCH"])
@@ -143,7 +143,7 @@ def update_org(org_id):
             update_org_policy(org.policy, data["policy"])
 
     member = check_org_membership(current_user.id, org_id)
-    return jsonify(build_org_response(org, member.role))
+    return jsonify(build_org_response(org, member.role.name if member else None))
 
 
 # ============================================================
@@ -284,7 +284,7 @@ def list_groups(org_id):
     result = []
     for group in groups:
         member = check_group_membership(current_user.id, group.id)
-        result.append(build_group_response(group, member.role if member else None))
+        result.append(build_group_response(group, member.role.name if member else None))
 
     return jsonify(result)
 
@@ -330,7 +330,7 @@ def create_grp(org_id):
         jsonify(
             {
                 "message": "グループを作成しました",
-                "group": build_group_response(group, member.role if member else None),
+                "group": build_group_response(group, member.role.name if member else None),
             }
         ),
         201,
@@ -352,7 +352,7 @@ def get_grp(org_id, group_id):
     if group.is_private and not member:
         return jsonify({"message": "このグループへのアクセス権がありません"}), 403
 
-    return jsonify(build_group_response(group, member.role if member else None))
+    return jsonify(build_group_response(group, member.role.name if member else None))
 
 
 @organizations_bp.route("/<int:org_id>/groups/<int:group_id>", methods=["PATCH"])
@@ -389,7 +389,7 @@ def update_grp(org_id, group_id):
         update_group_policy(group.policy, data["policy"])
 
     member = check_group_membership(current_user.id, group_id)
-    return jsonify(build_group_response(group, member.role if member else None))
+    return jsonify(build_group_response(group, member.role.name if member else None))
 
 
 @organizations_bp.route("/<int:org_id>/groups/<int:group_id>", methods=["DELETE"])
