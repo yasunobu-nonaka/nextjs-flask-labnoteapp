@@ -52,6 +52,16 @@ class Group(db.Model):
     )
     # 作成者（viewonly — User側にback_populatesなし）
     creator: Mapped["User"] = relationship(foreign_keys=[created_by_user_id], viewonly=True)
+    # Phase 3: グループが所有するノート・フォルダー・タグ
+    notes: Mapped[List["Note"]] = relationship(
+        back_populates="group", cascade="all, delete-orphan"
+    )
+    folders: Mapped[List["Folder"]] = relationship(
+        back_populates="group", cascade="all, delete-orphan"
+    )
+    tags: Mapped[List["Tag"]] = relationship(
+        back_populates="group", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Group {self.id} name={self.name} org={self.organization_id}>"

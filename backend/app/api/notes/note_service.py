@@ -7,14 +7,12 @@ from app.api.notes.tag_service import get_or_create_tags
 
 
 def get_notes_service(
-    user_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10
+    group_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10
 ):
-    """
-    ノート一覧取得
-    """
+    """ノート一覧取得。グループスコープでフィルタリングする。"""
 
-    query = db.select(Note).filter_by(user_id=user_id).options(selectinload(Note.tags))
-    count_query = db.select(func.count(Note.id)).filter_by(user_id=user_id)
+    query = db.select(Note).filter_by(group_id=group_id).options(selectinload(Note.tags))
+    count_query = db.select(func.count(Note.id)).filter_by(group_id=group_id)
 
     if query_word:
         query = query.filter(Note.title.ilike(f"%{query_word}%"))
@@ -43,33 +41,30 @@ def get_notes_service(
     return notes, total
 
 
-def get_note_or_404_service(note_id, user_id):
-    """
-    単一ノート取得
-    """
+def get_note_or_404_service(note_id, group_id):
+    """単一ノート取得。グループ所有を確認する。"""
 
     note = db.one_or_404(
         db.select(Note)
-        .filter_by(id=note_id, user_id=user_id)
+        .filter_by(id=note_id, group_id=group_id)
         .options(selectinload(Note.tags))
     )
 
     return note
 
 
-def create_note_service(data, user_id):
-    """
-    ノート作成
-    """
+def create_note_service(data, group_id, user_id):
+    """ノート作成。group_id でグループ所有、user_id で作成者を記録する。"""
 
     note = Note(
-        user_id=user_id,
+        group_id=group_id,
+        created_by_user_id=user_id,
         title=data["title"],
         content_md=data["content_md"],
         folder_id=data.get("folder_id"),
     )
 
-    tags = get_or_create_tags(data.get("tags", []), user_id)
+    tags = get_or_create_tags(data.get("tags", []), group_id)
 
     note.tags.extend(tags)
 
@@ -79,10 +74,8 @@ def create_note_service(data, user_id):
     return note
 
 
-def update_note_service(note, data, user_id):
-    """
-    ノート更新
-    """
+def update_note_service(note, data, group_id):
+    """ノート更新。"""
 
     if "title" in data:
         note.title = data["title"]
@@ -91,7 +84,7 @@ def update_note_service(note, data, user_id):
         note.content_md = data["content_md"]
 
     if "tags" in data:
-        tags = get_or_create_tags(data["tags"], user_id)
+        tags = get_or_create_tags(data["tags"], group_id)
         note.tags = tags
 
     if "folder_id" in data:
@@ -103,9 +96,7 @@ def update_note_service(note, data, user_id):
 
 
 def delete_note_service(note):
-    """
-    ノート削除
-    """
+    """ノート削除。"""
 
     db.session.delete(note)
     db.session.commit()

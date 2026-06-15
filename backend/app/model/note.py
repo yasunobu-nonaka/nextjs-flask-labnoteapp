@@ -28,7 +28,9 @@ class Note(db.Model):
     __tablename__ = "notes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Phase 3: user_id → group_id（グループ所有）+ created_by_user_id（作成者追跡）
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_md: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_jst, index=True)
@@ -37,8 +39,12 @@ class Note(db.Model):
     )
 
     # リレーション
-    # ユーザー：1対多
-    user: Mapped["User"] = relationship(back_populates="notes")
+    # グループ：多対1
+    group: Mapped["Group"] = relationship(back_populates="notes")
+    # 作成者（viewonly — User側にback_populatesなし）
+    creator: Mapped["User"] = relationship(
+        foreign_keys=[created_by_user_id], viewonly=True
+    )
 
     # フォルダー：多対1
     folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("folders.id"), nullable=True)
@@ -48,24 +54,25 @@ class Note(db.Model):
     tags: Mapped[List[Tag]] = relationship(secondary=notes_tags, back_populates="notes")
 
     def __repr__(self):
-        return f"<Note {self.id} user={self.user_id}>"
+        return f"<Note {self.id} group={self.group_id}>"
 
 
 class Tag(db.Model):
     __tablename__ = "tags"
     __table_args__ = (
-        # 重複タグを防止（同一ユーザー）
-        db.UniqueConstraint("user_id", "tagname"),
-        db.Index("ix_tag_user", "user_id"),
+        # 重複タグを防止（同一グループ内）
+        db.UniqueConstraint("group_id", "tagname"),
+        db.Index("ix_tag_group", "group_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Phase 3: user_id → group_id（グループ共有ラベル）
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
     tagname: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # リレーション
-    # ユーザー：1対多
-    user: Mapped["User"] = relationship(back_populates="tags")
+    # グループ：多対1
+    group: Mapped["Group"] = relationship(back_populates="tags")
     # ノート：多対多
     notes: Mapped[List[Note]] = relationship(
         secondary=notes_tags, back_populates="tags"

@@ -23,7 +23,8 @@ class NoteCreateSchema(Schema):
 
 class NoteResponseSchema(Schema):
     id = fields.Int(dump_only=True)
-    user_id = fields.Int(dump_only=True)
+    group_id = fields.Int(dump_only=True)
+    created_by_user_id = fields.Int(dump_only=True)
     title = fields.Str(dump_only=True)
     content_md = fields.Str(dump_only=True)
     folder_id = fields.Int(dump_only=True, allow_none=True)
