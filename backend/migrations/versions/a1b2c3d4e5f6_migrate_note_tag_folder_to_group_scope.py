@@ -48,7 +48,9 @@ def upgrade():
     # --- 5. folders.created_by_user_id に既存の user_id をコピー ---
     conn.execute(text("UPDATE folders SET created_by_user_id = user_id"))
 
-    # --- 6. group_id を決定できない既存行を削除（全削除） ---
+    # --- 6. group_id を決定できない既存行を削除（FK制約順に削除） ---
+    # notes_tags は notes と tags の両方を参照しているため先に削除する
+    conn.execute(text("DELETE FROM notes_tags"))
     conn.execute(text("DELETE FROM notes"))
     conn.execute(text("DELETE FROM folders"))
     conn.execute(text("DELETE FROM tags"))
