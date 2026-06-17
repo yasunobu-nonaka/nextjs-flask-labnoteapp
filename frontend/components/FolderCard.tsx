@@ -7,6 +7,8 @@ import Modal from "@/components/Modal";
 
 type Props = {
   folder: Folder;
+  orgId: number;
+  groupId: number;
   /** フォルダーに移動するハンドラ */
   onNavigate: (id: number) => void;
   /** フォルダーの CRUD 操作後に全フォルダーを再取得するハンドラ */
@@ -20,7 +22,7 @@ type Props = {
  * 右上の ··· ボタンでポップオーバーメニューを開き、名称変更・削除を行う。
  * 名称変更はモーダルで入力する。
  */
-export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
+export default function FolderCard({ folder, orgId, groupId, onNavigate, onMutation }: Props) {
   // ··· メニューポップオーバーの開閉
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   // 名称変更モーダルの開閉と入力値
@@ -32,10 +34,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   async function handleRename() {
     const trimmed = editName.trim();
     if (!trimmed) return;
-    const res = await authFetch(`/api/folders/${folder.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: trimmed }),
-    });
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/folders/${folder.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ name: trimmed }),
+      },
+    );
     if (res.ok) {
       setIsRenameModalOpen(false);
       onMutation();
@@ -43,9 +48,10 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   }
 
   async function handleDelete() {
-    const res = await authFetch(`/api/folders/${folder.id}`, {
-      method: "DELETE",
-    });
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/folders/${folder.id}`,
+      { method: "DELETE" },
+    );
     if (res.ok) {
       setIsDeleteModalOpen(false);
       onMutation();

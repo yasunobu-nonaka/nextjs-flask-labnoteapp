@@ -24,12 +24,16 @@ export type Note = {
  */
 export default function NoteCard({
   note,
+  orgId,
+  groupId,
   selectedTags,
   onTagToggle,
   folders,
   onMoved,
 }: {
   note: Note;
+  orgId: number;
+  groupId: number;
   selectedTags: string[];
   onTagToggle: (tag: string) => void;
   folders: Folder[];
@@ -50,10 +54,13 @@ export default function NoteCard({
   });
 
   async function handleMove() {
-    const res = await authFetch(`/api/notes/${note.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ folder_id: targetFolderId }),
-    });
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/notes/${note.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ folder_id: targetFolderId }),
+      },
+    );
     if (res.ok) {
       setMode("idle");
       onMoved();
@@ -98,7 +105,7 @@ export default function NoteCard({
 
       {/* タイトルリンク: 3行で折り返しを止めて省略 */}
       <Link
-        href={`/notes/${note.id}`}
+        href={`/organizations/${orgId}/groups/${groupId}/notes/${note.id}`}
         className="font-semibold text-base leading-snug hover:underline pr-6 line-clamp-3"
       >
         {note.title}

@@ -60,7 +60,7 @@ export default function LoginPage() {
       } else {
         localStorage.setItem("access_token", json.access_token);
         localStorage.setItem("refresh_token", json.refresh_token);
-        router.push("/notes");
+        router.push("/organizations");
       }
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
