@@ -59,8 +59,11 @@ app/
   api/
     __init__.py        # api_bp (prefix /api), registers sub-blueprints
     auth/              # /api/auth — register, login, email verify
-    notes/             # /api/notes — CRUD, tag list, folder filter
-    folders/           # /api/folders — folder CRUD
+    notes/             # note_service.py, tag_service.py (no routes; moved to organizations/)
+    folders/           # folder_service.py (no routes; moved to organizations/)
+    organizations/     # /api/organizations — org/group CRUD + note/folder routes
+      note_routes.py   # /api/organizations/<org_id>/groups/<group_id>/notes
+      folder_routes.py # /api/organizations/<org_id>/groups/<group_id>/folders
   model/               # SQLAlchemy 2.0 Mapped / mapped_column style
   schema/              # Marshmallow schemas (validation + serialisation)
   extensions/          # db, migrate, jwt, mail, cors — each in own file
@@ -69,10 +72,13 @@ app/
 
 **Request flow**: route → Marshmallow `schema.load()` validation → `*_service.py` function → Marshmallow `schema.dump()` → JSON response.
 
-**Auth**: Flask-JWT-Extended. All `/api/notes` and `/api/folders` routes require `@jwt_required()`. `current_user` is resolved via `user_lookup_callback` in `create_app`.
+**Auth**: Flask-JWT-Extended. All group-scoped note/folder routes require `@jwt_required()` plus RBAC permission checks via `check_org_permission()` and `check_group_permission()`. `current_user` is resolved via `user_lookup_callback` in `create_app`.
 
 **Models**:
-- `User` ← owns → `Note`, `Tag`, `Folder`
+- `Group` ← owns → `Note`, `Tag`, `Folder` (Phase 3: moved from User)
+- `Note` has `group_id` (FK → groups.id) and `created_by_user_id` (FK → users.id)
+- `Tag` has `group_id` (FK → groups.id); unique on `(group_id, tagname)`
+- `Folder` has `group_id` (FK → groups.id) and `created_by_user_id` (FK → users.id)
 - `Note` ↔ `Tag` (many-to-many via `notes_tags` association table)
 - `Folder` self-referential (`parent_id` → `Folder.id`); cascade-deletes children and owned notes
 
@@ -114,7 +120,7 @@ lib/
 
 ## Organization & Group Redesign
 
-The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 1 (backend models and API) is complete**.
+The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 3 (backend migration) is complete**.
 
 ### Phase Plan
 
@@ -122,7 +128,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 |-------|--------|---------|
 | 1 | ✅ Done | Organization & Group models, membership, basic API |
 | 2 | ✅ Done | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
-| 3 | Pending | Migrate Note / Tag / Folder ownership from User → Group |
+| 3 | ✅ Done | Migrate Note / Tag / Folder ownership from User → Group |
 | 4 | Pending | Frontend — org creation UI, group management, member management |
 | 5 | Pending | Email invitations, audit log, advanced policies |
 
@@ -154,7 +160,7 @@ Helper functions `check_org_permission()` and `check_group_permission()` are ava
 `group:read` / `group:edit` / `group:delete` / `group:member_add` / `group:member_remove` /
 `group:member_role_assign` / `note:create` / `note:read` / `note:edit` / `note:delete`
 
-### DB Models (Phase 1 + 2 additions)
+### DB Models (Phase 1 + 2 + 3 additions)
 
 ```
 Permission           — code (unique), description
@@ -169,15 +175,21 @@ Group                — organization_id, name, is_private, created_by_user_id
 GroupMember          — user_id + group_id (composite PK), role_id → RoleLocal, joined_at
 GroupPolicy          — group_id (unique FK), allow_private_notes,
                        join_method, is_notes_visible_to_org
+
+Note                 — group_id (FK → groups.id), created_by_user_id (FK → users.id),
+                       title, content, created_at, updated_at
+Tag                  — group_id (FK → groups.id), tagname; unique (group_id, tagname)
+Folder               — group_id (FK → groups.id), created_by_user_id (FK → users.id),
+                       name, parent_id (self-ref FK)
 ```
 
-RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()` in `conftest.py` after `db.create_all()`. Production uses the Alembic migration `e006c8e3c75a`.
+RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()` in `conftest.py` after `db.create_all()`. Production uses the Alembic migration `e006c8e3c75a` (Phase 2) followed by `a1b2c3d4e5f6` (Phase 3).
 
-Note / Tag / Folder still carry `user_id` and are unchanged until Phase 3.
-
-### New API Blueprint (Phase 1)
+### API Blueprint (Phase 1 + 3)
 
 `app/api/organizations/` — registered as `/api/organizations`
+
+#### Organization & Group routes (Phase 1)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -200,3 +212,22 @@ Note / Tag / Folder still carry `user_id` and are unchanged until Phase 3.
 | DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group |
 
 Service functions live in `organization_service.py` and `group_service.py` inside `app/api/organizations/`.
+
+#### Note & Folder routes (Phase 3)
+
+All routes require `org:read` org-level permission plus the group-level permission shown below.
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| GET | `/api/organizations/<id>/groups/<gid>/notes` | `note:read` | List notes in group |
+| POST | `/api/organizations/<id>/groups/<gid>/notes` | `note:create` | Create note in group |
+| GET | `/api/organizations/<id>/groups/<gid>/notes/tags` | `note:read` | List tags in group |
+| GET | `/api/organizations/<id>/groups/<gid>/notes/<nid>` | `note:read` | Get note |
+| PATCH | `/api/organizations/<id>/groups/<gid>/notes/<nid>` | `note:edit` | Update note |
+| DELETE | `/api/organizations/<id>/groups/<gid>/notes/<nid>` | `note:delete` | Delete note |
+| GET | `/api/organizations/<id>/groups/<gid>/folders` | `note:read` | List folders in group |
+| POST | `/api/organizations/<id>/groups/<gid>/folders` | `note:create` | Create folder in group |
+| PATCH | `/api/organizations/<id>/groups/<gid>/folders/<fid>` | `note:edit` | Rename folder |
+| DELETE | `/api/organizations/<id>/groups/<gid>/folders/<fid>` | `note:delete` | Delete folder |
+
+Route implementations live in `note_routes.py` and `folder_routes.py` inside `app/api/organizations/`.
