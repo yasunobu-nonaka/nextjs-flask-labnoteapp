@@ -130,7 +130,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 | 2 | ✅ Done | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
 | 3 | ✅ Done | Migrate Note / Tag / Folder ownership from User → Group |
 | 4 | Pending | Frontend — org creation UI, group management, member management |
-| 5 | Pending | Email invitations, audit log, advanced policies |
+| 5 | Pending | Email invitations (member invite flow), member management UI, audit log, advanced policies |
 
 ### Domain Concepts
 
