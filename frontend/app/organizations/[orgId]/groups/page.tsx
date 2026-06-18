@@ -59,7 +59,7 @@ export default function GroupsPage({
 
         const orgData = await orgRes.json();
         const groupsData: Group[] = await groupsRes.json();
-        setOrgName(orgData.organization?.name ?? "");
+        setOrgName(orgData.name ?? "");
         setGroups(groupsData);
       } catch {
         setError("サーバーへの接続に失敗しました");

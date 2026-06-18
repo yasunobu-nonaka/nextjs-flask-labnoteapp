@@ -80,7 +80,7 @@ export default function NotesPage({
       );
       if (res.ok) {
         const data = await res.json();
-        setGroupName(data.group?.name ?? "");
+        setGroupName(data.name ?? "");
       }
     }
     fetchGroupName();
