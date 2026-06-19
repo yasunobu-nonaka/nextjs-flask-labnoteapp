@@ -157,7 +157,7 @@ export default function FolderSidebar({
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
       {/* 現在の組織名と切り替えボタン */}
       <div className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
+        <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
           組織
         </span>
         <div className="flex items-center justify-between px-2">
@@ -167,7 +167,7 @@ export default function FolderSidebar({
           {/* 組織切り替えボタン */}
           <button
             onClick={handleOpenOrgModal}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            className="text-sm dark:text-base text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
           >
             ▽
           </button>
@@ -177,7 +177,7 @@ export default function FolderSidebar({
       {/* グループ一覧: 最大5件、現在のグループをハイライト */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
+          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             グループ
           </span>
           <button
@@ -214,7 +214,7 @@ export default function FolderSidebar({
         }}
         className="flex flex-col gap-1.5"
       >
-        <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
+        <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
           ノート検索
         </span>
         <div className="flex gap-1">
@@ -237,7 +237,7 @@ export default function FolderSidebar({
       {/* タグフィルター: チェックボックス一覧 */}
       {availableTags.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
+          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             タグで絞り込み
           </span>
           <div className="flex flex-col gap-1 px-2">

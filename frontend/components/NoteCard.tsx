@@ -73,7 +73,10 @@ export default function NoteCard({
      * shadow-sm + hover:shadow-md で浮き上がり感を演出。
      * flex-col で内部要素を縦に並べ、下部に日付・タグを固定する。
      */
-    <li className="relative flex flex-col gap-2 p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow aspect-3/4">
+    <li className="relative isolate flex flex-col gap-2 p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow aspect-3/4">
+      {/* 罫線オーバーレイ: mx-4 で左右に余白を持たせてノート風の横罫線を表示する。
+          isolate + [z-index:-1] でテキストより背面に配置する。 */}
+      <div className="absolute inset-0 mx-4 pointer-events-none z-[-1] bg-[repeating-linear-gradient(transparent,transparent_23px,#f0f1f4_23px,#f0f1f4_24px)] dark:bg-[repeating-linear-gradient(transparent,transparent_23px,#2b3544_23px,#2b3544_24px)]" />
       {/* ドロップダウンメニュー: 透明オーバーレイ + メニュー本体 */}
       {mode === "menu" && (
         <>
@@ -97,7 +100,7 @@ export default function NoteCard({
       {/* ··· メニューボタン（右上に固定） */}
       <button
         onClick={() => setMode(mode === "menu" ? "idle" : "menu")}
-        className="absolute top-3 right-3 px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-base leading-none"
+        className="absolute top-3 right-3 px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:font-bold text-base leading-none"
         title="メニュー"
       >
         ···
