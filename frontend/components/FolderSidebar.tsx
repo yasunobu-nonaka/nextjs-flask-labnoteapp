@@ -164,13 +164,23 @@ export default function FolderSidebar({
           <span className="text-base text-gray-700 dark:text-gray-300">
             {orgName}
           </span>
-          {/* 組織切り替えボタン */}
-          <button
-            onClick={handleOpenOrgModal}
-            className="text-sm dark:text-base text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-          >
-            ▽
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 組織コンソールへのリンク */}
+            <Link
+              href={`/organizations/${orgId}/console`}
+              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              title="組織コンソール"
+            >
+              ⚙
+            </Link>
+            {/* 組織切り替えボタン */}
+            <button
+              onClick={handleOpenOrgModal}
+              className="text-sm dark:text-base text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            >
+              ▽
+            </button>
+          </div>
         </div>
       </div>
 
