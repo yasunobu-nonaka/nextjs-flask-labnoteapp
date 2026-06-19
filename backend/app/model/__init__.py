@@ -4,6 +4,7 @@ from .note import Note, Tag
 from .folder import Folder
 from .organization import Organization, OrganizationMember, OrganizationPolicy
 from .group import Group, GroupMember, GroupPolicy
+from .invitation import Invitation
 
 __all__ = [
     "Permission",
@@ -19,4 +20,5 @@ __all__ = [
     "Group",
     "GroupMember",
     "GroupPolicy",
+    "Invitation",
 ]
