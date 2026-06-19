@@ -60,7 +60,14 @@ export default function LoginPage() {
       } else {
         localStorage.setItem("access_token", json.access_token);
         localStorage.setItem("refresh_token", json.refresh_token);
-        router.push("/organizations");
+        // ログイン前に保存されたリダイレクト先があればそちらへ遷移する
+        const redirect = localStorage.getItem("redirect_after_login");
+        if (redirect) {
+          localStorage.removeItem("redirect_after_login");
+          router.push(redirect);
+        } else {
+          router.push("/organizations");
+        }
       }
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
