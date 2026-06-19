@@ -51,9 +51,15 @@ export default function FolderSidebar({
   const [groups, setGroups] = useState<Group[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+  const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [orgsError, setOrgsError] = useState<string | null>(null);
   const router = useRouter();
+
+  // 新規グループ作成フォームの入力値と送信状態
+  const [newGroupName, setNewGroupName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchCurrentOrganization() {
@@ -118,6 +124,35 @@ export default function FolderSidebar({
     }
   }
 
+  // グループを新規作成してリストに追加する
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newGroupName.trim();
+    if (!trimmed) return;
+
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      const res = await authFetch(`/api/organizations/${orgId}/groups`, {
+        method: "POST",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        setCreateError(json.message ?? "作成に失敗しました");
+        return;
+      }
+      const data = await res.json();
+      setGroups((prev) => [...prev, { ...data.group, role: "admin" }]);
+      setNewGroupName("");
+      router.push(`/organizations/${orgId}/groups/${data.group.id}/notes`);
+    } catch {
+      setCreateError("サーバーへの接続に失敗しました");
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
       {/* 現在の組織名と切り替えボタン */}
@@ -141,9 +176,17 @@ export default function FolderSidebar({
 
       {/* グループ一覧: 最大5件、現在のグループをハイライト */}
       <div className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
-          グループ
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-base font-semibold text-gray-400 uppercase tracking-wider px-2">
+            グループ
+          </span>
+          <button
+            className="text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            onClick={() => setIsGroupCreateModalOpen(true)}
+          >
+            +
+          </button>
+        </div>
         {groups.length > 0 && (
           <div className="flex flex-col gap-1 px-2">
             {groups.slice(0, 5).map((group) => (
@@ -246,6 +289,52 @@ export default function FolderSidebar({
               </ul>
             )}
           </section>
+        </Modal>
+      )}
+
+      {/* グループ作成モーダル */}
+      {isGroupCreateModalOpen && (
+        <Modal
+          title="グループを作成"
+          onClose={() => {
+            setIsGroupCreateModalOpen(false);
+            setNewGroupName("");
+            setCreateError(null);
+          }}
+        >
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <input
+              autoFocus
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="グループ名"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+            />
+            {createError && (
+              <p className="text-sm text-red-500">{createError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGroupCreateModalOpen(false);
+                  setNewGroupName("");
+                  setCreateError(null);
+                }}
+                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={isCreating || !newGroupName.trim()}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              >
+                {isCreating ? "作成中..." : "作成"}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </aside>
