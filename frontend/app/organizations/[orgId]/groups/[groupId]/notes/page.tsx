@@ -157,7 +157,10 @@ export default function NotesPage({
         const params = new URLSearchParams();
         if (submittedQuery) params.set("q", submittedQuery);
         selectedTags.forEach((tag) => params.append("tag", tag));
-        params.set("folder_id", currentFolderId === null ? "null" : String(currentFolderId));
+        params.set(
+          "folder_id",
+          currentFolderId === null ? "null" : String(currentFolderId),
+        );
         params.set("page", String(currentPage));
 
         const res = await authFetch(
@@ -240,6 +243,8 @@ export default function NotesPage({
     <main className="h-screen overflow-hidden bg-background text-foreground flex">
       {/* 左カラム: 検索・タグフィルターサイドバー */}
       <FolderSidebar
+        orgId={orgId}
+        groupId={groupId}
         query={query}
         onQueryChange={setQuery}
         onSearch={() => {
