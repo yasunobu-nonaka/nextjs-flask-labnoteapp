@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
@@ -21,12 +21,6 @@ const ROLES = [
   { value: "sys_admin", label: "システム管理者" },
 ];
 
-let nextId = 1;
-
-function createEntry(): Entry {
-  return { id: nextId++, email: "", role: "member", status: "idle", message: "" };
-}
-
 /**
  * 組織コンソール: メンバー招待ページ。
  * 任意の数のメールアドレスとロールを入力して招待メールを送信できる。
@@ -39,7 +33,13 @@ export default function InviteMembersPage({
 }) {
   const { orgId } = use(params);
 
-  const [entries, setEntries] = useState<Entry[]>([createEntry()]);
+  // nextId をモジュールレベルに置くと Strict Mode の二重レンダリングで
+  // サーバー/クライアント間のカウントがずれハイドレーション不一致が起きるため useRef で管理する
+  const nextId = useRef(1);
+
+  const [entries, setEntries] = useState<Entry[]>([
+    { id: 0, email: "", role: "member", status: "idle", message: "" },
+  ]);
   const [isSending, setIsSending] = useState(false);
 
   /** 指定 id のエントリを部分更新する */
@@ -51,7 +51,11 @@ export default function InviteMembersPage({
 
   /** 行を追加する */
   function addEntry() {
-    setEntries((prev) => [...prev, createEntry()]);
+    const id = nextId.current++;
+    setEntries((prev) => [
+      ...prev,
+      { id, email: "", role: "member", status: "idle", message: "" },
+    ]);
   }
 
   /** 行を削除する（最低1行は残す） */
