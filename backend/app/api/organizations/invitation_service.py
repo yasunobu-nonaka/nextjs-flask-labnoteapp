@@ -28,10 +28,11 @@ def create_invitation(
 ) -> Invitation:
     """招待レコードを作成し、招待メールを送信する。
 
-    同じメールアドレスへの未承認招待が既に存在する場合は、それを返す（重複送信を防ぐ）。
+    同じメールアドレスへの未承認招待が既に存在する場合は、既存レコードを再利用して
+    再送する（ユーザーが再送を意図してフォームを再送信した場合に対応するため）。
     """
 
-    # 同一メール宛の pending 招待が既にあれば再利用する
+    # 同一メール宛の pending 招待が既にあれば再利用し、メールを再送する
     existing = db.session.execute(
         db.select(Invitation).filter_by(
             organization_id=org.id,
@@ -40,6 +41,7 @@ def create_invitation(
         )
     ).scalar_one_or_none()
     if existing and existing.is_valid():
+        _send_invitation_email(existing, org)
         return existing
 
     role = get_role_global_by_name(role_name)
