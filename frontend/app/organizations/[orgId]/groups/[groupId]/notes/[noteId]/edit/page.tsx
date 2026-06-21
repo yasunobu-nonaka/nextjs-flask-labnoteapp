@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/noteSchema";
 import NoteForm from "@/components/NoteForm";
@@ -13,12 +13,8 @@ type LoadStatus = "loading" | "ready" | "error";
  * ノート編集ページ（グループスコープ版）
  * 既存ノートのデータを取得してフォームに初期値としてセットし、保存する。
  */
-export default function EditNotePage({
-  params,
-}: {
-  params: Promise<{ orgId: string; groupId: string; noteId: string }>;
-}) {
-  const { orgId, groupId, noteId } = use(params);
+export default function EditNotePage() {
+  const { orgId, groupId, noteId } = useParams<{ orgId: string; groupId: string; noteId: string }>();
   const orgIdNum = Number(orgId);
   const groupIdNum = Number(groupId);
 

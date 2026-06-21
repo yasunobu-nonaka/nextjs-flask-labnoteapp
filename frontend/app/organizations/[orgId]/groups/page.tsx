@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
@@ -17,13 +17,8 @@ type Group = {
  * 指定された組織内のグループを表示し、新規グループの作成を行う。
  * グループをクリックするとノート一覧ページに遷移する。
  */
-export default function GroupsPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  // Next.js 15 ではルートパラメータが Promise になるため use() で unwrap する
-  const { orgId } = use(params);
+export default function GroupsPage() {
+  const { orgId } = useParams<{ orgId: string }>();
   const orgIdNum = Number(orgId);
 
   const [groups, setGroups] = useState<Group[]>([]);

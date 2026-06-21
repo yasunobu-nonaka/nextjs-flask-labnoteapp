@@ -1,16 +1,13 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 
 type Status = "loading" | "success" | "error";
 
-export default function VerifyEmailPage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
-  const { token } = use(params);
+export default function VerifyEmailPage() {
+  const { token } = useParams<{ token: string }>();
   const [status, setStatus] = useState<Status>("loading");
   const [message, setMessage] = useState<string | null>(null);
 

@@ -64,6 +64,7 @@ def _send_invitation_email(invitation: Invitation, org: Organization) -> None:
 
     msg = Message(
         subject=f"【LabNote】{org.name} への招待",
+        sender="noreply@example.com",
         recipients=[invitation.email],
         body=(
             f"{org.name} への参加招待が届いています。\n\n"

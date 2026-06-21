@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
@@ -27,12 +27,8 @@ const PER_PAGE = 20;
  * 組織に所属するメンバーの一覧をロールとともに表示する。
  * ページネーションはクライアントサイドで処理する（全件取得後に分割）。
  */
-export default function ConsoleMembersPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  const { orgId } = use(params);
+export default function ConsoleMembersPage() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
   const [members, setMembers] = useState<Member[]>([]);

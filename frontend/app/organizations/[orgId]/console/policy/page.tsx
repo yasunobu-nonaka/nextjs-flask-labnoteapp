@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
 type OrgPolicy = {
@@ -28,12 +28,8 @@ const JOIN_METHOD_LABELS: Record<string, string> = {
  * 組織コンソール: ポリシー管理ページ（Phase 5b 実装予定）。
  * 現在は組織ポリシーの表示のみ。
  */
-export default function ConsolePolicyPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  const { orgId } = use(params);
+export default function ConsolePolicyPage() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
   const [policy, setPolicy] = useState<OrgPolicy | null>(null);

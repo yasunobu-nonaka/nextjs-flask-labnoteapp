@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
 type Group = {
@@ -15,12 +15,8 @@ type Group = {
  * 組織コンソール: グループ管理ページ（Phase 5b 実装予定）。
  * 現在は組織内のグループ一覧を表示のみ。
  */
-export default function ConsoleGroupsPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  const { orgId } = use(params);
+export default function ConsoleGroupsPage() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
   const [groups, setGroups] = useState<Group[]>([]);

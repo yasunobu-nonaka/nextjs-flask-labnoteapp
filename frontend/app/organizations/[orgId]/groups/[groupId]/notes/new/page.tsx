@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/noteSchema";
 import NoteForm from "@/components/NoteForm";
@@ -11,12 +11,8 @@ import NoteForm from "@/components/NoteForm";
  * ノート新規作成ページ（グループスコープ版）
  * URL パラメータ folder_id が指定されていればそのフォルダーにノートを作成する。
  */
-export default function NewNotePage({
-  params,
-}: {
-  params: Promise<{ orgId: string; groupId: string }>;
-}) {
-  const { orgId, groupId } = use(params);
+export default function NewNotePage() {
+  const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
   const orgIdNum = Number(orgId);
   const groupIdNum = Number(groupId);
 

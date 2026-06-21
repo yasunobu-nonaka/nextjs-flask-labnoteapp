@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
@@ -26,12 +27,8 @@ const ROLES = [
  * 任意の数のメールアドレスとロールを入力して招待メールを送信できる。
  * 各行ごとに送信結果（成功・失敗）をインラインで表示する。
  */
-export default function InviteMembersPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  const { orgId } = use(params);
+export default function InviteMembersPage() {
+  const { orgId } = useParams<{ orgId: string }>();
 
   // nextId をモジュールレベルに置くと Strict Mode の二重レンダリングで
   // サーバー/クライアント間のカウントがずれハイドレーション不一致が起きるため useRef で管理する
@@ -41,6 +38,11 @@ export default function InviteMembersPage({
     { id: 0, email: "", role: "member", status: "idle", message: "" },
   ]);
   const [isSending, setIsSending] = useState(false);
+  // SSR とクライアントの初回レンダリングを一致させるためのフラグ。
+  // ルーターキャッシュが古いDOM状態を保持している場合でも、マウント前は常に
+  // disabled=true を返すことでハイドレーション不一致を防ぐ。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   /** 指定 id のエントリを部分更新する */
   function updateEntry(id: number, patch: Partial<Entry>) {
@@ -127,7 +129,8 @@ export default function InviteMembersPage({
       </div>
 
       {/* 招待フォーム */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {/* autoComplete="off": リロード時にブラウザがフォーム値を復元してハイドレーション不一致を起こすのを防ぐ */}
+      <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-4">
         {/* カラムヘッダー */}
         <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-1">
           <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
@@ -157,6 +160,7 @@ export default function InviteMembersPage({
                     })
                   }
                   placeholder="example@example.com"
+                  autoComplete="off"
                   disabled={entry.status === "sending" || entry.status === "sent"}
                   className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground disabled:opacity-60"
                 />
@@ -218,7 +222,7 @@ export default function InviteMembersPage({
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            disabled={isSending || !hasValidEntry}
+            disabled={!mounted || isSending || !hasValidEntry}
             className="px-5 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
           >
             {isSending ? "送信中..." : "招待メールを送信"}

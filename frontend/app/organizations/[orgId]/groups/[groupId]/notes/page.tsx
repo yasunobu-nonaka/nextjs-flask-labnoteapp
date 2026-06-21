@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import FolderSidebar from "@/components/FolderSidebar";
@@ -23,13 +23,8 @@ type NotesResponse = {
  * 指定された組織・グループ内のノートとフォルダーをファイルブラウザー形式で表示する。
  * フォルダーナビゲーション・キーワード検索・タグフィルター・ページネーションに対応。
  */
-export default function NotesPage({
-  params,
-}: {
-  params: Promise<{ orgId: string; groupId: string }>;
-}) {
-  // Next.js 15 ではルートパラメータが Promise になるため use() で unwrap する
-  const { orgId, groupId } = use(params);
+export default function NotesPage() {
+  const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
   const orgIdNum = Number(orgId);
   const groupIdNum = Number(groupId);
 

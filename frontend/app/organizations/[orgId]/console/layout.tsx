@@ -1,8 +1,7 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 
 /**
  * 組織コンソールの共通レイアウト。
@@ -10,12 +9,10 @@ import { usePathname } from "next/navigation";
  */
 export default function ConsoleLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ orgId: string }>;
 }) {
-  const { orgId } = use(params);
+  const { orgId } = useParams<{ orgId: string }>();
   const pathname = usePathname();
 
   const navItems = [

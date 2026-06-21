@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
 import { authFetch } from "@/lib/api";
@@ -22,12 +22,8 @@ type Status = "loading" | "success" | "error";
  * Markdown コンテンツをレンダリングして表示する。
  * ヘッダーに編集・削除ボタンを配置する。
  */
-export default function NoteDetailPage({
-  params,
-}: {
-  params: Promise<{ orgId: string; groupId: string; noteId: string }>;
-}) {
-  const { orgId, groupId, noteId } = use(params);
+export default function NoteDetailPage() {
+  const { orgId, groupId, noteId } = useParams<{ orgId: string; groupId: string; noteId: string }>();
   const orgIdNum = Number(orgId);
   const groupIdNum = Number(groupId);
 

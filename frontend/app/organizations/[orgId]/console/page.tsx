@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
 type OrgData = {
@@ -21,12 +21,8 @@ const ROLE_LABELS: Record<string, string> = {
  * 組織コンソール: 基本設定ページ。
  * 組織名の表示・編集と、現在のユーザーロールを表示する。
  */
-export default function ConsoleBasicPage({
-  params,
-}: {
-  params: Promise<{ orgId: string }>;
-}) {
-  const { orgId } = use(params);
+export default function ConsoleBasicPage() {
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
   const [org, setOrg] = useState<OrgData | null>(null);

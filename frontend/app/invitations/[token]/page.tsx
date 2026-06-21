@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
@@ -28,12 +28,8 @@ const ROLE_LABELS: Record<string, string> = {
  * メールのリンクから遷移するページ。招待内容を表示し、ログイン済みユーザーが承認できる。
  * 未ログインの場合はログイン・新規登録へ誘導し、ログイン後にこのページへ戻る。
  */
-export default function InvitationAcceptPage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
-  const { token } = use(params);
+export default function InvitationAcceptPage() {
+  const { token } = useParams<{ token: string }>();
   const router = useRouter();
 
   // 招待詳細の取得状態
