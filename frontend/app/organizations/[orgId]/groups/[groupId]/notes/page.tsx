@@ -166,6 +166,11 @@ export default function NotesPage() {
           router.push("/login");
           return;
         }
+        if (res.status === 403) {
+          setNotesError("このグループのメンバーではありません。グループ一覧からメンバー参加を申請してください。");
+          setNotesLoading(false);
+          return;
+        }
         if (!res.ok) {
           setNotesError("ノートの取得に失敗しました");
           setNotesLoading(false);
