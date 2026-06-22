@@ -230,7 +230,7 @@ export default function ConsoleMembersPage() {
                   ロール
                 </th>
                 {/* 削除ボタン列のスペース */}
-                <th className="py-2 px-3 w-12" />
+                <th className="py-2 px-3 w-20" />
               </tr>
             </thead>
             <tbody>
@@ -261,7 +261,7 @@ export default function ConsoleMembersPage() {
                             handleRoleChange(m.user_id, m.role, e.target.value)
                           }
                           className={[
-                            "px-2 py-1 text-sm border rounded-lg bg-transparent",
+                            "px-3 py-2 border rounded-md bg-transparent",
                             "focus:outline-none focus:ring-1 focus:ring-foreground",
                             isChanged
                               ? "border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400"
@@ -276,13 +276,13 @@ export default function ConsoleMembersPage() {
                         </select>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       {/* owner は削除不可 */}
                       {m.role !== "owner" && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMember(m)}
-                          className="text-gray-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
+                          className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
                           aria-label={`${m.username} を削除`}
                         >
                           削除
