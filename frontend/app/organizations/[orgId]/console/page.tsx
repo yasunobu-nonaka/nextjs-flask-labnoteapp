@@ -18,7 +18,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 /**
- * 組織コンソール: 基本設定ページ。
+ * 組織管理: 基本設定ページ。
  * 組織名の表示・編集と、現在のユーザーロールを表示する。
  */
 export default function ConsoleBasicPage() {

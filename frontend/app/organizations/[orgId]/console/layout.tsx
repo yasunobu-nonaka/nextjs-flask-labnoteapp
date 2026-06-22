@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
 /**
- * 組織コンソールの共通レイアウト。
+ * 組織管理の共通レイアウト。
  * 左サイドバーにナビゲーションを表示し、右側に各セクションのコンテンツを描画する。
  */
 export default function ConsoleLayout({
@@ -34,7 +34,7 @@ export default function ConsoleLayout({
           >
             ← ノートに戻る
           </Link>
-          <h1 className="text-lg font-bold px-2 mt-1">組織コンソール</h1>
+          <h1 className="text-lg font-bold px-2 mt-1">組織管理</h1>
         </div>
 
         {/* ナビゲーション: アクティブな項目をハイライトする */}

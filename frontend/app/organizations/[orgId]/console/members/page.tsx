@@ -26,7 +26,7 @@ const ASSIGNABLE_ROLES = ["sys_admin", "user_admin", "member"] as const;
 const PER_PAGE = 20;
 
 /**
- * 組織コンソール: メンバー一覧ページ。
+ * 組織管理: メンバー一覧ページ。
  * メンバーのロール変更（複数一括）と削除ができる。
  *
  * ロール変更は pendingRoles に変更分だけ蓄積し、「ロールの変更を保存」ボタンで
