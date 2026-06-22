@@ -207,25 +207,49 @@ export default function FolderSidebar({
         </div>
         {groups.length > 0 && (
           <div className="flex flex-col gap-1 px-2">
-            {groups.slice(0, 5).map((group) => (
-              <Link
-                key={group.id}
-                href={`/organizations/${orgId}/groups/${group.id}/notes`}
-                className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded transition-colors ${
-                  String(group.id) === groupId
-                    ? "bg-gray-200 dark:bg-gray-700 font-semibold"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="truncate">{group.name}</span>
-                {/* 非公開グループにのみバッジを表示する */}
-                {group.is_private && (
-                  <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
-                    非公開
-                  </span>
-                )}
-              </Link>
-            ))}
+            {groups.slice(0, 5).map((group) => {
+              const isActive = String(group.id) === groupId;
+              // グループ管理者またはグループ管理権限を持つ組織ロールであれば管理画面へのリンクを表示する
+              const canManage =
+                group.role === "admin" ||
+                ["owner", "sys_admin", "user_admin"].includes(orgRole ?? "");
+              return (
+                <div
+                  key={group.id}
+                  className={`flex items-center gap-0.5 rounded transition-colors ${
+                    isActive
+                      ? "bg-gray-200 dark:bg-gray-700"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  {/* グループ名: ノート一覧ページへのリンク */}
+                  <Link
+                    href={`/organizations/${orgId}/groups/${group.id}/notes`}
+                    className={`flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0 ${
+                      isActive ? "font-semibold" : ""
+                    }`}
+                  >
+                    <span className="truncate">{group.name}</span>
+                    {/* 非公開グループにのみバッジを表示する */}
+                    {group.is_private && (
+                      <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                        非公開
+                      </span>
+                    )}
+                  </Link>
+                  {/* ⚙ アイコン: グループ管理者または組織管理者のみ表示する */}
+                  {canManage && (
+                    <Link
+                      href={`/organizations/${orgId}/groups/${group.id}/admin`}
+                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-sm"
+                      title={`${group.name} の管理`}
+                    >
+                      ⚙
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
