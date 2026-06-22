@@ -57,6 +57,8 @@ export default function NotesPage() {
 
   // 新規作成ポップオーバーの開閉
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
+  // ユーザーメニューポップオーバーの開閉
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // フォルダー新規作成モーダルの開閉と入力値
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -65,7 +67,22 @@ export default function NotesPage() {
   // NoteCard の移動後にノート一覧を再フェッチするためのトリガー
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // 現在のログインユーザー名
+  const [currentUsername, setCurrentUsername] = useState<string>("");
+
   const router = useRouter();
+
+  // ログインユーザー情報を取得してユーザー名をセットする
+  useEffect(() => {
+    async function fetchMe() {
+      const res = await authFetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUsername(data.username ?? "");
+      }
+    }
+    fetchMe();
+  }, []);
 
   // グループ情報を取得してグループ名をセットする
   useEffect(() => {
@@ -312,12 +329,54 @@ export default function NotesPage() {
                   </div>
                 )}
               </div>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                ログアウト
-              </button>
+              {/* ユーザーメニューポップオーバー */}
+              {currentUsername && (
+                <div className="relative">
+                  {/* 外側クリックでポップオーバーを閉じるオーバーレイ */}
+                  {isUserMenuOpen && (
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    />
+                  )}
+                  {/* トリガー: アイコン + 省略ユーザー名 */}
+                  <button
+                    onClick={() => setIsUserMenuOpen((v) => !v)}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold shrink-0">
+                      {currentUsername.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="max-w-28 truncate text-sm text-gray-600 dark:text-gray-300">
+                      {currentUsername}
+                    </span>
+                  </button>
+                  {/* ポップオーバーメニュー */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-48 flex flex-col gap-3">
+                      {/* ユーザー情報 */}
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-base font-semibold shrink-0">
+                          {currentUsername.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="text-base font-medium break-all">
+                          {currentUsername}
+                        </span>
+                      </div>
+                      {/* ログアウトボタン */}
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        ログアウト
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

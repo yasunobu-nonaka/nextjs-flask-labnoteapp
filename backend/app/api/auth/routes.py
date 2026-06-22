@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, current_user
 from marshmallow import ValidationError
 
 from . import auth_bp
@@ -170,6 +170,13 @@ def login():
         return jsonify({"message": "Username or Password did not match"}), 401
 
     return jsonify(access_token=access_token, refresh_token=refresh_token)
+
+
+@auth_bp.route("/me", methods=["GET"])
+@jwt_required()
+def get_me():
+    """現在のログインユーザーの情報を返す"""
+    return jsonify({"id": current_user.id, "username": current_user.username, "email": current_user.email})
 
 
 @auth_bp.route("/refresh", methods=["POST"])
