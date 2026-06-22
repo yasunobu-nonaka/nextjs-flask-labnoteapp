@@ -1,4 +1,5 @@
-import { useState, KeyboardEvent } from "react";
+import { useState } from "react";
+import React from "react";
 
 export function useTagInput(tags: string[], setTags: (tags: string[]) => void) {
   const [tagInput, setTagInput] = useState("");
@@ -28,8 +29,9 @@ export function useTagInput(tags: string[], setTags: (tags: string[]) => void) {
     setTags(tags.filter((t) => t !== tag));
   }
 
-  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
+  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // IME 変換中の Enter は無視する（日本語確定の Enter でタグが追加されるのを防ぐ）
+    if ((e.key === "Enter" || e.key === ",") && !e.nativeEvent.isComposing) {
       e.preventDefault();
       addTag();
     }

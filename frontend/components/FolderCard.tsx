@@ -7,6 +7,8 @@ import Modal from "@/components/Modal";
 
 type Props = {
   folder: Folder;
+  orgId: number;
+  groupId: number;
   /** フォルダーに移動するハンドラ */
   onNavigate: (id: number) => void;
   /** フォルダーの CRUD 操作後に全フォルダーを再取得するハンドラ */
@@ -20,7 +22,13 @@ type Props = {
  * 右上の ··· ボタンでポップオーバーメニューを開き、名称変更・削除を行う。
  * 名称変更はモーダルで入力する。
  */
-export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
+export default function FolderCard({
+  folder,
+  orgId,
+  groupId,
+  onNavigate,
+  onMutation,
+}: Props) {
   // ··· メニューポップオーバーの開閉
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   // 名称変更モーダルの開閉と入力値
@@ -32,10 +40,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   async function handleRename() {
     const trimmed = editName.trim();
     if (!trimmed) return;
-    const res = await authFetch(`/api/folders/${folder.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: trimmed }),
-    });
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/folders/${folder.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ name: trimmed }),
+      },
+    );
     if (res.ok) {
       setIsRenameModalOpen(false);
       onMutation();
@@ -43,9 +54,10 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
   }
 
   async function handleDelete() {
-    const res = await authFetch(`/api/folders/${folder.id}`, {
-      method: "DELETE",
-    });
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/folders/${folder.id}`,
+      { method: "DELETE" },
+    );
     if (res.ok) {
       setIsDeleteModalOpen(false);
       onMutation();
@@ -62,13 +74,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
          * overflow-hidden を外しているのは、··· メニューのドロップダウンが
          * カード下端を超えて表示できるようにするため。
          */}
-        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-950/30 aspect-4/3">
+        <div className="relative rounded-lg rounded-tl-none border border-yellow-400 dark:border-yellow-700 bg-yellow-300 bg-linear-to-br from-yellow-300 via-yellow-300 to-yellow-400 dark:bg-linear-to-br dark:from-yellow-500 dark:via-yellow-500 dark:to-yellow-600 aspect-4/3">
           {/* カード全体をクリック可能にするナビゲーションボタン */}
           <button
             onClick={() => onNavigate(folder.id)}
             className="absolute inset-0 w-full h-full text-left p-4 flex items-end"
           >
-            <span className="text-base font-medium truncate w-full">
+            <span className="text-base dark:text-gray-800 font-medium truncate w-full">
               {folder.name}
             </span>
           </button>
@@ -117,7 +129,7 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
               e.stopPropagation();
               setIsMenuOpen((v) => !v);
             }}
-            className="absolute top-2 right-2 px-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-base leading-none z-10"
+            className="absolute top-2 right-2 px-1 text-gray-700 hover:text-gray-900 dark:hover:text-black hover:font-bold text-base leading-none z-10"
             title="メニュー"
           >
             ···
@@ -127,9 +139,13 @@ export default function FolderCard({ folder, onNavigate, onMutation }: Props) {
 
       {/* 削除確認モーダル */}
       {isDeleteModalOpen && (
-        <Modal title="フォルダーを削除" onClose={() => setIsDeleteModalOpen(false)}>
+        <Modal
+          title="フォルダーを削除"
+          onClose={() => setIsDeleteModalOpen(false)}
+        >
           <p className="text-base text-gray-600 dark:text-gray-400">
-            「{folder.name}」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。
+            「{folder.name}
+            」を削除しますか？フォルダー内のノートと子フォルダーも削除されます。
           </p>
           <div className="flex justify-end gap-2">
             <button

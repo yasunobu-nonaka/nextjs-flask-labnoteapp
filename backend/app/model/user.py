@@ -32,9 +32,10 @@ class User(db.Model):
     )
 
     # リレーション
-    notes: Mapped[List["Note"]] = relationship(back_populates="user")
-    tags: Mapped[List["Tag"]] = relationship(back_populates="user")
-    folders: Mapped[List["Folder"]] = relationship(back_populates="user")
+    # Phase 3: notes/tags/folders は Group 所有に移行したため削除
+    # 組織・グループのメンバーシップ
+    organization_memberships: Mapped[List["OrganizationMember"]] = relationship(back_populates="user")
+    group_memberships: Mapped[List["GroupMember"]] = relationship(back_populates="user")
 
     def __repr__(self):
         return f"<User {self.username}>"

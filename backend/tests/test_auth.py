@@ -233,6 +233,16 @@ class TestEmailVerification:
 class TestResendVerification:
     """認証メール再送信のテスト"""
 
+    def test_resend_verification_success(self, client, test_user):
+        """未認証ユーザーへの再送信が成功する。"""
+        # test_user はデフォルトで verified=False
+        response = client.post(
+            "/api/auth/resend-verification", json={"email": test_user.email}
+        )
+
+        assert response.status_code == 200
+        assert "再送信しました" in response.get_json()["message"]
+
     def test_resend_verification_missing_email(self, client):
         """メールアドレスなしの再送信テスト"""
         response = client.post("/api/auth/resend-verification", json={})
@@ -314,8 +324,9 @@ class TestUserLogin:
 
         res = login_user(client)
 
-        assert "access_token" in res.get_json()
         assert res.status_code == 200
+        assert "access_token" in res.get_json()
+        assert "refresh_token" in res.get_json()
 
     def test_no_identifier_login_failed(self, client):
         register_user(client)
@@ -365,6 +376,65 @@ class TestUserLogin:
         )
 
         assert "access_token" not in res.get_json()
+        assert res.status_code == 401
+
+
+#############################################
+# tests for token refresh
+#############################################
+
+
+class TestTokenRefresh:
+    def test_refresh_returns_new_access_token(self, client):
+        """リフレッシュトークンで新しいアクセストークンを取得できる。"""
+        register_user(client)
+        login_res = login_user(client)
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+
+        assert res.status_code == 200
+        assert "access_token" in res.get_json()
+
+    def test_refresh_new_token_works_for_protected_routes(self, client):
+        """リフレッシュで取得した新しいアクセストークンで保護ルートにアクセスできる。"""
+        register_user(client)
+        login_res = login_user(client)
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        # リフレッシュして新しいアクセストークンを取得
+        refresh_res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        new_access_token = refresh_res.get_json()["access_token"]
+
+        # 新しいアクセストークンで保護されたルートにアクセスできることを確認
+        res = client.get(
+            "/api/organizations",
+            headers={"Authorization": f"Bearer {new_access_token}"},
+        )
+        assert res.status_code == 200
+
+    def test_refresh_with_access_token_fails(self, client):
+        """アクセストークンをリフレッシュエンドポイントに使うと失敗する。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+
+        # リフレッシュエンドポイントにアクセストークンを渡す → 422
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert res.status_code == 422
+
+    def test_refresh_without_token_fails(self, client):
+        """トークンなしでリフレッシュエンドポイントを叩くと401になる。"""
+        res = client.post("/api/auth/refresh")
         assert res.status_code == 401
 
 

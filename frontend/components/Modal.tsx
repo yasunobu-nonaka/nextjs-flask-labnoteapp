@@ -25,7 +25,7 @@ export default function Modal({ title, onClose, children }: Props) {
     >
       {/* ダイアログ本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
       <div
-        className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-80 flex flex-col gap-4"
+        className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold">{title}</h2>
