@@ -24,6 +24,7 @@ type Props = {
 type Group = {
   id: number;
   name: string;
+  is_private: boolean;
   role: string | null;
 };
 
@@ -60,6 +61,7 @@ export default function FolderSidebar({
 
   // 新規グループ作成フォームの入力値と送信状態
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupIsPrivate, setNewGroupIsPrivate] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -139,7 +141,7 @@ export default function FolderSidebar({
     try {
       const res = await authFetch(`/api/organizations/${orgId}/groups`, {
         method: "POST",
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, is_private: newGroupIsPrivate }),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -209,13 +211,19 @@ export default function FolderSidebar({
               <Link
                 key={group.id}
                 href={`/organizations/${orgId}/groups/${group.id}/notes`}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
+                className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded transition-colors ${
                   String(group.id) === groupId
                     ? "bg-gray-200 dark:bg-gray-700 font-semibold"
                     : "hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                {group.name}
+                <span className="truncate">{group.name}</span>
+                {/* 非公開グループにのみバッジを表示する */}
+                {group.is_private && (
+                  <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                    非公開
+                  </span>
+                )}
               </Link>
             ))}
           </div>
@@ -315,6 +323,7 @@ export default function FolderSidebar({
           onClose={() => {
             setIsGroupCreateModalOpen(false);
             setNewGroupName("");
+            setNewGroupIsPrivate(false);
             setCreateError(null);
           }}
         >
@@ -327,6 +336,15 @@ export default function FolderSidebar({
               placeholder="グループ名"
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
             />
+            {/* 公開設定: 公開（デフォルト）または非公開を選択する */}
+            <select
+              value={newGroupIsPrivate ? "private" : "public"}
+              onChange={(e) => setNewGroupIsPrivate(e.target.value === "private")}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+            >
+              <option value="public">公開グループ</option>
+              <option value="private">非公開グループ</option>
+            </select>
             {createError && (
               <p className="text-sm text-red-500">{createError}</p>
             )}
@@ -336,6 +354,7 @@ export default function FolderSidebar({
                 onClick={() => {
                   setIsGroupCreateModalOpen(false);
                   setNewGroupName("");
+                  setNewGroupIsPrivate(false);
                   setCreateError(null);
                 }}
                 className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"

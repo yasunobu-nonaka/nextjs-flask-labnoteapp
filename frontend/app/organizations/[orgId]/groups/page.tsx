@@ -35,6 +35,7 @@ export default function GroupsPage() {
 
   // 新規グループ作成フォームの入力値と送信状態
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupIsPrivate, setNewGroupIsPrivate] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -83,7 +84,7 @@ export default function GroupsPage() {
     try {
       const res = await authFetch(`/api/organizations/${orgIdNum}/groups`, {
         method: "POST",
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, is_private: newGroupIsPrivate }),
       });
       if (!res.ok) {
         const json = await res.json();
@@ -94,6 +95,7 @@ export default function GroupsPage() {
       // 作成者は自動的に admin になる
       setGroups((prev) => [...prev, { ...json.group, role: "admin" }]);
       setNewGroupName("");
+      setNewGroupIsPrivate(false);
     } catch {
       setCreateError("サーバーへの接続に失敗しました");
     } finally {
@@ -126,6 +128,7 @@ export default function GroupsPage() {
         {/* 新規グループ作成フォーム */}
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">グループを作成</h2>
+          {/* 名前・公開設定・作成ボタンを一列に並べる */}
           <form onSubmit={handleCreate} className="flex gap-2">
             <input
               value={newGroupName}
@@ -133,6 +136,14 @@ export default function GroupsPage() {
               placeholder="グループ名"
               className="flex-1 px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
             />
+            <select
+              value={newGroupIsPrivate ? "private" : "public"}
+              onChange={(e) => setNewGroupIsPrivate(e.target.value === "private")}
+              className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+            >
+              <option value="public">公開グループ</option>
+              <option value="private">非公開グループ</option>
+            </select>
             <button
               type="submit"
               disabled={isCreating || !newGroupName.trim()}
