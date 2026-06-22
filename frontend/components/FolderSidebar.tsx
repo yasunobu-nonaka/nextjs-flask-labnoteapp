@@ -24,6 +24,7 @@ type Props = {
 type Group = {
   id: number;
   name: string;
+  role: string | null;
 };
 
 type Organization = {
@@ -91,8 +92,9 @@ export default function FolderSidebar({
           return;
         }
         if (res.ok) {
-          const data = await res.json();
-          setGroups(data);
+          const data: Group[] = await res.json();
+          // 所属しているグループ（role !== null）のみ表示する
+          setGroups(data.filter((g) => g.role !== null));
         }
       } catch (err) {
         console.error("グループ一覧の取得に失敗しました", err);
