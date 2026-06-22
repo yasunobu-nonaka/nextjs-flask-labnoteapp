@@ -117,7 +117,7 @@ export default function InviteMembersPage() {
       {/* ヘッダー */}
       <div className="flex flex-col gap-1">
         <Link
-          href={`/organizations/${orgId}/console/members`}
+          href={`/organizations/${orgId}/admin/members`}
           className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
         >
           ← メンバー一覧に戻る
@@ -228,7 +228,7 @@ export default function InviteMembersPage() {
             {isSending ? "送信中..." : "招待メールを送信"}
           </button>
           <Link
-            href={`/organizations/${orgId}/console/members`}
+            href={`/organizations/${orgId}/admin/members`}
             className="px-5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             キャンセル

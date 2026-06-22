@@ -16,10 +16,10 @@ export default function ConsoleLayout({
   const pathname = usePathname();
 
   const navItems = [
-    { label: "基本設定", href: `/organizations/${orgId}/console` },
-    { label: "メンバー管理", href: `/organizations/${orgId}/console/members` },
-    { label: "グループ管理", href: `/organizations/${orgId}/console/groups` },
-    { label: "ポリシー管理", href: `/organizations/${orgId}/console/policy` },
+    { label: "基本設定", href: `/organizations/${orgId}/admin` },
+    { label: "メンバー管理", href: `/organizations/${orgId}/admin/members` },
+    { label: "グループ管理", href: `/organizations/${orgId}/admin/groups` },
+    { label: "ポリシー管理", href: `/organizations/${orgId}/admin/policy` },
   ];
 
   return (
@@ -42,7 +42,7 @@ export default function ConsoleLayout({
           {navItems.map(({ label, href }) => {
             /* 基本設定は完全一致、その他は前方一致でアクティブ判定する */
             const isActive =
-              href === `/organizations/${orgId}/console`
+              href === `/organizations/${orgId}/admin`
                 ? pathname === href
                 : pathname.startsWith(href);
             return (

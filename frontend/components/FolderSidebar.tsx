@@ -169,7 +169,7 @@ export default function FolderSidebar({
           <div className="flex items-center gap-1">
             {/* 組織管理へのリンク */}
             <Link
-              href={`/organizations/${orgId}/console`}
+              href={`/organizations/${orgId}/admin`}
               className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
               title="組織管理"
             >

@@ -201,7 +201,7 @@ export default function ConsoleMembersPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">メンバー管理</h2>
         <Link
-          href={`/organizations/${orgId}/console/members/invite`}
+          href={`/organizations/${orgId}/admin/members/invite`}
           className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
         >
           メンバーを招待
