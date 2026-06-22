@@ -49,6 +49,7 @@ export default function FolderSidebar({
   onTagToggle,
 }: Props) {
   const [orgName, setOrgName] = useState("");
+  const [orgRole, setOrgRole] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
@@ -74,6 +75,7 @@ export default function FolderSidebar({
         if (res.ok) {
           const data = await res.json();
           setOrgName(data.name);
+          setOrgRole(data.role ?? null);
         }
       } catch (err) {
         console.error("組織情報の取得に失敗しました", err);
@@ -167,14 +169,16 @@ export default function FolderSidebar({
             {orgName}
           </span>
           <div className="flex items-center gap-1">
-            {/* 組織管理へのリンク */}
-            <Link
-              href={`/organizations/${orgId}/admin`}
-              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              title="組織管理"
-            >
-              ⚙
-            </Link>
+            {/* 組織管理へのリンク: owner / sys_admin / user_admin のみ表示する */}
+            {orgRole && ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
+              <Link
+                href={`/organizations/${orgId}/admin`}
+                className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+                title="組織管理"
+              >
+                ⚙
+              </Link>
+            )}
             {/* 組織切り替えボタン */}
             <button
               onClick={handleOpenOrgModal}

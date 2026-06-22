@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { authFetch } from "@/lib/api";
+
+/** 組織管理画面にアクセスできるロール */
+const ADMIN_ROLES = ["owner", "sys_admin", "user_admin"];
 
 /**
  * 組織管理の共通レイアウト。
+ * マウント時に現在ユーザーの組織ロールを確認し、権限がなければグループ一覧へリダイレクトする。
  * 左サイドバーにナビゲーションを表示し、右側に各セクションのコンテンツを描画する。
  */
 export default function ConsoleLayout({
@@ -14,6 +20,48 @@ export default function ConsoleLayout({
 }) {
   const { orgId } = useParams<{ orgId: string }>();
   const pathname = usePathname();
+  const router = useRouter();
+
+  /**
+   * null = 権限チェック中
+   * true = アクセス許可
+   * false = アクセス拒否（リダイレクト済み）
+   */
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        const res = await authFetch(`/api/organizations/${orgId}`);
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+        if (!res.ok) {
+          router.push(`/organizations/${orgId}/groups`);
+          return;
+        }
+        const data = await res.json();
+        if (!ADMIN_ROLES.includes(data.role)) {
+          router.push(`/organizations/${orgId}/groups`);
+          return;
+        }
+        setAuthorized(true);
+      } catch {
+        router.push(`/organizations/${orgId}/groups`);
+      }
+    }
+    checkAccess();
+  }, [orgId, router]);
+
+  /* 権限チェック中はコンテンツを表示しない（ちらつき防止） */
+  if (authorized === null) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background text-foreground">
+        <p className="text-gray-500">確認中...</p>
+      </div>
+    );
+  }
 
   const navItems = [
     { label: "基本設定", href: `/organizations/${orgId}/admin` },
