@@ -279,12 +279,6 @@ export default function NotesPage() {
           {/* ページヘッダー: グループへの戻り・タイトル・新規作成・ログアウト */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
-              <Link
-                href={`/organizations/${orgId}/groups`}
-                className="text-sm text-gray-500 hover:underline"
-              >
-                ← グループ一覧へ戻る
-              </Link>
               <h1 className="text-3xl font-bold">
                 {groupName ? `${groupName}` : "ノート一覧"}
               </h1>

@@ -34,9 +34,16 @@ type Organization = {
   role: string;
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "管理者",
+  editor: "編集者",
+  viewer: "閲覧者",
+};
+
 /**
  * FolderSidebar コンポーネント
  * 現在の組織名・グループ一覧、キーワード検索フォーム、タグフィルターを表示する左サイドバー。
+ * 「切り替え」ボタンで組織一覧モーダル、「一覧」ボタンでグループ一覧モーダルを開く。
  * フォルダーナビゲーションはメインコンテンツ側の FolderCard / ブレッドクラムで行う。
  */
 export default function FolderSidebar({
@@ -51,15 +58,19 @@ export default function FolderSidebar({
 }: Props) {
   const [orgName, setOrgName] = useState("");
   const [orgRole, setOrgRole] = useState<string | null>(null);
+  // 全グループ（所属・未所属）を保持し、描画時にフィルターする
   const [groups, setGroups] = useState<Group[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
+
+  // モーダルの開閉状態
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
-  const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
+  const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
+
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [orgsError, setOrgsError] = useState<string | null>(null);
   const router = useRouter();
 
-  // 新規グループ作成フォームの入力値と送信状態
+  // グループ一覧モーダル内の作成フォームの入力値と送信状態
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupIsPrivate, setNewGroupIsPrivate] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -97,8 +108,8 @@ export default function FolderSidebar({
         }
         if (res.ok) {
           const data: Group[] = await res.json();
-          // 所属しているグループ（role !== null）のみ表示する
-          setGroups(data.filter((g) => g.role !== null));
+          // 全グループ（所属・未所属）を保持する。表示時にフィルターする。
+          setGroups(data);
         }
       } catch (err) {
         console.error("グループ一覧の取得に失敗しました", err);
@@ -130,6 +141,14 @@ export default function FolderSidebar({
     }
   }
 
+  /** グループ一覧モーダルを閉じて作成フォームをリセットする */
+  function handleCloseGroupListModal() {
+    setIsGroupListModalOpen(false);
+    setNewGroupName("");
+    setNewGroupIsPrivate(false);
+    setCreateError(null);
+  }
+
   // グループを新規作成してリストに追加する
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -149,8 +168,12 @@ export default function FolderSidebar({
         return;
       }
       const data = await res.json();
+      // 作成者は自動的に admin になる
       setGroups((prev) => [...prev, { ...data.group, role: "admin" }]);
       setNewGroupName("");
+      setNewGroupIsPrivate(false);
+      // 作成したグループのノート一覧へ遷移してモーダルを閉じる
+      handleCloseGroupListModal();
       router.push(`/organizations/${orgId}/groups/${data.group.id}/notes`);
     } catch {
       setCreateError("サーバーへの接続に失敗しました");
@@ -159,55 +182,61 @@ export default function FolderSidebar({
     }
   }
 
+  // サイドバーには所属グループのみ表示する（最大5件）
+  const joinedGroups = groups.filter((g) => g.role !== null);
+  // グループ一覧モーダル用に所属・未所属を分ける
+  const unjoinedGroups = groups.filter((g) => g.role === null);
+
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
       {/* 現在の組織名と切り替えボタン */}
       <div className="flex flex-col gap-1">
-        <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-          組織
-        </span>
+        <div className="flex items-center justify-between px-2">
+          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            組織
+          </span>
+          {/* 組織切り替えボタン: 「組織」ヘッダーの右側に配置する */}
+          <button
+            onClick={handleOpenOrgModal}
+            className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+          >
+            切り替え
+          </button>
+        </div>
         <div className="flex items-center justify-between px-2">
           <span className="text-base text-gray-700 dark:text-gray-300">
             {orgName}
           </span>
-          <div className="flex items-center gap-1">
-            {/* 組織管理へのリンク: owner / sys_admin / user_admin のみ表示する */}
-            {orgRole && ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
-              <Link
-                href={`/organizations/${orgId}/admin`}
-                className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-                title="組織管理"
-              >
-                ⚙
-              </Link>
-            )}
-            {/* 組織切り替えボタン */}
-            <button
-              onClick={handleOpenOrgModal}
-              className="text-sm dark:text-base text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+          {/* 組織管理へのリンク: owner / sys_admin / user_admin のみ表示する */}
+          {orgRole && ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
+            <Link
+              href={`/organizations/${orgId}/admin`}
+              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              title="組織管理"
             >
-              ▽
-            </button>
-          </div>
+              ⚙
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* グループ一覧: 最大5件、現在のグループをハイライト */}
+      {/* グループ一覧: 所属グループを最大5件表示し、「一覧」でモーダルを開く */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             グループ
           </span>
+          {/* グループ一覧モーダルを開くボタン */}
           <button
-            className="text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-            onClick={() => setIsGroupCreateModalOpen(true)}
+            className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            onClick={() => setIsGroupListModalOpen(true)}
           >
-            +
+            一覧
           </button>
         </div>
-        {groups.length > 0 && (
+        {joinedGroups.length > 0 && (
           <div className="flex flex-col gap-1 px-2">
-            {groups.slice(0, 5).map((group) => {
+            {joinedGroups.slice(0, 5).map((group) => {
               const isActive = String(group.id) === groupId;
               // グループ管理者またはグループ管理権限を持つ組織ロールであれば管理画面へのリンクを表示する
               const canManage =
@@ -324,10 +353,11 @@ export default function FolderSidebar({
               <ul className="flex flex-col gap-2">
                 {orgs.map((org) => (
                   <li key={org.id}>
-                    {/* 組織カード: クリックでグループ一覧へ遷移する */}
+                    {/* 組織カード: クリックで最初の参加グループのノート一覧へ遷移する */}
                     <Link
                       href={`/organizations/${org.id}/groups`}
                       className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm transition-all"
+                      onClick={() => setIsOrgModalOpen(false)}
                     >
                       <span className="text-base font-medium">{org.name}</span>
                       <span className="text-sm text-gray-400">{org.role}</span>
@@ -340,60 +370,119 @@ export default function FolderSidebar({
         </Modal>
       )}
 
-      {/* グループ作成モーダル */}
-      {isGroupCreateModalOpen && (
-        <Modal
-          title="グループを作成"
-          onClose={() => {
-            setIsGroupCreateModalOpen(false);
-            setNewGroupName("");
-            setNewGroupIsPrivate(false);
-            setCreateError(null);
-          }}
-        >
-          <form onSubmit={handleCreate} className="flex flex-col gap-4">
-            <input
-              autoFocus
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="グループ名"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-            />
-            {/* 公開設定: 公開（デフォルト）または非公開を選択する */}
-            <select
-              value={newGroupIsPrivate ? "private" : "public"}
-              onChange={(e) => setNewGroupIsPrivate(e.target.value === "private")}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-            >
-              <option value="public">公開グループ</option>
-              <option value="private">非公開グループ</option>
-            </select>
-            {createError && (
-              <p className="text-sm text-red-500">{createError}</p>
+      {/* グループ一覧モーダル: 所属・未所属グループと新規作成フォームを表示する */}
+      {isGroupListModalOpen && (
+        <Modal title="グループ一覧" onClose={handleCloseGroupListModal}>
+          <div className="flex flex-col gap-6">
+            {/* グループ新規作成フォーム */}
+            <section className="flex flex-col gap-3">
+              <h2 className="text-base font-semibold">グループを作成</h2>
+              <form onSubmit={handleCreate} className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="グループ名"
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                  />
+                  <select
+                    value={newGroupIsPrivate ? "private" : "public"}
+                    onChange={(e) =>
+                      setNewGroupIsPrivate(e.target.value === "private")
+                    }
+                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                  >
+                    <option value="public">公開グループ</option>
+                    <option value="private">非公開グループ</option>
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={isCreating || !newGroupName.trim()}
+                    className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+                  >
+                    {isCreating ? "作成中..." : "作成"}
+                  </button>
+                </div>
+                {createError && (
+                  <p className="text-sm text-red-500">{createError}</p>
+                )}
+              </form>
+            </section>
+
+            {/* 所属グループ */}
+            {joinedGroups.length > 0 && (
+              <section className="flex flex-col gap-2">
+                <h2 className="text-base font-semibold">所属グループ</h2>
+                <ul className="flex flex-col gap-2">
+                  {joinedGroups.map((group) => (
+                    <li key={group.id}>
+                      <Link
+                        href={`/organizations/${orgId}/groups/${group.id}/notes`}
+                        onClick={handleCloseGroupListModal}
+                        className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-medium">
+                            {group.name}
+                          </span>
+                          {group.is_private && (
+                            <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                              非公開
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-400">
+                          {ROLE_LABELS[group.role!] ?? group.role}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsGroupCreateModalOpen(false);
-                  setNewGroupName("");
-                  setNewGroupIsPrivate(false);
-                  setCreateError(null);
-                }}
-                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                disabled={isCreating || !newGroupName.trim()}
-                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-              >
-                {isCreating ? "作成中..." : "作成"}
-              </button>
-            </div>
-          </form>
+
+            {/* 未所属グループ */}
+            {unjoinedGroups.length > 0 && (
+              <section className="flex flex-col gap-2">
+                <h2 className="text-base font-semibold">未所属グループ</h2>
+                <ul className="flex flex-col gap-2">
+                  {unjoinedGroups.map((group) => (
+                    <li key={group.id}>
+                      <div className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-medium">
+                            {group.name}
+                          </span>
+                          {group.is_private && (
+                            <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                              非公開
+                            </span>
+                          )}
+                        </div>
+                        {/* 参加申請ボタン（バックエンド未実装のため現在は無効） */}
+                        <button
+                          type="button"
+                          disabled
+                          className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-400 cursor-not-allowed"
+                          title="この機能は近日公開予定です"
+                        >
+                          参加を申請する
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {groups.length === 0 && (
+              <p className="text-gray-500 text-base">
+                グループがありません。
+              </p>
+            )}
+          </div>
         </Modal>
       )}
     </aside>
