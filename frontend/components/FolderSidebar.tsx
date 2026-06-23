@@ -319,7 +319,8 @@ export default function FolderSidebar({
     if (wcc === "member") return true; // org メンバーであれば orgRole は必ず非 null
     if (wcc === "user_admin")
       return ["user_admin", "sys_admin", "owner"].includes(orgRole);
-    if (wcc === "sys_admin_only") return ["sys_admin", "owner"].includes(orgRole);
+    if (wcc === "sys_admin_only")
+      return ["sys_admin", "owner"].includes(orgRole);
     return false;
   }
 
@@ -355,20 +356,21 @@ export default function FolderSidebar({
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between px-2">
+        <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800">
           <span className="text-base text-gray-700 dark:text-gray-300">
             {orgName}
           </span>
           {/* 組織管理へのリンク: owner / sys_admin / user_admin のみ表示する */}
-          {orgRole && ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
-            <Link
-              href={`/organizations/${orgId}/admin`}
-              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              title="組織管理"
-            >
-              ⚙
-            </Link>
-          )}
+          {orgRole &&
+            ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
+              <Link
+                href={`/organizations/${orgId}/admin`}
+                className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+                title="組織管理"
+              >
+                ⚙
+              </Link>
+            )}
         </div>
       </div>
 
@@ -398,7 +400,7 @@ export default function FolderSidebar({
           </div>
         </div>
         {joinedGroups.length > 0 && (
-          <div className="flex flex-col gap-1 px-2">
+          <div className="flex flex-col gap-1.5 px-2">
             {joinedGroups.slice(0, 5).map((group) => {
               const isActive = String(group.id) === groupId;
               // グループ管理者またはグループ管理権限を持つ組織ロールであれば管理画面へのリンクを表示する
@@ -410,8 +412,8 @@ export default function FolderSidebar({
                   key={group.id}
                   className={`flex items-center gap-0.5 rounded transition-colors ${
                     isActive
-                      ? "bg-gray-200 dark:bg-gray-700"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "py-0.5 bg-gray-300 dark:bg-gray-600"
+                      : "py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >
                   {/* グループ名: ノート一覧ページへのリンク */}
@@ -518,7 +520,9 @@ export default function FolderSidebar({
 
             {/* プライベートグループの作成 */}
             <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">プライベートグループの作成</p>
+              <p className="text-sm font-semibold">
+                プライベートグループの作成
+              </p>
               <RadioGroup
                 name="org_allow_private_groups"
                 options={[
@@ -563,7 +567,9 @@ export default function FolderSidebar({
 
             {/* デフォルト参加方式 */}
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">グループへのデフォルト参加方式</p>
+              <p className="text-sm font-semibold">
+                グループへのデフォルト参加方式
+              </p>
               <RadioGroup
                 name="org_default_join_method"
                 options={JOIN_METHOD_OPTIONS}
@@ -591,7 +597,10 @@ export default function FolderSidebar({
 
       {/* 組織切り替えモーダル */}
       {isOrgSwitchModalOpen && (
-        <Modal title="組織を選択" onClose={() => setIsOrgSwitchModalOpen(false)}>
+        <Modal
+          title="組織を選択"
+          onClose={() => setIsOrgSwitchModalOpen(false)}
+        >
           <section className="flex flex-col gap-3">
             {orgsLoading ? (
               <p className="text-gray-500 text-base">読み込み中...</p>
@@ -684,7 +693,9 @@ export default function FolderSidebar({
 
             {/* 組織メンバーへのノート公開 */}
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">ノートを組織メンバーに公開</p>
+              <p className="text-sm font-semibold">
+                ノートを組織メンバーに公開
+              </p>
               <RadioGroup
                 name="group_is_notes_visible_to_org"
                 options={[
@@ -718,7 +729,10 @@ export default function FolderSidebar({
 
       {/* グループ一覧モーダル: 所属・未所属グループを表示する（作成フォームは独立モーダルに移動） */}
       {isGroupListModalOpen && (
-        <Modal title="グループ一覧" onClose={() => setIsGroupListModalOpen(false)}>
+        <Modal
+          title="グループ一覧"
+          onClose={() => setIsGroupListModalOpen(false)}
+        >
           <div className="flex flex-col gap-6">
             {/* 所属グループ */}
             {joinedGroups.length > 0 && (
