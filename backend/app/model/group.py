@@ -68,7 +68,10 @@ class Group(db.Model):
 
 
 class GroupMember(db.Model):
-    """グループとユーザーの中間テーブル。RoleLocal FK でロール（役割）を持つ。"""
+    """グループとユーザーの中間テーブル。RoleLocal FK でロール（役割）を持つ。
+
+    status: 'active'（正式メンバー）| 'pending'（参加申請中）
+    """
 
     __tablename__ = "group_members"
 
@@ -81,6 +84,8 @@ class GroupMember(db.Model):
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc
     )
+    # 参加申請フロー用ステータス: 'active'（通常メンバー）| 'pending'（承認待ち）
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
 
     # リレーション
     user: Mapped["User"] = relationship(back_populates="group_memberships")

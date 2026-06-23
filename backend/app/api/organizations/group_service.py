@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from app.extensions import db
 from app.model import User
@@ -72,6 +72,7 @@ def create_group(
         user_id=user_id,
         group_id=group.id,
         role_id=admin_role.id,
+        status="active",
     )
     db.session.add(member)
 
@@ -104,9 +105,9 @@ def create_group(
 def get_accessible_groups(org_id: int, user_id: int) -> List[Group]:
     """ユーザーがアクセス可能なグループ一覧を返す（公開グループ + 所属プライベートグループ）。"""
 
-    # ユーザーが所属するグループのIDを取得
+    # active メンバーとして所属するグループのIDを取得する
     memberships = db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id)
+        db.select(GroupMember).filter_by(user_id=user_id, status="active")
     ).scalars().all()
     member_group_ids = {m.group_id for m in memberships}
 
@@ -132,11 +133,21 @@ def get_group_or_404(group_id: int, org_id: int) -> Group:
     )
 
 
-def check_group_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """ユーザーのグループメンバーシップを返す。所属していなければNoneを返す。"""
+def _get_any_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
+    """status を問わずメンバーシップを返す（内部用）。"""
 
     return db.session.execute(
         db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id)
+    ).scalar_one_or_none()
+
+
+def check_group_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
+    """ユーザーのアクティブなグループメンバーシップを返す。
+    active メンバーでなければ None を返す（RBAC・権限チェックに使用する）。
+    """
+
+    return db.session.execute(
+        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="active")
     ).scalar_one_or_none()
 
 
@@ -160,11 +171,21 @@ def check_group_permission(user_id: int, group_id: int, permission_code: str) ->
 
 
 def add_group_member(group_id: int, user_id: int, role: str = "editor") -> GroupMember:
-    """グループにメンバーを追加する。すでに所属している場合はValueErrorを送出する。"""
+    """グループにメンバーを追加する（管理者による直接追加）。
+    すでに active な場合は ValueError を送出する。
+    pending 申請中の場合は active に昇格させる。
+    """
 
-    existing = check_group_membership(user_id, group_id)
+    existing = _get_any_membership(user_id, group_id)
     if existing:
-        raise ValueError("ユーザーはすでにこのグループのメンバーです")
+        if existing.status == "active":
+            raise ValueError("ユーザーはすでにこのグループのメンバーです")
+        # pending → active に昇格（管理者が直接追加した場合）
+        role_obj = get_role_local(role)
+        existing.status = "active"
+        existing.role_id = role_obj.id
+        db.session.commit()
+        return existing
 
     user = db.session.get(User, user_id)
     if not user:
@@ -175,10 +196,89 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
         user_id=user_id,
         group_id=group_id,
         role_id=role_obj.id,
+        status="active",
     )
     db.session.add(member)
     db.session.commit()
     return member
+
+
+def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
+    """join_method に応じて active または pending でメンバーを追加する。
+
+    戻り値: (GroupMember, "joined" | "pending")
+    join_method が invite_only の場合は ValueError を送出する。
+    すでに active / pending な場合も ValueError を送出する。
+    """
+
+    existing = _get_any_membership(user_id, group.id)
+    if existing:
+        if existing.status == "active":
+            raise ValueError("already_member")
+        if existing.status == "pending":
+            raise ValueError("already_pending")
+
+    join_method = group.policy.join_method if group.policy else "invite_only"
+
+    if join_method == "invite_only":
+        raise ValueError("invite_only")
+
+    # editor ロールをデフォルト付与（open / request 共通）
+    role_obj = get_role_local("editor")
+    status = "active" if join_method == "open" else "pending"
+    member = GroupMember(
+        user_id=user_id,
+        group_id=group.id,
+        role_id=role_obj.id,
+        status=status,
+    )
+    db.session.add(member)
+    db.session.commit()
+    return member, "joined" if status == "active" else "pending"
+
+
+def get_pending_join_requests(group_id: int) -> List[GroupMember]:
+    """グループの参加申請中（pending）メンバー一覧を返す。"""
+
+    return db.session.execute(
+        db.select(GroupMember).filter_by(group_id=group_id, status="pending")
+    ).scalars().all()
+
+
+def get_pending_join_request_count(group_id: int) -> int:
+    """グループの未承認申請数を返す（バッジ表示用）。"""
+
+    from sqlalchemy import func
+    return db.session.execute(
+        db.select(func.count()).select_from(GroupMember).filter_by(group_id=group_id, status="pending")
+    ).scalar() or 0
+
+
+def approve_join_request(group_id: int, user_id: int) -> GroupMember:
+    """参加申請を承認し、pending → active に変更する。"""
+
+    member = db.session.execute(
+        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+    ).scalar_one_or_none()
+    if not member:
+        raise ValueError("参加申請が見つかりません")
+
+    member.status = "active"
+    db.session.commit()
+    return member
+
+
+def reject_join_request(group_id: int, user_id: int) -> None:
+    """参加申請を拒否し、レコードを削除する（再申請を許容するため hard delete）。"""
+
+    member = db.session.execute(
+        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+    ).scalar_one_or_none()
+    if not member:
+        raise ValueError("参加申請が見つかりません")
+
+    db.session.delete(member)
+    db.session.commit()
 
 
 def update_group_member_role(member: GroupMember, role: str) -> GroupMember:
@@ -235,6 +335,7 @@ def build_group_member_response(member: GroupMember) -> dict:
         "user_id": member.user_id,
         "group_id": member.group_id,
         "role": member.role.name,
+        "status": member.status,
         "joined_at": member.joined_at,
         "username": member.user.username,
         "email": member.user.email,
