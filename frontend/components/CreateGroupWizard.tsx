@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
-import Modal from "@/components/Modal";
 
 type OrgMember = {
   user_id: number;
@@ -71,20 +70,21 @@ function RadioGroup<T extends string | boolean>({
 
 type Props = {
   orgId: string;
-  onClose: () => void;
   /** グループ作成成功後に呼ばれる。作成されたグループの基本情報を受け取る。 */
   onCreated: (group: { id: number; name: string }) => void;
 };
 
 /**
- * グループ作成ウィザード（共通コンポーネント）。
- * FolderSidebar の「作成」ボタンおよびグループなし組織の landing ページから利用する。
+ * グループ作成ウィザードの中身（共通コンポーネント）。
+ * モーダルを持たないため、呼び出し側が必要に応じて <Modal> で包む。
+ * - FolderSidebar: <Modal> で包んでオーバーレイ表示
+ * - groups/page.tsx: ページ内にそのまま埋め込み
  *
  * Step 1: グループ名・公開設定・ポリシー
  * Step 2: メンバー追加（任意。0件のまま作成すれば作成者のみ）
  * 右から左へスライドするアニメーションでステップを遷移する。
  */
-export default function CreateGroupWizard({ orgId, onClose, onCreated }: Props) {
+export default function CreateGroupWizard({ orgId, onCreated }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
 
   // ---- Step 1 フォーム ----
@@ -189,7 +189,7 @@ export default function CreateGroupWizard({ orgId, onClose, onCreated }: Props) 
   }
 
   return (
-    <Modal title="グループを作成" onClose={onClose}>
+    <div className="flex flex-col gap-4">
       {/* ステップインジケーター */}
       <div className="flex items-center gap-2 text-sm mb-1">
         <span
@@ -426,6 +426,6 @@ export default function CreateGroupWizard({ orgId, onClose, onCreated }: Props) 
           </div>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

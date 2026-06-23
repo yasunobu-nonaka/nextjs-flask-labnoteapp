@@ -62,20 +62,21 @@ export default function GroupsRedirectPage() {
   return (
     /* グループがない組織に遷移したときの初期グループ作成画面 */
     <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      <div className="text-center mb-8 absolute top-1/4">
-        <h1 className="text-lg font-semibold mb-1">グループがありません</h1>
-        <p className="text-sm text-gray-500">
-          最初のグループを作成してノートを始めましょう。
-        </p>
+      <div className="w-full max-w-3xl px-6">
+        <div className="text-center mb-8">
+          <h1 className="text-lg font-semibold mb-1">グループがありません</h1>
+          <p className="text-sm text-gray-500">
+            最初のグループを作成してノートを始めましょう。
+          </p>
+        </div>
+        {/* 共通ウィザードコンポーネントをページ内に直接埋め込む */}
+        <CreateGroupWizard
+          orgId={orgId}
+          onCreated={(group) =>
+            router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
+          }
+        />
       </div>
-      {/* 共通ウィザードコンポーネントでグループを作成する */}
-      <CreateGroupWizard
-        orgId={orgId}
-        onClose={() => router.push("/organizations")}
-        onCreated={(group) =>
-          router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
-        }
-      />
     </main>
   );
 }

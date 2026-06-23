@@ -571,19 +571,23 @@ export default function FolderSidebar({
 
       {/* グループ作成ウィザード */}
       {isGroupCreateModalOpen && (
-        <CreateGroupWizard
-          orgId={orgId}
+        <Modal
+          title="グループを作成"
           onClose={() => setIsGroupCreateModalOpen(false)}
-          onCreated={(group) => {
-            // 作成者は自動的に admin になる
-            setGroups((prev) => [
-              ...prev,
-              { id: group.id, name: group.name, is_private: false, role: "admin" },
-            ]);
-            setIsGroupCreateModalOpen(false);
-            router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
-          }}
-        />
+        >
+          <CreateGroupWizard
+            orgId={orgId}
+            onCreated={(group) => {
+              // 作成者は自動的に admin になる
+              setGroups((prev) => [
+                ...prev,
+                { id: group.id, name: group.name, is_private: false, role: "admin" },
+              ]);
+              setIsGroupCreateModalOpen(false);
+              router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
+            }}
+          />
+        </Modal>
       )}
 
       {/* グループ一覧モーダル: 所属・未所属グループを表示する（作成フォームは独立モーダルに移動） */}
