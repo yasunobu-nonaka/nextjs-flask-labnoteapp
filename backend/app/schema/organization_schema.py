@@ -8,16 +8,6 @@ WHO_CAN_CREATE_GROUPS = ["sys_admin_only", "user_admin", "member", "all"]
 JOIN_METHODS = ["invite_only", "request", "open"]
 
 
-class OrganizationCreateSchema(Schema):
-    """組織作成の入力スキーマ。"""
-
-    name = fields.Str(
-        required=True,
-        validate=validate.Length(min=1, max=200, error="組織名は1〜200文字で入力してください"),
-        load_only=True,
-    )
-
-
 class OrganizationPolicySchema(Schema):
     """組織ポリシーのスキーマ（入出力兼用）。"""
 
@@ -31,6 +21,17 @@ class OrganizationPolicySchema(Schema):
         load_default="invite_only",
         validate=validate.OneOf(JOIN_METHODS, error="無効な値です"),
     )
+
+
+class OrganizationCreateSchema(Schema):
+    """組織作成の入力スキーマ。policy は省略可能でデフォルト値が使われる。"""
+
+    name = fields.Str(
+        required=True,
+        validate=validate.Length(min=1, max=200, error="組織名は1〜200文字で入力してください"),
+        load_only=True,
+    )
+    policy = fields.Nested(OrganizationPolicySchema, load_default=None, load_only=True)
 
 
 class OrganizationUpdateSchema(Schema):

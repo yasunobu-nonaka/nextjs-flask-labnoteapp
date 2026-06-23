@@ -43,9 +43,17 @@ def can_user_create_group(user_id: int, org_id: int, who_can_create: str) -> boo
 
 
 def create_group(
-    org_id: int, name: str, is_private: bool, user_id: int, default_join_method: str = "invite_only"
+    org_id: int,
+    name: str,
+    is_private: bool,
+    user_id: int,
+    default_join_method: str = "invite_only",
+    policy_data: Optional[dict] = None,
 ) -> Group:
-    """グループを作成し、作成者をadminとして登録する。デフォルトのポリシーも同時に作成する。"""
+    """グループを作成し、作成者をadminとして登録する。デフォルトのポリシーも同時に作成する。
+
+    policy_data が指定された場合はデフォルト値を上書きする。同一トランザクションで確定する。
+    """
 
     group = Group(
         organization_id=org_id,
@@ -65,11 +73,14 @@ def create_group(
     )
     db.session.add(member)
 
-    # デフォルトポリシーを作成（組織のdefault_join_methodを引き継ぐ）
+    # デフォルトポリシーを作成（組織のdefault_join_methodを引き継ぎ、指定値で上書きする）
     policy = GroupPolicy(
         group_id=group.id,
         join_method=default_join_method,
     )
+    if policy_data:
+        for key, value in policy_data.items():
+            setattr(policy, key, value)
     db.session.add(policy)
 
     db.session.commit()

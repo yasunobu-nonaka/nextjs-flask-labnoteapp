@@ -6,17 +6,6 @@ GROUP_ROLES = ["admin", "editor", "viewer"]
 GROUP_JOIN_METHODS = ["invite_only", "request", "open"]
 
 
-class GroupCreateSchema(Schema):
-    """グループ作成の入力スキーマ。"""
-
-    name = fields.Str(
-        required=True,
-        validate=validate.Length(min=1, max=200, error="グループ名は1〜200文字で入力してください"),
-        load_only=True,
-    )
-    is_private = fields.Bool(load_default=False, load_only=True)
-
-
 class GroupPolicySchema(Schema):
     """グループポリシーのスキーマ（入出力兼用）。"""
 
@@ -26,6 +15,18 @@ class GroupPolicySchema(Schema):
         validate=validate.OneOf(GROUP_JOIN_METHODS, error="無効な値です"),
     )
     is_notes_visible_to_org = fields.Bool(load_default=False)
+
+
+class GroupCreateSchema(Schema):
+    """グループ作成の入力スキーマ。policy は省略可能でデフォルト値が使われる。"""
+
+    name = fields.Str(
+        required=True,
+        validate=validate.Length(min=1, max=200, error="グループ名は1〜200文字で入力してください"),
+        load_only=True,
+    )
+    is_private = fields.Bool(load_default=False, load_only=True)
+    policy = fields.Nested(GroupPolicySchema, load_default=None, load_only=True)
 
 
 class GroupUpdateSchema(Schema):

@@ -92,7 +92,7 @@ def create_org():
     except ValidationError as err:
         return jsonify({"message": "validation error", "errors": err.messages}), 400
 
-    org = create_organization(data["name"], current_user.id)
+    org = create_organization(data["name"], current_user.id, policy_data=data.get("policy"))
     member = check_org_membership(current_user.id, org.id)
 
     return (
@@ -323,6 +323,7 @@ def create_grp(org_id):
         is_private=data.get("is_private", False),
         user_id=current_user.id,
         default_join_method=org.policy.default_join_method,
+        policy_data=data.get("policy"),
     )
 
     member = check_group_membership(current_user.id, group.id)
