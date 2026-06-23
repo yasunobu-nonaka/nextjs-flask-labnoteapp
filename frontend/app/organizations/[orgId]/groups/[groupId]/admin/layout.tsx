@@ -95,7 +95,7 @@ export default function GroupAdminLayout({
   return (
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる */}
-      <aside className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
+      <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
         <div className="flex flex-col gap-2">
           {/* ノートページへ戻るリンク */}
           <Link
@@ -105,7 +105,7 @@ export default function GroupAdminLayout({
             ← ノートに戻る
           </Link>
           <div className="px-2 mt-1 flex flex-col gap-0.5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            <p className="text-lg font-semibold text-gray-400 uppercase tracking-wider">
               グループ管理
             </p>
             <h1 className="text-lg font-bold truncate">{groupName}</h1>
@@ -117,8 +117,7 @@ export default function GroupAdminLayout({
           {navItems.map(({ label, href }) => {
             /* 基本設定は完全一致、その他は前方一致でアクティブ判定する */
             const isActive =
-              href ===
-              `/organizations/${orgId}/groups/${groupId}/admin`
+              href === `/organizations/${orgId}/groups/${groupId}/admin`
                 ? pathname === href
                 : pathname.startsWith(href);
             return (

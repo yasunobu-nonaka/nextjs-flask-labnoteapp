@@ -73,7 +73,7 @@ export default function ConsoleLayout({
   return (
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる */}
-      <aside className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
+      <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
         <div className="flex flex-col gap-2">
           {/* ノートページへ戻るリンク */}
           <Link

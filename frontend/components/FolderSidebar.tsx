@@ -61,7 +61,6 @@ const JOIN_METHOD_OPTIONS = [
   { value: "open", label: "誰でも参加" },
 ];
 
-
 /**
  * ラジオボタングループ。
  * name に一意な文字列を指定することで同一ページ内の複数グループが干渉しない。
@@ -144,7 +143,6 @@ export default function FolderSidebar({
   });
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [orgCreateError, setOrgCreateError] = useState<string | null>(null);
-
 
   useEffect(() => {
     async function fetchCurrentOrganization() {
@@ -374,7 +372,7 @@ export default function FolderSidebar({
                   {canManage && (
                     <Link
                       href={`/organizations/${orgId}/groups/${group.id}/admin`}
-                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-sm"
+                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
                       title={`${group.name} の管理`}
                     >
                       ⚙
@@ -581,7 +579,12 @@ export default function FolderSidebar({
               // 作成者は自動的に admin になる
               setGroups((prev) => [
                 ...prev,
-                { id: group.id, name: group.name, is_private: false, role: "admin" },
+                {
+                  id: group.id,
+                  name: group.name,
+                  is_private: false,
+                  role: "admin",
+                },
               ]);
               setIsGroupCreateModalOpen(false);
               router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
