@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import Modal from "@/components/Modal";
 
 type GroupMember = {
   user_id: number;
@@ -14,6 +15,14 @@ type GroupMember = {
 
 type OrgMember = {
   user_id: number;
+  username: string;
+  email: string;
+  role: string;
+};
+
+/** モーダル内で選択・追加予定のメンバー */
+type PendingMember = {
+  userId: number;
   username: string;
   email: string;
   role: string;
@@ -35,7 +44,7 @@ const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
  * ロール変更は pendingRoles に変更分だけ蓄積し、「変更を保存」ボタンで
  * 変更があったメンバー分だけ PATCH リクエストを送る。
  *
- * メンバー追加は組織メンバー一覧から未参加のメンバーを選択して POST する。
+ * メンバー追加はモーダルで複数メンバーをリストに積んでから一括 POST する。
  */
 export default function GroupAdminMembersPage() {
   const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
@@ -51,10 +60,19 @@ export default function GroupAdminMembersPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // メンバー追加フォームの状態
+  // メンバー追加モーダルの状態
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // 組織メンバー一覧（モーダルのドロップダウン用）
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
+
+  // モーダル内の現在の選択状態
   const [addUserId, setAddUserId] = useState<number | "">("");
   const [addRole, setAddRole] = useState<string>("editor");
+
+  // 追加予定メンバーのリスト（モーダル内でリストに積んだもの）
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -207,49 +225,114 @@ export default function GroupAdminMembersPage() {
     }
   }
 
-  /** 選択した組織メンバーをグループに追加する */
-  async function handleAddMember(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * 選択中のメンバーを追加予定リストに積む。
+   * ドロップダウンから選ばれたメンバーを pendingMembers に追加し、選択をリセットする。
+   */
+  function handleAddToPending() {
     if (addUserId === "") return;
+    const member = addableOrgMembers.find((m) => m.user_id === addUserId);
+    if (!member) return;
+    setPendingMembers((prev) => [
+      ...prev,
+      { userId: member.user_id, username: member.username, email: member.email, role: addRole },
+    ]);
+    setAddUserId("");
+  }
 
+  /** 追加予定リストから1件取り除く */
+  function handleRemoveFromPending(userId: number) {
+    setPendingMembers((prev) => prev.filter((p) => p.userId !== userId));
+  }
+
+  /**
+   * 追加予定リストのメンバーをまとめてグループに POST する。
+   * 部分失敗した場合は成功分だけ members に反映し、失敗分は pending に残してエラー表示する。
+   */
+  async function handleSubmitAddMembers() {
+    if (pendingMembers.length === 0) return;
     setIsAdding(true);
     setAddError(null);
-    try {
-      const res = await authFetch(
-        `/api/organizations/${orgId}/groups/${groupId}/members`,
-        {
-          method: "POST",
-          body: JSON.stringify({ user_id: addUserId, role: addRole }),
-        },
-      );
-      if (!res.ok) {
-        const json = await res.json();
-        setAddError(json.message ?? "追加に失敗しました");
-        return;
+
+    const errors: string[] = [];
+    const addedMembers: GroupMember[] = [];
+    const failedUserIds = new Set<number>();
+
+    for (const pending of pendingMembers) {
+      try {
+        const res = await authFetch(
+          `/api/organizations/${orgId}/groups/${groupId}/members`,
+          {
+            method: "POST",
+            body: JSON.stringify({ user_id: pending.userId, role: pending.role }),
+          },
+        );
+        if (res.ok) {
+          const json = await res.json();
+          addedMembers.push(json.member);
+        } else {
+          const json = await res.json();
+          errors.push(`${pending.username}: ${json.message ?? "追加に失敗しました"}`);
+          failedUserIds.add(pending.userId);
+        }
+      } catch {
+        errors.push(`${pending.username}: 接続エラー`);
+        failedUserIds.add(pending.userId);
       }
-      const json = await res.json();
-      // 追加したメンバーをリストに追加してフォームをリセットする
-      setMembers((prev) => [...prev, json.member]);
+    }
+
+    if (addedMembers.length > 0) {
+      setMembers((prev) => [...prev, ...addedMembers]);
+    }
+
+    if (errors.length > 0) {
+      // 失敗したメンバーのみ pending に残す
+      setPendingMembers((prev) => prev.filter((p) => failedUserIds.has(p.userId)));
+      setAddError(errors.join(" / "));
+    } else {
+      // 全員成功: モーダルを閉じてリセット
+      setPendingMembers([]);
       setAddUserId("");
       setAddRole("editor");
-    } catch {
-      setAddError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsAdding(false);
+      setIsAddModalOpen(false);
     }
+
+    setIsAdding(false);
+  }
+
+  /** モーダルを閉じてフォーム状態をリセットする */
+  function handleCloseModal() {
+    setIsAddModalOpen(false);
+    setPendingMembers([]);
+    setAddUserId("");
+    setAddRole("editor");
+    setAddError(null);
   }
 
   const hasPendingChanges = Object.keys(pendingRoles).length > 0;
 
-  // 組織メンバーのうちまだグループに参加していないメンバーを抽出する
+  // 組織メンバーのうちグループ未参加かつ追加予定でないメンバーを抽出する
   const currentMemberIds = new Set(members.map((m) => m.user_id));
+  const pendingMemberIds = new Set(pendingMembers.map((p) => p.userId));
   const addableOrgMembers = orgMembers.filter(
-    (m) => !currentMemberIds.has(m.user_id),
+    (m) => !currentMemberIds.has(m.user_id) && !pendingMemberIds.has(m.user_id),
   );
 
   return (
     <div className="flex flex-col gap-8">
-      <h2 className="text-2xl font-bold">メンバー管理</h2>
+      {/* ページヘッダー: タイトルと追加ボタンを横並びに配置 */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">メンバー管理</h2>
+        {!loading && !fetchError && (currentMemberIds.size + pendingMemberIds.size) < orgMembers.length && (
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+          >
+            メンバーを追加
+          </button>
+        )}
+      </div>
 
       {/* メンバー一覧 */}
       {loading ? (
@@ -355,48 +438,105 @@ export default function GroupAdminMembersPage() {
         </div>
       )}
 
-      {/* メンバー追加フォーム: 組織メンバーのうち未参加のメンバーを追加できる */}
-      {!loading && !fetchError && addableOrgMembers.length > 0 && (
-        <section className="flex flex-col gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold">メンバーを追加</h3>
-          <form onSubmit={handleAddMember} className="flex gap-2 flex-wrap">
-            {/* 追加するメンバーの選択 */}
-            <select
-              value={addUserId}
-              onChange={(e) =>
-                setAddUserId(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              className="flex-1 min-w-48 px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
-            >
-              <option value="">メンバーを選択</option>
-              {addableOrgMembers.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.username}（{m.email}）
-                </option>
-              ))}
-            </select>
-            {/* 追加時のロール選択 */}
-            <select
-              value={addRole}
-              onChange={(e) => setAddRole(e.target.value)}
-              className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
-            >
-              {ASSIGNABLE_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {ROLE_LABELS[role]}
-                </option>
-              ))}
-            </select>
+      {/* メンバー追加モーダル */}
+      {isAddModalOpen && (
+        <Modal title="メンバーを追加" onClose={handleCloseModal}>
+          <div className="flex flex-col gap-5">
+            {/* メンバー選択行: ドロップダウン + ロール + リストに追加ボタン */}
+            <div className="flex gap-2 items-end flex-wrap">
+              <div className="flex flex-col gap-1 flex-1 min-w-48">
+                <label className="text-sm font-medium">メンバー</label>
+                {/* 組織メンバーのうちグループ未参加かつ追加予定でないメンバーを表示する */}
+                <select
+                  value={addUserId}
+                  onChange={(e) =>
+                    setAddUserId(
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+                >
+                  <option value="">メンバーを選択</option>
+                  {addableOrgMembers.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.username}（{m.email}）
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">ロール</label>
+                <select
+                  value={addRole}
+                  onChange={(e) => setAddRole(e.target.value)}
+                  className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+                >
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_LABELS[role]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddToPending}
+                disabled={addUserId === ""}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 whitespace-nowrap"
+              >
+                リストに追加
+              </button>
+            </div>
+
+            {/* 追加予定リスト */}
+            {pendingMembers.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-gray-500">
+                  追加予定（{pendingMembers.length} 件）
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {pendingMembers.map((p) => (
+                    <li
+                      key={p.userId}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm"
+                    >
+                      <span className="font-medium">{p.username}</span>
+                      <span className="text-gray-500 dark:text-gray-400 flex-1 truncate">
+                        {p.email}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-300 shrink-0">
+                        {ROLE_LABELS[p.role]}
+                      </span>
+                      {/* 追加予定リストから取り除くボタン */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromPending(p.userId)}
+                        className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                        aria-label={`${p.username} を追加予定から外す`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {addError && <p className="text-sm text-red-500">{addError}</p>}
+
+            {/* 一括追加ボタン */}
             <button
-              type="submit"
-              disabled={isAdding || addUserId === ""}
-              className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              type="button"
+              onClick={handleSubmitAddMembers}
+              disabled={isAdding || pendingMembers.length === 0}
+              className="w-full px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
             >
-              {isAdding ? "追加中..." : "追加"}
+              {isAdding
+                ? "追加中..."
+                : `グループに追加${pendingMembers.length > 0 ? `（${pendingMembers.length} 件）` : ""}`}
             </button>
-          </form>
-          {addError && <p className="text-sm text-red-500">{addError}</p>}
-        </section>
+          </div>
+        </Modal>
       )}
     </div>
   );

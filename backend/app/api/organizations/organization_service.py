@@ -17,8 +17,11 @@ def get_role_global(name: str) -> RoleGlobal:
     return role
 
 
-def create_organization(name: str, user_id: int) -> Organization:
-    """組織を作成し、作成者をownerとして登録する。デフォルトのポリシーも同時に作成する。"""
+def create_organization(name: str, user_id: int, policy_data: Optional[dict] = None) -> Organization:
+    """組織を作成し、作成者をownerとして登録する。デフォルトのポリシーも同時に作成する。
+
+    policy_data が指定された場合はデフォルト値を上書きする。同一トランザクションで確定する。
+    """
 
     org = Organization(name=name, created_by_user_id=user_id)
     db.session.add(org)
@@ -33,8 +36,11 @@ def create_organization(name: str, user_id: int) -> Organization:
     )
     db.session.add(member)
 
-    # デフォルトポリシーを作成
+    # デフォルトポリシーを作成し、指定値で上書きする
     policy = OrganizationPolicy(organization_id=org.id)
+    if policy_data:
+        for key, value in policy_data.items():
+            setattr(policy, key, value)
     db.session.add(policy)
 
     db.session.commit()

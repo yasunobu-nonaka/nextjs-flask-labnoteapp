@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import CreateGroupWizard from "@/components/CreateGroupWizard";
 
 /**
  * グループ一覧リダイレクトページ。
  * 組織切り替えモーダルなどから組織 ID のみ指定されて遷移した場合に、
  * 最初の所属グループのノート一覧へ自動的に転送する。
- * 所属グループが見つからない場合は組織一覧へ戻す。
+ * 所属グループが見つからない場合はグループ作成ウィザードを表示する。
  */
 export default function GroupsRedirectPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
+
+  /* ローディングが終わりグループなしと確定したら true */
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     async function redirect() {
@@ -27,7 +31,7 @@ export default function GroupsRedirectPage() {
           return;
         }
         const groups = await res.json();
-        // role が null でないものが所属グループ
+        /* role が null でないものが所属グループ */
         const firstJoined = groups.find(
           (g: { role: string | null }) => g.role !== null,
         );
@@ -36,8 +40,8 @@ export default function GroupsRedirectPage() {
             `/organizations/${orgId}/groups/${firstJoined.id}/notes`,
           );
         } else {
-          // 所属グループがない場合は組織一覧へ戻す
-          router.replace("/organizations");
+          /* 所属グループがない場合はグループ作成ウィザードを表示する */
+          setShowWizard(true);
         }
       } catch {
         router.replace("/organizations");
@@ -46,9 +50,33 @@ export default function GroupsRedirectPage() {
     redirect();
   }, [orgId, router]);
 
+  /* グループなし確定前はローディング表示 */
+  if (!showWizard) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <p className="text-gray-500">読み込み中...</p>
+      </main>
+    );
+  }
+
   return (
+    /* グループがない組織に遷移したときの初期グループ作成画面 */
     <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      <p className="text-gray-500">読み込み中...</p>
+      <div className="w-full max-w-3xl px-6">
+        <div className="text-center mb-8">
+          <h1 className="text-lg font-semibold mb-1">グループがありません</h1>
+          <p className="text-sm text-gray-500">
+            最初のグループを作成してノートを始めましょう。
+          </p>
+        </div>
+        {/* 共通ウィザードコンポーネントをページ内に直接埋め込む */}
+        <CreateGroupWizard
+          orgId={orgId}
+          onCreated={(group) =>
+            router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
+          }
+        />
+      </div>
     </main>
   );
 }

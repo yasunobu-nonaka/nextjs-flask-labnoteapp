@@ -6,17 +6,6 @@ GROUP_ROLES = ["admin", "editor", "viewer"]
 GROUP_JOIN_METHODS = ["invite_only", "request", "open"]
 
 
-class GroupCreateSchema(Schema):
-    """グループ作成の入力スキーマ。"""
-
-    name = fields.Str(
-        required=True,
-        validate=validate.Length(min=1, max=200, error="グループ名は1〜200文字で入力してください"),
-        load_only=True,
-    )
-    is_private = fields.Bool(load_default=False, load_only=True)
-
-
 class GroupPolicySchema(Schema):
     """グループポリシーのスキーマ（入出力兼用）。"""
 
@@ -26,6 +15,35 @@ class GroupPolicySchema(Schema):
         validate=validate.OneOf(GROUP_JOIN_METHODS, error="無効な値です"),
     )
     is_notes_visible_to_org = fields.Bool(load_default=False)
+
+
+class AddGroupMemberSchema(Schema):
+    """グループメンバー追加の入力スキーマ。GroupCreateSchema の initial_members でも再利用する。"""
+
+    user_id = fields.Int(required=True, load_only=True)
+    role = fields.Str(
+        load_default="editor",
+        validate=validate.OneOf(GROUP_ROLES, error="無効なロールです"),
+        load_only=True,
+    )
+
+
+class GroupCreateSchema(Schema):
+    """グループ作成の入力スキーマ。policy・initial_members は省略可能でデフォルト値が使われる。"""
+
+    name = fields.Str(
+        required=True,
+        validate=validate.Length(min=1, max=200, error="グループ名は1〜200文字で入力してください"),
+        load_only=True,
+    )
+    is_private = fields.Bool(load_default=False, load_only=True)
+    policy = fields.Nested(GroupPolicySchema, load_default=None, load_only=True)
+    # 作成時に追加するメンバー一覧（省略可能、作成者は自動的にadminとして登録される）
+    initial_members = fields.List(
+        fields.Nested(AddGroupMemberSchema),
+        load_default=None,
+        load_only=True,
+    )
 
 
 class GroupUpdateSchema(Schema):
@@ -63,17 +81,6 @@ class GroupMemberResponseSchema(Schema):
     # ユーザー情報（サービス側で付加）
     username = fields.Str(dump_only=True)
     email = fields.Str(dump_only=True)
-
-
-class AddGroupMemberSchema(Schema):
-    """グループメンバー追加の入力スキーマ。"""
-
-    user_id = fields.Int(required=True, load_only=True)
-    role = fields.Str(
-        load_default="editor",
-        validate=validate.OneOf(GROUP_ROLES, error="無効なロールです"),
-        load_only=True,
-    )
 
 
 class UpdateGroupMemberRoleSchema(Schema):
