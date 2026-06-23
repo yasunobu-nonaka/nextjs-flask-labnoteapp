@@ -49,10 +49,12 @@ def create_group(
     user_id: int,
     default_join_method: str = "invite_only",
     policy_data: Optional[dict] = None,
+    initial_members: Optional[List[dict]] = None,
 ) -> Group:
     """グループを作成し、作成者をadminとして登録する。デフォルトのポリシーも同時に作成する。
 
-    policy_data が指定された場合はデフォルト値を上書きする。同一トランザクションで確定する。
+    policy_data が指定された場合はデフォルト値を上書きする。
+    initial_members が指定された場合は作成者以外のメンバーを同一トランザクションで登録する。
     """
 
     group = Group(
@@ -82,6 +84,18 @@ def create_group(
         for key, value in policy_data.items():
             setattr(policy, key, value)
     db.session.add(policy)
+
+    # 初期メンバーを登録する（作成者は admin として既に登録済みのためスキップ）
+    if initial_members:
+        for m in initial_members:
+            if m["user_id"] == user_id:
+                continue
+            role_obj = get_role_local(m.get("role", "editor"))
+            db.session.add(GroupMember(
+                user_id=m["user_id"],
+                group_id=group.id,
+                role_id=role_obj.id,
+            ))
 
     db.session.commit()
     return group

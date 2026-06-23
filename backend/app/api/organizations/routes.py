@@ -324,6 +324,7 @@ def create_grp(org_id):
         user_id=current_user.id,
         default_join_method=org.policy.default_join_method,
         policy_data=data.get("policy"),
+        initial_members=data.get("initial_members"),
     )
 
     member = check_group_membership(current_user.id, group.id)

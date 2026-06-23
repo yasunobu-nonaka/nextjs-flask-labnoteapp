@@ -4,6 +4,7 @@ import { authFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
+import CreateGroupWizard from "@/components/CreateGroupWizard";
 import Link from "next/link";
 
 type Props = {
@@ -60,11 +61,6 @@ const JOIN_METHOD_OPTIONS = [
   { value: "open", label: "誰でも参加" },
 ];
 
-const GROUP_JOIN_METHOD_OPTIONS = [
-  { value: "invite_only", label: "招待のみ" },
-  { value: "request", label: "申請制" },
-  { value: "open", label: "誰でも参加" },
-];
 
 /**
  * ラジオボタングループ。
@@ -149,16 +145,6 @@ export default function FolderSidebar({
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [orgCreateError, setOrgCreateError] = useState<string | null>(null);
 
-  // ---- グループ作成フォームの状態 ----
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupIsPrivate, setNewGroupIsPrivate] = useState(false);
-  const [newGroupPolicy, setNewGroupPolicy] = useState({
-    allow_private_notes: true,
-    join_method: "invite_only",
-    is_notes_visible_to_org: false,
-  });
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [groupCreateError, setGroupCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchCurrentOrganization() {
@@ -235,21 +221,8 @@ export default function FolderSidebar({
     setOrgCreateError(null);
   }
 
-  /** グループ作成モーダルを閉じてフォームをリセットする */
-  function handleCloseGroupCreateModal() {
-    setIsGroupCreateModalOpen(false);
-    setNewGroupName("");
-    setNewGroupIsPrivate(false);
-    setNewGroupPolicy({
-      allow_private_notes: true,
-      join_method: "invite_only",
-      is_notes_visible_to_org: false,
-    });
-    setGroupCreateError(null);
-  }
-
   /** 組織を作成してモーダルを閉じ、新組織のグループ一覧へ遷移する */
-  async function handleCreateOrg(e: React.FormEvent) {
+  async function handleCreateOrg(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = newOrgName.trim();
     if (!trimmed) return;
@@ -274,40 +247,6 @@ export default function FolderSidebar({
       setOrgCreateError("サーバーへの接続に失敗しました");
     } finally {
       setIsCreatingOrg(false);
-    }
-  }
-
-  /** グループを作成してモーダルを閉じ、ノート一覧へ遷移する */
-  async function handleCreateGroup(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = newGroupName.trim();
-    if (!trimmed) return;
-
-    setIsCreatingGroup(true);
-    setGroupCreateError(null);
-    try {
-      const res = await authFetch(`/api/organizations/${orgId}/groups`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: trimmed,
-          is_private: newGroupIsPrivate,
-          policy: newGroupPolicy,
-        }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        setGroupCreateError(json.message ?? "作成に失敗しました");
-        return;
-      }
-      const data = await res.json();
-      // 作成者は自動的に admin になる
-      setGroups((prev) => [...prev, { ...data.group, role: "admin" }]);
-      handleCloseGroupCreateModal();
-      router.push(`/organizations/${orgId}/groups/${data.group.id}/notes`);
-    } catch {
-      setGroupCreateError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsCreatingGroup(false);
     }
   }
 
@@ -630,101 +569,21 @@ export default function FolderSidebar({
         </Modal>
       )}
 
-      {/* グループ作成モーダル */}
+      {/* グループ作成ウィザード */}
       {isGroupCreateModalOpen && (
-        <Modal title="グループを作成" onClose={handleCloseGroupCreateModal}>
-          <form onSubmit={handleCreateGroup} className="flex flex-col gap-5">
-            {/* グループ名と公開設定 */}
-            <div className="flex flex-col gap-3 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold">グループ名</label>
-                <input
-                  autoFocus
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="グループ名を入力"
-                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold">公開設定</label>
-                <select
-                  value={newGroupIsPrivate ? "private" : "public"}
-                  onChange={(e) =>
-                    setNewGroupIsPrivate(e.target.value === "private")
-                  }
-                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-                >
-                  <option value="public">公開グループ</option>
-                  <option value="private">非公開グループ</option>
-                </select>
-              </div>
-            </div>
-
-            {/* プライベートノートの作成 */}
-            <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">プライベートノートの作成</p>
-              <RadioGroup
-                name="group_allow_private_notes"
-                options={[
-                  { value: true, label: "許可" },
-                  { value: false, label: "禁止" },
-                ]}
-                value={newGroupPolicy.allow_private_notes}
-                onChange={(v) =>
-                  setNewGroupPolicy((p) => ({ ...p, allow_private_notes: v }))
-                }
-              />
-            </div>
-
-            {/* 参加方式 */}
-            <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">参加方式</p>
-              <RadioGroup
-                name="group_join_method"
-                options={GROUP_JOIN_METHOD_OPTIONS}
-                value={newGroupPolicy.join_method}
-                onChange={(v) =>
-                  setNewGroupPolicy((p) => ({ ...p, join_method: v }))
-                }
-              />
-            </div>
-
-            {/* 組織メンバーへのノート公開 */}
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">
-                ノートを組織メンバーに公開
-              </p>
-              <RadioGroup
-                name="group_is_notes_visible_to_org"
-                options={[
-                  { value: true, label: "公開する" },
-                  { value: false, label: "公開しない" },
-                ]}
-                value={newGroupPolicy.is_notes_visible_to_org}
-                onChange={(v) =>
-                  setNewGroupPolicy((p) => ({
-                    ...p,
-                    is_notes_visible_to_org: v,
-                  }))
-                }
-              />
-            </div>
-
-            {groupCreateError && (
-              <p className="text-sm text-red-500">{groupCreateError}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={isCreatingGroup || !newGroupName.trim()}
-              className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-            >
-              {isCreatingGroup ? "作成中..." : "作成"}
-            </button>
-          </form>
-        </Modal>
+        <CreateGroupWizard
+          orgId={orgId}
+          onClose={() => setIsGroupCreateModalOpen(false)}
+          onCreated={(group) => {
+            // 作成者は自動的に admin になる
+            setGroups((prev) => [
+              ...prev,
+              { id: group.id, name: group.name, is_private: false, role: "admin" },
+            ]);
+            setIsGroupCreateModalOpen(false);
+            router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
+          }}
+        />
       )}
 
       {/* グループ一覧モーダル: 所属・未所属グループを表示する（作成フォームは独立モーダルに移動） */}

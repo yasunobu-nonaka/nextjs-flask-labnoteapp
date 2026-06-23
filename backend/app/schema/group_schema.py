@@ -17,8 +17,19 @@ class GroupPolicySchema(Schema):
     is_notes_visible_to_org = fields.Bool(load_default=False)
 
 
+class AddGroupMemberSchema(Schema):
+    """グループメンバー追加の入力スキーマ。GroupCreateSchema の initial_members でも再利用する。"""
+
+    user_id = fields.Int(required=True, load_only=True)
+    role = fields.Str(
+        load_default="editor",
+        validate=validate.OneOf(GROUP_ROLES, error="無効なロールです"),
+        load_only=True,
+    )
+
+
 class GroupCreateSchema(Schema):
-    """グループ作成の入力スキーマ。policy は省略可能でデフォルト値が使われる。"""
+    """グループ作成の入力スキーマ。policy・initial_members は省略可能でデフォルト値が使われる。"""
 
     name = fields.Str(
         required=True,
@@ -27,6 +38,12 @@ class GroupCreateSchema(Schema):
     )
     is_private = fields.Bool(load_default=False, load_only=True)
     policy = fields.Nested(GroupPolicySchema, load_default=None, load_only=True)
+    # 作成時に追加するメンバー一覧（省略可能、作成者は自動的にadminとして登録される）
+    initial_members = fields.List(
+        fields.Nested(AddGroupMemberSchema),
+        load_default=None,
+        load_only=True,
+    )
 
 
 class GroupUpdateSchema(Schema):
@@ -64,17 +81,6 @@ class GroupMemberResponseSchema(Schema):
     # ユーザー情報（サービス側で付加）
     username = fields.Str(dump_only=True)
     email = fields.Str(dump_only=True)
-
-
-class AddGroupMemberSchema(Schema):
-    """グループメンバー追加の入力スキーマ。"""
-
-    user_id = fields.Int(required=True, load_only=True)
-    role = fields.Str(
-        load_default="editor",
-        validate=validate.OneOf(GROUP_ROLES, error="無効なロールです"),
-        load_only=True,
-    )
 
 
 class UpdateGroupMemberRoleSchema(Schema):
