@@ -29,6 +29,8 @@ export default function GroupAdminLayout({
    */
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [groupName, setGroupName] = useState("");
+  /** 未承認の参加申請数（メンバー管理ナビのバッジ用） */
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     async function checkAccess() {
@@ -61,6 +63,15 @@ export default function GroupAdminLayout({
 
         setGroupName(groupData.name);
         setAuthorized(true);
+
+        // 権限確認後に参加申請数を取得する
+        const countRes = await authFetch(
+          `/api/organizations/${orgId}/groups/${groupId}/join-requests/count`
+        );
+        if (countRes.ok) {
+          const countData = await countRes.json();
+          setPendingCount(countData.count ?? 0);
+        }
       } catch {
         router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
       }
@@ -124,13 +135,19 @@ export default function GroupAdminLayout({
               <Link
                 key={href}
                 href={href}
-                className={`px-3 py-2 rounded-lg text-base transition-colors ${
+                className={`flex items-center px-3 py-2 rounded-lg text-base transition-colors ${
                   isActive
                     ? "bg-gray-100 dark:bg-gray-800 font-semibold"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 {label}
+                {/* メンバー管理ナビのみ未承認申請数バッジを表示する */}
+                {label === "メンバー管理" && pendingCount > 0 && (
+                  <span className="ml-auto text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 min-w-5 text-center leading-tight">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
