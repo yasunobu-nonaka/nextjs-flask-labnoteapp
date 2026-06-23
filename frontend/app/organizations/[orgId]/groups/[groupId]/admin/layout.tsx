@@ -105,10 +105,10 @@ export default function GroupAdminLayout({
             ← ノートに戻る
           </Link>
           <div className="px-2 mt-1 flex flex-col gap-0.5">
-            <p className="text-lg font-semibold text-gray-400 uppercase tracking-wider">
+            <p className="text-lg text-gray-400 uppercase tracking-wider font-semibold">
               グループ管理
             </p>
-            <h1 className="text-lg font-bold truncate">{groupName}</h1>
+            <h1 className="text-2xl font-semibold">{groupName}</h1>
           </div>
         </div>
 

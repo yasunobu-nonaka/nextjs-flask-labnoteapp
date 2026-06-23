@@ -28,6 +28,7 @@ export default function ConsoleLayout({
    * false = アクセス拒否（リダイレクト済み）
    */
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [orgName, setOrgName] = useState("");
 
   useEffect(() => {
     async function checkAccess() {
@@ -46,6 +47,7 @@ export default function ConsoleLayout({
           router.push(`/organizations/${orgId}/groups`);
           return;
         }
+        setOrgName(data.name);
         setAuthorized(true);
       } catch {
         router.push(`/organizations/${orgId}/groups`);
@@ -82,7 +84,12 @@ export default function ConsoleLayout({
           >
             ← ノートに戻る
           </Link>
-          <h1 className="text-lg font-bold px-2 mt-1">組織管理</h1>
+          <div className="px-2 mt-1 flex flex-col gap-0.5">
+            <p className="text-lg text-gray-400 uppercase tracking-wider font-semibold">
+              組織管理
+            </p>
+            <h1 className="text-2xl font-semibold">{orgName}</h1>
+          </div>
         </div>
 
         {/* ナビゲーション: アクティブな項目をハイライトする */}
