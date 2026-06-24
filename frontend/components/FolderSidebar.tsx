@@ -270,27 +270,40 @@ export default function FolderSidebar({
   }
 
   // 未所属グループごとの参加処理状態（groupId → JoinStatus）
-  const [joinStatusMap, setJoinStatusMap] = useState<Map<number, JoinStatus>>(new Map());
-  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(new Map());
+  const [joinStatusMap, setJoinStatusMap] = useState<Map<number, JoinStatus>>(
+    new Map(),
+  );
+  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(
+    new Map(),
+  );
 
   /** グループへの参加申請または即時参加を行う */
   async function handleJoin(groupId: number) {
     setJoinStatusMap((prev) => new Map(prev).set(groupId, "requesting"));
-    setJoinErrorMap((prev) => { const m = new Map(prev); m.delete(groupId); return m; });
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(groupId);
+      return m;
+    });
     try {
-      const res = await authFetch(`/api/organizations/${orgId}/groups/${groupId}/join`, {
-        method: "POST",
-      });
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join`,
+        {
+          method: "POST",
+        },
+      );
       const data = await res.json();
       if (!res.ok) {
         setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
-        setJoinErrorMap((prev) => new Map(prev).set(groupId, data.message ?? "参加に失敗しました"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(groupId, data.message ?? "参加に失敗しました"),
+        );
         return;
       }
       if (data.result === "joined") {
         // 即時参加: グループリストを更新してモーダルを閉じる
         setGroups((prev) =>
-          prev.map((g) => g.id === groupId ? { ...g, role: "editor" } : g)
+          prev.map((g) => (g.id === groupId ? { ...g, role: "editor" } : g)),
         );
         setIsGroupListModalOpen(false);
         router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
@@ -300,7 +313,9 @@ export default function FolderSidebar({
       }
     } catch {
       setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
-      setJoinErrorMap((prev) => new Map(prev).set(groupId, "サーバーへの接続に失敗しました"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
+      );
     }
   }
 
@@ -310,7 +325,11 @@ export default function FolderSidebar({
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
+    <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-4 pb-6 px-3 flex flex-col gap-4">
+      {/* アプリロゴ */}
+      <div className="h-12 flex items-center px-2 pt-2 shrink-0">
+        <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+      </div>
       {/* 現在の組織名と操作ボタン */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between px-2">
@@ -682,7 +701,8 @@ export default function FolderSidebar({
                 <h2 className="text-base font-semibold">未所属グループ</h2>
                 <ul className="flex flex-col gap-2">
                   {unjoinedGroups.map((group) => {
-                    const joinMethod = group.policy?.join_method ?? "invite_only";
+                    const joinMethod =
+                      group.policy?.join_method ?? "invite_only";
                     const status = joinStatusMap.get(group.id) ?? "idle";
                     const error = joinErrorMap.get(group.id);
                     return (
