@@ -191,6 +191,115 @@ class TestGetNotifications:
         res = client.get("/api/notifications")
         assert res.status_code == 401
 
+
+# ---------------------------------------------------------------------------
+# 申請者向け通知（承認・拒否）
+# ---------------------------------------------------------------------------
+
+
+class TestMemberResultNotifications:
+    """join_request_approved / join_request_rejected 通知のテスト。"""
+
+    def _setup_with_request(self, client, auth_headers):
+        """request グループを作成し user2 に申請させて返す。"""
+        org = create_org(client, auth_headers["headers"])
+        group = create_group(client, auth_headers["headers"], org["id"])
+        set_join_method(client, auth_headers["headers"], org["id"], group["id"], "request")
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org["id"], user2_id)
+        send_join_request(client, user2_headers, org["id"], group["id"])
+
+        return org, group, user2_headers, user2_id
+
+    def test_approved_notification_returned_to_requester(self, client, auth_headers):
+        """承認されると申請者の通知一覧に join_request_approved が返る。"""
+        org, group, user2_headers, user2_id = self._setup_with_request(client, auth_headers)
+
+        client.patch(
+            f"/api/organizations/{org['id']}/groups/{group['id']}/join-requests/{user2_id}",
+            json={"action": "approve"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.get("/api/notifications", headers=user2_headers)
+
+        assert res.status_code == 200
+        data = res.get_json()
+        approved = [n for n in data if n["type"] == "join_request_approved"]
+        assert len(approved) == 1
+        assert approved[0]["group_id"] == group["id"]
+        assert approved[0]["approved_at"] is not None
+
+    def test_rejected_notification_returned_to_requester(self, client, auth_headers):
+        """拒否されると申請者の通知一覧に join_request_rejected が返る。"""
+        org, group, user2_headers, user2_id = self._setup_with_request(client, auth_headers)
+
+        client.patch(
+            f"/api/organizations/{org['id']}/groups/{group['id']}/join-requests/{user2_id}",
+            json={"action": "reject"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.get("/api/notifications", headers=user2_headers)
+
+        assert res.status_code == 200
+        data = res.get_json()
+        rejected = [n for n in data if n["type"] == "join_request_rejected"]
+        assert len(rejected) == 1
+        assert rejected[0]["group_id"] == group["id"]
+        assert rejected[0]["rejected_at"] is not None
+
+    def test_directly_added_member_has_no_approved_notification(self, client, auth_headers):
+        """管理者が直接追加したメンバーには承認通知が出ない（approved_at が None のため）。"""
+        org = create_org(client, auth_headers["headers"])
+        group = create_group(client, auth_headers["headers"], org["id"])
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org["id"], user2_id)
+
+        # 申請フローではなく管理者が直接追加
+        client.post(
+            f"/api/organizations/{org['id']}/groups/{group['id']}/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.get("/api/notifications", headers=user2_headers)
+
+        assert res.status_code == 200
+        approved = [n for n in res.get_json() if n["type"] == "join_request_approved"]
+        assert approved == []
+
+    def test_dismiss_rejected_removes_notification(self, client, auth_headers):
+        """DELETE /api/notifications/rejected で拒否通知が消える。"""
+        org, group, user2_headers, user2_id = self._setup_with_request(client, auth_headers)
+
+        client.patch(
+            f"/api/organizations/{org['id']}/groups/{group['id']}/join-requests/{user2_id}",
+            json={"action": "reject"},
+            headers=auth_headers["headers"],
+        )
+
+        # dismiss 前は通知がある
+        before = client.get("/api/notifications", headers=user2_headers).get_json()
+        assert any(n["type"] == "join_request_rejected" for n in before)
+
+        # dismiss する
+        res = client.delete("/api/notifications/rejected", headers=user2_headers)
+        assert res.status_code == 204
+
+        # dismiss 後は通知がない
+        after = client.get("/api/notifications", headers=user2_headers).get_json()
+        assert not any(n["type"] == "join_request_rejected" for n in after)
+
+    def test_dismiss_unauthorized(self, client):
+        """未認証で dismiss しようとすると 401 を返す。"""
+        res = client.delete("/api/notifications/rejected")
+        assert res.status_code == 401
+
     def test_response_shape(self, client, auth_headers):
         """レスポンスの各通知に必須フィールドが含まれている。"""
         org = create_org(client, auth_headers["headers"])

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from app.extensions import db
@@ -209,6 +210,7 @@ def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
     戻り値: (GroupMember, "joined" | "pending")
     join_method が invite_only の場合は ValueError を送出する。
     すでに active / pending な場合も ValueError を送出する。
+    rejected レコードが残っている場合は再申請として既存レコードを更新する。
     """
 
     existing = get_any_membership(user_id, group.id)
@@ -223,18 +225,28 @@ def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
     if join_method == "invite_only":
         raise ValueError("invite_only")
 
-    # editor ロールをデフォルト付与（open / request 共通）
     role_obj = get_role_local("editor")
-    status = "active" if join_method == "open" else "pending"
+    new_status = "active" if join_method == "open" else "pending"
+
+    if existing and existing.status == "rejected":
+        # 拒否後の再申請: 複合 PK の制約があるため既存レコードを更新して再利用する
+        existing.role_id = role_obj.id
+        existing.status = new_status
+        existing.joined_at = datetime.now(timezone.utc)
+        existing.approved_at = None
+        existing.rejected_at = None
+        db.session.commit()
+        return existing, "joined" if new_status == "active" else "pending"
+
     member = GroupMember(
         user_id=user_id,
         group_id=group.id,
         role_id=role_obj.id,
-        status=status,
+        status=new_status,
     )
     db.session.add(member)
     db.session.commit()
-    return member, "joined" if status == "active" else "pending"
+    return member, "joined" if new_status == "active" else "pending"
 
 
 def get_pending_join_requests(group_id: int) -> List[GroupMember]:
@@ -255,7 +267,7 @@ def get_pending_join_request_count(group_id: int) -> int:
 
 
 def approve_join_request(group_id: int, user_id: int) -> GroupMember:
-    """参加申請を承認し、pending → active に変更する。"""
+    """参加申請を承認し、pending → active に変更する。approved_at を記録する。"""
 
     member = db.session.execute(
         db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
@@ -264,12 +276,17 @@ def approve_join_request(group_id: int, user_id: int) -> GroupMember:
         raise ValueError("参加申請が見つかりません")
 
     member.status = "active"
+    member.approved_at = datetime.now(timezone.utc)
     db.session.commit()
     return member
 
 
 def reject_join_request(group_id: int, user_id: int) -> None:
-    """参加申請を拒否し、レコードを削除する（再申請を許容するため hard delete）。"""
+    """参加申請を拒否する。pending → rejected に変更し rejected_at を記録する。
+
+    ハードデリートではなくソフトデリートにすることで、申請者への拒否通知を
+    ポーリングで届けられるようにする。申請者が通知を確認した時点でレコードを削除する。
+    """
 
     member = db.session.execute(
         db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
@@ -277,7 +294,8 @@ def reject_join_request(group_id: int, user_id: int) -> None:
     if not member:
         raise ValueError("参加申請が見つかりません")
 
-    db.session.delete(member)
+    member.status = "rejected"
+    member.rejected_at = datetime.now(timezone.utc)
     db.session.commit()
 
 

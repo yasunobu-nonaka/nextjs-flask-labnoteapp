@@ -84,8 +84,12 @@ class GroupMember(db.Model):
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc
     )
-    # 参加申請フロー用ステータス: 'active'（通常メンバー）| 'pending'（承認待ち）
+    # 参加申請フロー用ステータス: 'active'（通常メンバー）| 'pending'（承認待ち）| 'rejected'（拒否済み）
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    # 申請が承認された日時（申請フロー経由の承認時のみセット。管理者による直接追加は None）
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 申請が拒否された日時（拒否通知を申請者に届けるまでレコードを保持する）
+    rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # リレーション
     user: Mapped["User"] = relationship(back_populates="group_memberships")

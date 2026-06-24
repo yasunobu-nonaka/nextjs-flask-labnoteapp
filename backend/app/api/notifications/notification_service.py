@@ -36,7 +36,6 @@ def get_join_request_notifications(user_id: int) -> List[dict]:
         )
     ).scalars().all()
 
-    # 6. 通知オブジェクトに変換して返す
     notifications = []
     for m in pending_members:
         notifications.append({
@@ -51,3 +50,69 @@ def get_join_request_notifications(user_id: int) -> List[dict]:
         })
 
     return notifications
+
+
+def get_member_result_notifications(user_id: int) -> List[dict]:
+    """申請者向け通知を返す。承認・拒否の結果をポーリングで届けるために使用する。
+
+    対象:
+    - approved: 自分の申請が承認された（status='active' かつ approved_at が存在する）
+    - rejected: 自分の申請が拒否された（status='rejected'）
+    """
+
+    # approved_at が存在する active レコード = 申請フロー経由で承認されたもの
+    approved_members = db.session.execute(
+        db.select(GroupMember).filter(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "active",
+            GroupMember.approved_at.is_not(None),
+        )
+    ).scalars().all()
+
+    # rejected レコード = 拒否通知未確認のもの
+    rejected_members = db.session.execute(
+        db.select(GroupMember).filter(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "rejected",
+        )
+    ).scalars().all()
+
+    notifications = []
+    for m in approved_members:
+        notifications.append({
+            "type": "join_request_approved",
+            "org_id": m.group.organization_id,
+            "group_id": m.group_id,
+            "group_name": m.group.name,
+            "approved_at": m.approved_at.isoformat() if m.approved_at else None,
+        })
+
+    for m in rejected_members:
+        notifications.append({
+            "type": "join_request_rejected",
+            "org_id": m.group.organization_id,
+            "group_id": m.group_id,
+            "group_name": m.group.name,
+            "rejected_at": m.rejected_at.isoformat() if m.rejected_at else None,
+        })
+
+    return notifications
+
+
+def dismiss_rejected_notifications(user_id: int) -> None:
+    """拒否通知を確認済みとして削除する。
+
+    ユーザーがベルを開いて rejected 通知を確認した時点でレコードを削除する。
+    rejected レコードを削除することで再申請が可能になる。
+    """
+
+    rejected_members = db.session.execute(
+        db.select(GroupMember).filter(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "rejected",
+        )
+    ).scalars().all()
+
+    for m in rejected_members:
+        db.session.delete(m)
+    db.session.commit()

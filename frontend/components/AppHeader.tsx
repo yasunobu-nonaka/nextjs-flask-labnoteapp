@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 
-/** 参加申請通知の型 */
+/** 管理者向け: グループへの参加申請 */
 type JoinRequestNotification = {
   type: "join_request";
   org_id: number;
@@ -17,7 +17,25 @@ type JoinRequestNotification = {
   requested_at: string | null;
 };
 
-type Notification = JoinRequestNotification;
+/** 申請者向け: 自分の申請が承認された */
+type JoinApprovedNotification = {
+  type: "join_request_approved";
+  org_id: number;
+  group_id: number;
+  group_name: string;
+  approved_at: string | null;
+};
+
+/** 申請者向け: 自分の申請が拒否された */
+type JoinRejectedNotification = {
+  type: "join_request_rejected";
+  org_id: number;
+  group_id: number;
+  group_name: string;
+  rejected_at: string | null;
+};
+
+type Notification = JoinRequestNotification | JoinApprovedNotification | JoinRejectedNotification;
 
 const POLL_INTERVAL_MS = 30_000;
 /** localStorage に保存する最終既読タイムスタンプのキー */
@@ -81,14 +99,25 @@ export default function AppHeader() {
 
     const lastSeenDate = new Date(lastSeenStr);
 
-    // requested_at が last_seen より新しい通知だけを未読と判定する
-    const unreadNotifications = data.filter((notification) => {
-      if (!notification.requested_at) return false;
-      const requestedAt = new Date(notification.requested_at);
-      return requestedAt > lastSeenDate;
+    const unread = data.filter((n) => {
+      // 管理者向け申請通知: requested_at > last_seen なら未読
+      if (n.type === "join_request") {
+        if (!n.requested_at) return false;
+        return new Date(n.requested_at) > lastSeenDate;
+      }
+      // 承認通知: approved_at > last_seen なら未読
+      if (n.type === "join_request_approved") {
+        if (!n.approved_at) return false;
+        return new Date(n.approved_at) > lastSeenDate;
+      }
+      // 拒否通知: 存在する限り常に未読（ベルを開いたとき dismiss する）
+      if (n.type === "join_request_rejected") {
+        return true;
+      }
+      return false;
     });
 
-    setUnreadCount(unreadNotifications.length);
+    setUnreadCount(unread.length);
   }
 
   // マウント時に初回フェッチ、その後 30 秒ごとにポーリングする
@@ -107,6 +136,11 @@ export default function AppHeader() {
       // 開いた瞬間に既読マークをつける
       localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
       setUnreadCount(0);
+      // 拒否通知をサーバーから削除する（確認済みとして処理）
+      const hasRejected = notifications.some((n) => n.type === "join_request_rejected");
+      if (hasRejected) {
+        authFetch("/api/notifications/rejected", { method: "DELETE" }).catch(() => {});
+      }
     }
     setIsBellOpen((v) => !v);
     setIsUserMenuOpen(false);
@@ -174,32 +208,91 @@ export default function AppHeader() {
               </p>
             ) : (
               <ul className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-                {notifications.map((n) => (
-                  <li key={`${n.group_id}-${n.requester_user_id}`}>
-                    <Link
-                      href={`/organizations/${n.org_id}/groups/${n.group_id}/admin/members`}
-                      onClick={() => setIsBellOpen(false)}
-                      className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                        <span className="font-medium">{n.requester_username}</span>
-                        {" さんが "}
-                        <span className="font-medium">{n.group_name}</span>
-                        {" への参加を申請しました"}
-                      </p>
-                      {n.requested_at && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {new Date(n.requested_at).toLocaleString("ja-JP", {
-                            month: "numeric",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      )}
-                    </Link>
-                  </li>
-                ))}
+                {notifications.map((n, i) => {
+                  /* 管理者向け: 申請を承認・拒否するページへのリンク */
+                  if (n.type === "join_request") {
+                    return (
+                      <li key={`req-${n.group_id}-${n.requester_user_id}`}>
+                        <Link
+                          href={`/organizations/${n.org_id}/groups/${n.group_id}/admin/members`}
+                          onClick={() => setIsBellOpen(false)}
+                          className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                            <span className="font-medium">{n.requester_username}</span>
+                            {" さんが "}
+                            <span className="font-medium">{n.group_name}</span>
+                            {" への参加を申請しました"}
+                          </p>
+                          {n.requested_at && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(n.requested_at).toLocaleString("ja-JP", {
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  }
+
+                  /* 申請者向け: 承認されたらグループのノートページへ遷移 */
+                  if (n.type === "join_request_approved") {
+                    return (
+                      <li key={`approved-${n.group_id}-${i}`}>
+                        <Link
+                          href={`/organizations/${n.org_id}/groups/${n.group_id}/notes`}
+                          onClick={() => setIsBellOpen(false)}
+                          className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                            <span className="font-medium">{n.group_name}</span>
+                            {" への参加が承認されました"}
+                          </p>
+                          {n.approved_at && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(n.approved_at).toLocaleString("ja-JP", {
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  }
+
+                  /* 申請者向け: 拒否された（リンクなし、メッセージのみ） */
+                  if (n.type === "join_request_rejected") {
+                    return (
+                      <li key={`rejected-${n.group_id}-${i}`}>
+                        <div className="px-4 py-3">
+                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                            <span className="font-medium">{n.group_name}</span>
+                            {" への参加申請が却下されました"}
+                          </p>
+                          {n.rejected_at && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(n.rejected_at).toLocaleString("ja-JP", {
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+
+                  return null;
+                })}
               </ul>
             )}
           </div>

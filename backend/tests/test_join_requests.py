@@ -518,3 +518,69 @@ class TestCancelJoinRequest:
             f"/api/organizations/{org_id}/groups/{group_id}/join",
         )
         assert res.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# reject → re-apply flow（ソフトデリート + 再申請）
+# ---------------------------------------------------------------------------
+
+
+class TestRejectAndReapply:
+    """拒否後の再申請フローのテスト。"""
+
+    def test_can_reapply_after_rejection(self, client, auth_headers):
+        """拒否された申請者は再度申請でき、pending 状態になる。"""
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+        set_join_method(client, auth_headers["headers"], org_id, group_id, "request")
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org_id, user2_id)
+
+        # 申請 → 拒否
+        client.post(f"/api/organizations/{org_id}/groups/{group_id}/join", headers=user2_headers)
+        client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/join-requests/{user2_id}",
+            json={"action": "reject"},
+            headers=auth_headers["headers"],
+        )
+
+        # 再申請 → 201 かつ pending
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=user2_headers,
+        )
+        assert res.status_code == 201
+        assert res.get_json()["result"] == "pending"
+
+    def test_approve_sets_approved_at(self, client, auth_headers):
+        """承認すると approved_at が記録される。"""
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+        set_join_method(client, auth_headers["headers"], org_id, group_id, "request")
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org_id, user2_id)
+        client.post(f"/api/organizations/{org_id}/groups/{group_id}/join", headers=user2_headers)
+
+        client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/join-requests/{user2_id}",
+            json={"action": "approve"},
+            headers=auth_headers["headers"],
+        )
+
+        # DB を直接確認して approved_at が設定されていることを確認する
+        from app.model.group import GroupMember
+        from app.extensions import db
+        with client.application.app_context():
+            member = db.session.execute(
+                db.select(GroupMember).filter_by(user_id=user2_id, group_id=group_id)
+            ).scalar_one()
+            assert member.approved_at is not None
+            assert member.status == "active"
