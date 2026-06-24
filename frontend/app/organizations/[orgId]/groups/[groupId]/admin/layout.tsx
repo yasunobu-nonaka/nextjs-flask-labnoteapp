@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
 
 /** グループ管理画面にアクセスできる組織ロール */
 const ORG_ADMIN_ROLES = ["owner", "sys_admin", "user_admin"];
@@ -104,7 +105,11 @@ export default function GroupAdminLayout({
   ];
 
   return (
-    <div className="h-screen overflow-hidden flex bg-background text-foreground">
+    <div className="h-screen overflow-hidden flex flex-col bg-background text-foreground">
+      {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
+      <AppHeader />
+      {/* サイドバー＋コンテンツを横並びにする行 */}
+      <div className="flex flex-1 overflow-hidden">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる */}
       <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
         <div className="flex flex-col gap-2">
@@ -156,6 +161,7 @@ export default function GroupAdminLayout({
 
       {/* メインコンテンツエリア: 各ページの内容を表示する */}
       <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
+      </div>
     </div>
   );
 }
