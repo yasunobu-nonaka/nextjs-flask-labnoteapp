@@ -27,6 +27,8 @@ type Group = {
   name: string;
   is_private: boolean;
   role: string | null;
+  /** APIから返される参加ステータス: "active" | "pending" | null */
+  join_status: "active" | "pending" | null;
   policy: {
     join_method: string;
     allow_private_notes: boolean;
@@ -185,6 +187,14 @@ export default function FolderSidebar({
           const data: Group[] = await res.json();
           // 全グループ（所属・未所属）を保持する。表示時にフィルターする。
           setGroups(data);
+          // pending 状態のグループを「申請済み」として初期化する（リロード後の復元）
+          const initialJoinStatus = new Map<number, JoinStatus>();
+          data.forEach((g) => {
+            if (g.join_status === "pending") {
+              initialJoinStatus.set(g.id, "requested");
+            }
+          });
+          setJoinStatusMap(initialJoinStatus);
         }
       } catch (err) {
         console.error("グループ一覧の取得に失敗しました", err);
@@ -303,7 +313,9 @@ export default function FolderSidebar({
       if (data.result === "joined") {
         // 即時参加: グループリストを更新してモーダルを閉じる
         setGroups((prev) =>
-          prev.map((g) => (g.id === groupId ? { ...g, role: "editor" } : g)),
+          prev.map((g) =>
+            g.id === groupId ? { ...g, role: "editor", join_status: "active" } : g,
+          ),
         );
         setIsGroupListModalOpen(false);
         router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
@@ -646,6 +658,7 @@ export default function FolderSidebar({
                   name: group.name,
                   is_private: false,
                   role: "admin",
+                  join_status: "active",
                   policy: null,
                 },
               ]);

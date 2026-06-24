@@ -35,6 +35,7 @@ from app.api.organizations.group_service import (
     get_accessible_groups,
     get_group_or_404,
     check_group_membership,
+    get_any_membership,
     check_group_role,
     add_group_member,
     request_to_join,
@@ -290,8 +291,10 @@ def list_groups(org_id):
 
     result = []
     for group in groups:
-        member = check_group_membership(current_user.id, group.id)
-        result.append(build_group_response(group, member.role.name if member else None))
+        membership = get_any_membership(current_user.id, group.id)
+        user_role = membership.role.name if membership and membership.status == "active" else None
+        join_status = membership.status if membership else None
+        result.append(build_group_response(group, user_role, join_status))
 
     return jsonify(result)
 

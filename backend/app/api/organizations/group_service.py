@@ -133,8 +133,8 @@ def get_group_or_404(group_id: int, org_id: int) -> Group:
     )
 
 
-def _get_any_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """status を問わずメンバーシップを返す（内部用）。"""
+def get_any_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
+    """status を問わずメンバーシップを返す（active / pending を含む）。"""
 
     return db.session.execute(
         db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id)
@@ -176,7 +176,7 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
     pending 申請中の場合は active に昇格させる。
     """
 
-    existing = _get_any_membership(user_id, group_id)
+    existing = get_any_membership(user_id, group_id)
     if existing:
         if existing.status == "active":
             raise ValueError("ユーザーはすでにこのグループのメンバーです")
@@ -211,7 +211,7 @@ def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
     すでに active / pending な場合も ValueError を送出する。
     """
 
-    existing = _get_any_membership(user_id, group.id)
+    existing = get_any_membership(user_id, group.id)
     if existing:
         if existing.status == "active":
             raise ValueError("already_member")
@@ -342,8 +342,17 @@ def build_group_member_response(member: GroupMember) -> dict:
     }
 
 
-def build_group_response(group: Group, user_role: Optional[str]) -> dict:
-    """Groupにユーザーのロールとポリシーを付加してdictとして返す。"""
+def build_group_response(
+    group: Group,
+    user_role: Optional[str],
+    join_status: Optional[str] = None,
+) -> dict:
+    """Groupにユーザーのロール・参加ステータス・ポリシーを付加してdictとして返す。
+
+    join_status: "active" | "pending" | None
+        グループ一覧など呼び出し元が pending を把握している場合に渡す。
+        省略時は None（既存の単一グループ取得エンドポイントとの後方互換）。
+    """
 
     policy = group.policy
     policy_data = {
@@ -360,5 +369,6 @@ def build_group_response(group: Group, user_role: Optional[str]) -> dict:
         "created_at": group.created_at,
         "created_by_user_id": group.created_by_user_id,
         "role": user_role,
+        "join_status": join_status,
         "policy": policy_data,
     }
