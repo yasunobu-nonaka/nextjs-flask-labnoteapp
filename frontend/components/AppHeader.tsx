@@ -69,18 +69,26 @@ export default function AppHeader() {
     }
   }
 
-  /** notifications_last_seen と比較して未読数をセットする */
+  /** localStorage の最終既読時刻より新しい通知を未読としてカウントし unreadCount にセットする */
   function updateUnreadCount(data: Notification[]) {
-    const lastSeen = localStorage.getItem(LAST_SEEN_KEY);
-    if (!lastSeen) {
+    const lastSeenStr = localStorage.getItem(LAST_SEEN_KEY);
+
+    // 一度もベルを開いたことがない場合は全件未読とみなす
+    if (!lastSeenStr) {
       setUnreadCount(data.length);
       return;
     }
-    const lastSeenDate = new Date(lastSeen);
-    const unread = data.filter(
-      (n) => n.requested_at && new Date(n.requested_at) > lastSeenDate
-    );
-    setUnreadCount(unread.length);
+
+    const lastSeenDate = new Date(lastSeenStr);
+
+    // requested_at が last_seen より新しい通知だけを未読と判定する
+    const unreadNotifications = data.filter((notification) => {
+      if (!notification.requested_at) return false;
+      const requestedAt = new Date(notification.requested_at);
+      return requestedAt > lastSeenDate;
+    });
+
+    setUnreadCount(unreadNotifications.length);
   }
 
   // マウント時に初回フェッチ、その後 30 秒ごとにポーリングする
