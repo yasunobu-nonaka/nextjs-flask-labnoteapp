@@ -425,3 +425,96 @@ class TestApproveRejectJoinRequest:
             headers=auth_headers["headers"],
         )
         assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# DELETE /join
+# ---------------------------------------------------------------------------
+
+
+class TestCancelJoinRequest:
+    """DELETE /api/organizations/<org_id>/groups/<group_id>/join のテスト。"""
+
+    def _setup(self, client, auth_headers):
+        """申請者ユーザーが request グループに申請した状態を作る。
+        戻り値: (org_id, group_id, user2_headers)
+        """
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+        set_join_method(client, auth_headers["headers"], org_id, group_id, "request")
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org_id, user2_id)
+
+        # user2 が参加申請する
+        client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=user2_headers,
+        )
+
+        return org_id, group_id, user2_headers
+
+    def test_cancel_pending_request(self, client, auth_headers):
+        """pending 申請をキャンセルすると 204 を返し、申請一覧から消える。"""
+        org_id, group_id, user2_headers = self._setup(client, auth_headers)
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=user2_headers,
+        )
+        assert res.status_code == 204
+
+        # 管理者が申請一覧を取得すると空になっていること
+        list_res = client.get(
+            f"/api/organizations/{org_id}/groups/{group_id}/join-requests",
+            headers=auth_headers["headers"],
+        )
+        assert list_res.get_json() == []
+
+    def test_cancel_not_pending(self, client, auth_headers):
+        """pending 申請がない状態でキャンセルすると 404 を返す。"""
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+        set_join_method(client, auth_headers["headers"], org_id, group_id, "request")
+
+        user2_headers = register_and_get_headers(client, "user2", "user2@example.com")
+        user2_id = get_user_id(client, "user2@example.com")
+        add_org_member(client, auth_headers["headers"], org_id, user2_id)
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=user2_headers,
+        )
+        assert res.status_code == 404
+
+    def test_cancel_not_org_member(self, client, auth_headers):
+        """組織外のユーザーがキャンセルしようとすると 403 を返す。"""
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+
+        outsider_headers = register_and_get_headers(client, "outsider", "outsider@example.com")
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=outsider_headers,
+        )
+        assert res.status_code == 403
+
+    def test_cancel_unauthorized(self, client, auth_headers):
+        """未認証のリクエストは 401 を返す。"""
+        org = create_org(client, auth_headers["headers"])
+        org_id = org["id"]
+        group = create_group(client, auth_headers["headers"], org_id)
+        group_id = group["id"]
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+        )
+        assert res.status_code == 401

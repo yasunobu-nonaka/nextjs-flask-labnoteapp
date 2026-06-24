@@ -43,6 +43,7 @@ from app.api.organizations.group_service import (
     get_pending_join_request_count,
     approve_join_request,
     reject_join_request,
+    cancel_join_request,
     update_group_member_role,
     remove_group_member,
     update_group,
@@ -593,6 +594,27 @@ def join_group(org_id, group_id):
         }),
         201,
     )
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join", methods=["DELETE"])
+@jwt_required()
+def cancel_join(org_id, group_id):
+    """自分自身の参加申請をキャンセルする。
+
+    pending 申請が存在しない場合は 404 を返す。
+    """
+
+    if not check_org_membership(current_user.id, org_id):
+        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+
+    get_group_or_404(group_id, org_id)
+
+    try:
+        cancel_join_request(group_id, current_user.id)
+    except ValueError:
+        return jsonify({"message": "キャンセルできる参加申請がありません"}), 404
+
+    return "", 204
 
 
 @organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join-requests", methods=["GET"])

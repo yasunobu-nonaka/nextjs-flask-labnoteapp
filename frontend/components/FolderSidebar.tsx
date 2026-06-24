@@ -37,7 +37,7 @@ type Group = {
 };
 
 /** 未所属グループごとの参加処理状態 */
-type JoinStatus = "idle" | "requesting" | "requested" | "joined";
+type JoinStatus = "idle" | "requesting" | "requested" | "canceling" | "joined";
 
 type Organization = {
   id: number;
@@ -325,6 +325,42 @@ export default function FolderSidebar({
       }
     } catch {
       setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  /** グループへの参加申請をキャンセルする */
+  async function handleCancelJoin(groupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(groupId, "canceling"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(groupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(groupId, data.message ?? "キャンセルに失敗しました"),
+        );
+        return;
+      }
+      // キャンセル成功: 申請前の状態に戻す
+      setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId ? { ...g, join_status: null } : g,
+        ),
+      );
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
       setJoinErrorMap((prev) =>
         new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
       );
@@ -737,10 +773,20 @@ export default function FolderSidebar({
                               <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
                                 招待制
                               </span>
-                            ) : status === "requested" ? (
-                              <span className="text-sm text-green-600 dark:text-green-400">
-                                ✓ 申請済み
-                              </span>
+                            ) : status === "requested" || status === "canceling" ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  ✓ 申請済み
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={status === "canceling"}
+                                  onClick={() => handleCancelJoin(group.id)}
+                                  className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {status === "canceling" ? "キャンセル中..." : "申請をキャンセル"}
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 type="button"

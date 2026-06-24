@@ -281,6 +281,19 @@ def reject_join_request(group_id: int, user_id: int) -> None:
     db.session.commit()
 
 
+def cancel_join_request(group_id: int, user_id: int) -> None:
+    """申請者自身が pending 申請を取り消す。レコードを hard delete（再申請を許容）。"""
+
+    member = db.session.execute(
+        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+    ).scalar_one_or_none()
+    if not member:
+        raise ValueError("参加申請が見つかりません")
+
+    db.session.delete(member)
+    db.session.commit()
+
+
 def update_group_member_role(member: GroupMember, role: str) -> GroupMember:
     """グループメンバーのロールを変更する。"""
 
