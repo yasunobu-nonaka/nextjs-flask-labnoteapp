@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
+import { usePendingCount } from "../pending-count-context";
 
 type GroupMember = {
   user_id: number;
@@ -58,6 +59,9 @@ const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
 export default function GroupAdminMembersPage() {
   const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
   const router = useRouter();
+
+  // layout のサイドバーバッジを承認・拒否後に更新するための再取得関数
+  const { refreshPendingCount } = usePendingCount();
 
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,6 +232,7 @@ export default function GroupAdminMembersPage() {
       const json = await res.json();
       setMembers((prev) => [...prev, json.member]);
       setJoinRequests((prev) => prev.filter((r) => r.user_id !== req.user_id));
+      refreshPendingCount();
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
@@ -250,6 +255,7 @@ export default function GroupAdminMembersPage() {
         return;
       }
       setJoinRequests((prev) => prev.filter((r) => r.user_id !== req.user_id));
+      refreshPendingCount();
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
