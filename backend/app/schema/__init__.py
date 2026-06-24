@@ -23,4 +23,5 @@ from .group_schema import (
     GroupPolicySchema,
     AddGroupMemberSchema,
     UpdateGroupMemberRoleSchema,
+    JoinRequestActionSchema,
 )

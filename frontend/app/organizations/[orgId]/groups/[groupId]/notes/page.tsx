@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
 import FolderSidebar from "@/components/FolderSidebar";
 import FolderCard from "@/components/FolderCard";
 import NoteCard, { type Note } from "@/components/NoteCard";
@@ -22,6 +23,7 @@ type NotesResponse = {
  * ノート一覧ページ（グループスコープ版）
  * 指定された組織・グループ内のノートとフォルダーをファイルブラウザー形式で表示する。
  * フォルダーナビゲーション・キーワード検索・タグフィルター・ページネーションに対応。
+ * ユーザーメニューとベル通知は AppHeader に移譲している。
  */
 export default function NotesPage() {
   const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
@@ -57,8 +59,6 @@ export default function NotesPage() {
 
   // 新規作成ポップオーバーの開閉
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
-  // ユーザーメニューポップオーバーの開閉
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // フォルダー新規作成モーダルの開閉と入力値
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -67,22 +67,7 @@ export default function NotesPage() {
   // NoteCard の移動後にノート一覧を再フェッチするためのトリガー
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // 現在のログインユーザー名
-  const [currentUsername, setCurrentUsername] = useState<string>("");
-
   const router = useRouter();
-
-  // ログインユーザー情報を取得してユーザー名をセットする
-  useEffect(() => {
-    async function fetchMe() {
-      const res = await authFetch("/api/auth/me");
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentUsername(data.username ?? "");
-      }
-    }
-    fetchMe();
-  }, []);
 
   // グループ情報を取得してグループ名をセットする
   useEffect(() => {
@@ -97,12 +82,6 @@ export default function NotesPage() {
     }
     fetchGroupName();
   }, [orgIdNum, groupIdNum]);
-
-  function handleLogout() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    router.push("/login");
-  }
 
   // キーワード検索・タグフィルターをリセットして1ページ目に戻る（フォルダー位置は維持）
   function handleClear() {
@@ -184,7 +163,9 @@ export default function NotesPage() {
           return;
         }
         if (res.status === 403) {
-          setNotesError("このグループのメンバーではありません。グループ一覧からメンバー参加を申請してください。");
+          setNotesError(
+            "このグループのメンバーではありません。グループ一覧からメンバー参加を申請してください。",
+          );
           setNotesLoading(false);
           return;
         }
@@ -258,7 +239,7 @@ export default function NotesPage() {
 
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground flex">
-      {/* 左カラム: 検索・タグフィルターサイドバー */}
+      {/* 左カラム: 検索・タグフィルターサイドバー（画面上端まで広がる） */}
       <FolderSidebar
         orgId={orgId}
         groupId={groupId}
@@ -273,232 +254,189 @@ export default function NotesPage() {
         onTagToggle={handleTagToggle}
       />
 
-      {/* 右カラム: メインコンテンツ */}
-      <div className="flex-1 overflow-y-auto px-6 py-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
-          {/* ページヘッダー: グループへの戻り・タイトル・新規作成・ログアウト */}
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-3xl font-bold">
-                {groupName ? `${groupName}` : "ノート一覧"}
-              </h1>
-            </div>
-            <div className="flex gap-2">
-              {/* 新規作成ポップオーバー: ノート or フォルダーを選択する */}
-              <div className="relative">
-                {isNewMenuOpen && (
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsNewMenuOpen(false)}
-                  />
-                )}
-                <button
-                  onClick={() => setIsNewMenuOpen((v) => !v)}
-                  className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
-                >
-                  新規作成
-                </button>
-                {isNewMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32">
-                    <Link
-                      href={
-                        currentFolderId
-                          ? `${notesBase}/new?folder_id=${currentFolderId}`
-                          : `${notesBase}/new`
-                      }
-                      className="block w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onClick={() => setIsNewMenuOpen(false)}
-                    >
-                      ノート
-                    </Link>
-                    <button
-                      onClick={() => {
-                        setIsNewMenuOpen(false);
-                        setIsFolderModalOpen(true);
-                      }}
-                      className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      フォルダー
-                    </button>
-                  </div>
-                )}
+      {/* 右カラム: ヘッダー＋メインコンテンツ */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
+        <AppHeader />
+        {/* メインコンテンツ */}
+        <div className="flex-1 overflow-y-auto px-6 py-10">
+          <div className="max-w-6xl mx-auto flex flex-col gap-6">
+            {/* ページヘッダー: タイトル・新規作成 */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-3xl font-bold">
+                  {groupName ? `${groupName}` : "ノート一覧"}
+                </h1>
               </div>
-              {/* ユーザーメニューポップオーバー */}
-              {currentUsername && (
+              <div className="flex gap-2">
+                {/* 新規作成ポップオーバー: ノート or フォルダーを選択する */}
                 <div className="relative">
-                  {/* 外側クリックでポップオーバーを閉じるオーバーレイ */}
-                  {isUserMenuOpen && (
+                  {isNewMenuOpen && (
                     <div
                       className="fixed inset-0 z-10"
-                      onClick={() => setIsUserMenuOpen(false)}
+                      onClick={() => setIsNewMenuOpen(false)}
                     />
                   )}
-                  {/* トリガー: アイコン + 省略ユーザー名 */}
                   <button
-                    onClick={() => setIsUserMenuOpen((v) => !v)}
-                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => setIsNewMenuOpen((v) => !v)}
+                    className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
                   >
-                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold shrink-0">
-                      {currentUsername.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="max-w-28 truncate text-sm text-gray-600 dark:text-gray-300">
-                      {currentUsername}
-                    </span>
+                    新規作成
                   </button>
-                  {/* ポップオーバーメニュー */}
-                  {isUserMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-48 flex flex-col gap-3">
-                      {/* ユーザー情報 */}
-                      <div className="flex items-center gap-3">
-                        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-base font-semibold shrink-0">
-                          {currentUsername.charAt(0).toUpperCase()}
-                        </span>
-                        <span className="text-base font-medium break-all">
-                          {currentUsername}
-                        </span>
-                      </div>
-                      {/* ログアウトボタン */}
+                  {isNewMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32">
+                      <Link
+                        href={
+                          currentFolderId
+                            ? `${notesBase}/new?folder_id=${currentFolderId}`
+                            : `${notesBase}/new`
+                        }
+                        className="block w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => setIsNewMenuOpen(false)}
+                      >
+                        ノート
+                      </Link>
                       <button
                         onClick={() => {
-                          setIsUserMenuOpen(false);
-                          handleLogout();
+                          setIsNewMenuOpen(false);
+                          setIsFolderModalOpen(true);
                         }}
-                        className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
                       >
-                        ログアウト
+                        フォルダー
                       </button>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
 
-          {/* ブレッドクラム */}
-          <nav
-            aria-label="フォルダーの階層"
-            className="flex items-center gap-1 text-base text-gray-500 flex-wrap"
-          >
-            {breadcrumb.map((item, index) => {
-              const isLast = index === breadcrumb.length - 1;
-              return (
-                <span
-                  key={item.id ?? "root"}
-                  className="flex items-center gap-1"
+            {/* ブレッドクラム */}
+            <nav
+              aria-label="フォルダーの階層"
+              className="flex items-center gap-1 text-base text-gray-500 flex-wrap"
+            >
+              {breadcrumb.map((item, index) => {
+                const isLast = index === breadcrumb.length - 1;
+                return (
+                  <span
+                    key={item.id ?? "root"}
+                    className="flex items-center gap-1"
+                  >
+                    {index > 0 && (
+                      <span className="text-gray-400 select-none">›</span>
+                    )}
+                    {isLast ? (
+                      <span className="text-foreground font-medium">
+                        {item.name}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleNavigate(item.id)}
+                        className="hover:underline hover:text-foreground transition-colors"
+                      >
+                        {item.name}
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </nav>
+
+            {/* フィルター中バナー */}
+            {isFiltering && (
+              <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
+                {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
+                {selectedTags.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span>タグ:</span>
+                    {selectedTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={handleClear}
+                  className="underline hover:text-foreground transition-colors ml-auto"
                 >
-                  {index > 0 && (
-                    <span className="text-gray-400 select-none">›</span>
-                  )}
-                  {isLast ? (
-                    <span className="text-foreground font-medium">
-                      {item.name}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleNavigate(item.id)}
-                      className="hover:underline hover:text-foreground transition-colors"
-                    >
-                      {item.name}
-                    </button>
-                  )}
-                </span>
-              );
-            })}
-          </nav>
-
-          {/* フィルター中バナー */}
-          {isFiltering && (
-            <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
-              {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
-              {selectedTags.length > 0 && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span>タグ:</span>
-                  {selectedTags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={handleClear}
-                className="underline hover:text-foreground transition-colors ml-auto"
-              >
-                すべてクリア
-              </button>
-            </div>
-          )}
-
-          {/* コンテンツ一覧: フォルダー → ノートの順に表示 */}
-          <div className="flex flex-col gap-4">
-            {currentLevelFolders.length > 0 && (
-              <ul className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {currentLevelFolders.map((folder) => (
-                  <FolderCard
-                    key={folder.id}
-                    folder={folder}
-                    orgId={orgIdNum}
-                    groupId={groupIdNum}
-                    onNavigate={handleNavigate}
-                    onMutation={fetchAllFolders}
-                  />
-                ))}
-              </ul>
+                  すべてクリア
+                </button>
+              </div>
             )}
 
-            {notesLoading ? (
-              <p className="text-gray-500 text-base">読み込み中...</p>
-            ) : notesError ? (
-              <p className="text-red-500 text-sm">{notesError}</p>
-            ) : notes.length === 0 && currentLevelFolders.length === 0 ? (
-              <p className="text-gray-500">
-                {isFiltering
-                  ? "該当するノートが見つかりませんでした。"
-                  : "ノートがありません。"}
-              </p>
-            ) : notes.length > 0 ? (
-              <ul className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {notes.map((note) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    orgId={orgIdNum}
-                    groupId={groupIdNum}
-                    selectedTags={selectedTags}
-                    onTagToggle={handleTagToggle}
-                    folders={allFolders}
-                    onMoved={handleNoteMoved}
-                  />
-                ))}
-              </ul>
-            ) : null}
-          </div>
+            {/* コンテンツ一覧: フォルダー → ノートの順に表示 */}
+            <div className="flex flex-col gap-4">
+              {currentLevelFolders.length > 0 && (
+                <ul className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {currentLevelFolders.map((folder) => (
+                    <FolderCard
+                      key={folder.id}
+                      folder={folder}
+                      orgId={orgIdNum}
+                      groupId={groupIdNum}
+                      onNavigate={handleNavigate}
+                      onMutation={fetchAllFolders}
+                    />
+                  ))}
+                </ul>
+              )}
 
-          {/* ページネーション */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={() => setCurrentPage((p) => p - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                前へ
-              </button>
-              <span className="text-base text-gray-500">
-                {currentPage} / {totalPages} ページ
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => p + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                次へ
-              </button>
+              {notesLoading ? (
+                <p className="text-gray-500 text-base">読み込み中...</p>
+              ) : notesError ? (
+                <p className="text-red-500 text-sm">{notesError}</p>
+              ) : notes.length === 0 && currentLevelFolders.length === 0 ? (
+                <p className="text-gray-500">
+                  {isFiltering
+                    ? "該当するノートが見つかりませんでした。"
+                    : "ノートがありません。"}
+                </p>
+              ) : notes.length > 0 ? (
+                <ul className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {notes.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      orgId={orgIdNum}
+                      groupId={groupIdNum}
+                      selectedTags={selectedTags}
+                      onTagToggle={handleTagToggle}
+                      folders={allFolders}
+                      onMoved={handleNoteMoved}
+                    />
+                  ))}
+                </ul>
+              ) : null}
             </div>
-          )}
+
+            {/* ページネーション */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  前へ
+                </button>
+                <span className="text-base text-gray-500">
+                  {currentPage} / {totalPages} ページ
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  次へ
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

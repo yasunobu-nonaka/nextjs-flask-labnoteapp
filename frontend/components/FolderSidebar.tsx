@@ -27,7 +27,17 @@ type Group = {
   name: string;
   is_private: boolean;
   role: string | null;
+  /** APIから返される参加ステータス: "active" | "pending" | null */
+  join_status: "active" | "pending" | null;
+  policy: {
+    join_method: string;
+    allow_private_notes: boolean;
+    is_notes_visible_to_org: boolean;
+  } | null;
 };
+
+/** 未所属グループごとの参加処理状態 */
+type JoinStatus = "idle" | "requesting" | "requested" | "canceling" | "joined";
 
 type Organization = {
   id: number;
@@ -177,6 +187,14 @@ export default function FolderSidebar({
           const data: Group[] = await res.json();
           // 全グループ（所属・未所属）を保持する。表示時にフィルターする。
           setGroups(data);
+          // pending 状態のグループを「申請済み」として初期化する（リロード後の復元）
+          const initialJoinStatus = new Map<number, JoinStatus>();
+          data.forEach((g) => {
+            if (g.join_status === "pending") {
+              initialJoinStatus.set(g.id, "requested");
+            }
+          });
+          setJoinStatusMap(initialJoinStatus);
         }
       } catch (err) {
         console.error("グループ一覧の取得に失敗しました", err);
@@ -261,13 +279,105 @@ export default function FolderSidebar({
     return false;
   }
 
+  // 未所属グループごとの参加処理状態（groupId → JoinStatus）
+  const [joinStatusMap, setJoinStatusMap] = useState<Map<number, JoinStatus>>(
+    new Map(),
+  );
+  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(
+    new Map(),
+  );
+
+  /** グループへの参加申請または即時参加を行う */
+  async function handleJoin(groupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(groupId, "requesting"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(groupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join`,
+        {
+          method: "POST",
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(groupId, data.message ?? "参加に失敗しました"),
+        );
+        return;
+      }
+      if (data.result === "joined") {
+        // 即時参加: グループリストを更新してモーダルを閉じる
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === groupId ? { ...g, role: "editor", join_status: "active" } : g,
+          ),
+        );
+        setIsGroupListModalOpen(false);
+        router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
+      } else {
+        // 申請送信: ボタンを「申請済み」状態にする
+        setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
+      }
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  /** グループへの参加申請をキャンセルする */
+  async function handleCancelJoin(groupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(groupId, "canceling"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(groupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(groupId, data.message ?? "キャンセルに失敗しました"),
+        );
+        return;
+      }
+      // キャンセル成功: 申請前の状態に戻す
+      setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId ? { ...g, join_status: null } : g,
+        ),
+      );
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
   // サイドバーには所属グループのみ表示する（最大5件）
   const joinedGroups = groups.filter((g) => g.role !== null);
   // グループ一覧モーダル用に所属・未所属を分ける
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-10 pb-6 px-3 flex flex-col gap-4">
+    <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-4 pb-6 px-3 flex flex-col gap-4">
+      {/* アプリロゴ */}
+      <div className="h-12 flex items-center px-2 pt-2 shrink-0">
+        <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+      </div>
       {/* 現在の組織名と操作ボタン */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between px-2">
@@ -584,6 +694,8 @@ export default function FolderSidebar({
                   name: group.name,
                   is_private: false,
                   role: "admin",
+                  join_status: "active",
+                  policy: null,
                 },
               ]);
               setIsGroupCreateModalOpen(false);
@@ -637,31 +749,67 @@ export default function FolderSidebar({
               <section className="flex flex-col gap-2">
                 <h2 className="text-base font-semibold">未所属グループ</h2>
                 <ul className="flex flex-col gap-2">
-                  {unjoinedGroups.map((group) => (
-                    <li key={group.id}>
-                      <div className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base font-medium">
-                            {group.name}
-                          </span>
-                          {group.is_private && (
-                            <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
-                              非公開
-                            </span>
+                  {unjoinedGroups.map((group) => {
+                    const joinMethod =
+                      group.policy?.join_method ?? "invite_only";
+                    const status = joinStatusMap.get(group.id) ?? "idle";
+                    const error = joinErrorMap.get(group.id);
+                    return (
+                      <li key={group.id}>
+                        <div className="flex flex-col gap-1 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-medium">
+                                {group.name}
+                              </span>
+                              {group.is_private && (
+                                <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                                  非公開
+                                </span>
+                              )}
+                            </div>
+                            {/* join_method に応じてボタンを切り替える */}
+                            {joinMethod === "invite_only" ? (
+                              <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
+                                招待制
+                              </span>
+                            ) : status === "requested" || status === "canceling" ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  ✓ 申請済み
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={status === "canceling"}
+                                  onClick={() => handleCancelJoin(group.id)}
+                                  className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {status === "canceling" ? "キャンセル中..." : "申請をキャンセル"}
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={status === "requesting"}
+                                onClick={() => handleJoin(group.id)}
+                                className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {status === "requesting"
+                                  ? "処理中..."
+                                  : joinMethod === "open"
+                                    ? "グループに参加"
+                                    : "参加を申請する"}
+                              </button>
+                            )}
+                          </div>
+                          {/* エラーメッセージ */}
+                          {error && (
+                            <p className="text-xs text-red-500">{error}</p>
                           )}
                         </div>
-                        {/* 参加申請ボタン（バックエンド未実装のため現在は無効） */}
-                        <button
-                          type="button"
-                          disabled
-                          className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-400 cursor-not-allowed"
-                          title="この機能は近日公開予定です"
-                        >
-                          参加を申請する
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             )}

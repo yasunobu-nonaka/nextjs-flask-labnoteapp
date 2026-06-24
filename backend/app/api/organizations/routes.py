@@ -13,6 +13,7 @@ from app.schema import (
     GroupMemberResponseSchema,
     AddGroupMemberSchema,
     UpdateGroupMemberRoleSchema,
+    JoinRequestActionSchema,
 )
 from app.api.organizations.organization_service import (
     create_organization,
@@ -34,8 +35,15 @@ from app.api.organizations.group_service import (
     get_accessible_groups,
     get_group_or_404,
     check_group_membership,
+    get_any_membership,
     check_group_role,
     add_group_member,
+    request_to_join,
+    get_pending_join_requests,
+    get_pending_join_request_count,
+    approve_join_request,
+    reject_join_request,
+    cancel_join_request,
     update_group_member_role,
     remove_group_member,
     update_group,
@@ -60,6 +68,7 @@ group_member_res_schema = GroupMemberResponseSchema()
 group_member_res_many_schema = GroupMemberResponseSchema(many=True)
 add_group_member_schema = AddGroupMemberSchema()
 update_group_role_schema = UpdateGroupMemberRoleSchema()
+join_request_action_schema = JoinRequestActionSchema()
 
 
 # ============================================================
@@ -283,8 +292,10 @@ def list_groups(org_id):
 
     result = []
     for group in groups:
-        member = check_group_membership(current_user.id, group.id)
-        result.append(build_group_response(group, member.role.name if member else None))
+        membership = get_any_membership(current_user.id, group.id)
+        user_role = membership.role.name if membership and membership.status == "active" else None
+        join_status = membership.status if membership else None
+        result.append(build_group_response(group, user_role, join_status))
 
     return jsonify(result)
 
@@ -430,7 +441,12 @@ def list_group_members(org_id, group_id):
     if group.is_private and not member:
         return jsonify({"message": "このグループへのアクセス権がありません"}), 403
 
-    result = [build_group_member_response(m) for m in group.members]
+    from app.model.group import GroupMember
+    from app.extensions import db as _db
+    active_members = _db.session.execute(
+        _db.select(GroupMember).filter_by(group_id=group_id, status="active")
+    ).scalars().all()
+    result = [build_group_member_response(m) for m in active_members]
     return jsonify(group_member_res_many_schema.dump(result))
 
 
@@ -539,3 +555,133 @@ def remove_grp_member(org_id, group_id, member_user_id):
 
     remove_group_member(member)
     return "", 204
+
+
+# ============================================================
+#  グループ参加申請（Join Request）エンドポイント
+# ============================================================
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join", methods=["POST"])
+@jwt_required()
+def join_group(org_id, group_id):
+    """グループへの参加申請または即時参加。
+    join_method='open' なら即時参加、'request' なら申請（pending）として登録する。
+    'invite_only' の場合は 403 を返す。
+    """
+
+    if not check_org_membership(current_user.id, org_id):
+        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+
+    group = get_group_or_404(group_id, org_id)
+
+    try:
+        member, result = request_to_join(group, current_user.id)
+    except ValueError as err:
+        code = str(err)
+        if code == "already_member":
+            return jsonify({"message": "すでにグループのメンバーです"}), 409
+        if code == "already_pending":
+            return jsonify({"message": "参加申請中です"}), 409
+        if code == "invite_only":
+            return jsonify({"message": "このグループは招待制です"}), 403
+        return jsonify({"message": code}), 400
+
+    return (
+        jsonify({
+            "result": result,
+            "member": group_member_res_schema.dump(build_group_member_response(member)),
+        }),
+        201,
+    )
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join", methods=["DELETE"])
+@jwt_required()
+def cancel_join(org_id, group_id):
+    """自分自身の参加申請をキャンセルする。
+
+    pending 申請が存在しない場合は 404 を返す。
+    """
+
+    if not check_org_membership(current_user.id, org_id):
+        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+
+    get_group_or_404(group_id, org_id)
+
+    try:
+        cancel_join_request(group_id, current_user.id)
+    except ValueError:
+        return jsonify({"message": "キャンセルできる参加申請がありません"}), 404
+
+    return "", 204
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join-requests", methods=["GET"])
+@jwt_required()
+def list_join_requests(org_id, group_id):
+    """グループへの参加申請一覧を返す。グループadminまたは組織adminのみアクセス可能。"""
+
+    get_group_or_404(group_id, org_id)
+
+    is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
+    is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
+
+    if not (is_group_admin or is_org_admin):
+        return jsonify({"message": "この操作を行う権限がありません"}), 403
+
+    pending = get_pending_join_requests(group_id)
+    result = [build_group_member_response(m) for m in pending]
+    return jsonify(group_member_res_many_schema.dump(result))
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join-requests/count", methods=["GET"])
+@jwt_required()
+def count_join_requests(org_id, group_id):
+    """グループの未承認参加申請数を返す（バッジ表示用）。グループadminのみアクセス可能。"""
+
+    get_group_or_404(group_id, org_id)
+
+    is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
+    is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
+
+    if not (is_group_admin or is_org_admin):
+        return jsonify({"message": "この操作を行う権限がありません"}), 403
+
+    count = get_pending_join_request_count(group_id)
+    return jsonify({"count": count})
+
+
+@organizations_bp.route(
+    "/<int:org_id>/groups/<int:group_id>/join-requests/<int:target_user_id>",
+    methods=["PATCH"],
+)
+@jwt_required()
+def process_join_request(org_id, group_id, target_user_id):
+    """参加申請を承認または拒否する。グループadminまたは組織adminのみ可能。"""
+
+    get_group_or_404(group_id, org_id)
+
+    is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
+    is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
+
+    if not (is_group_admin or is_org_admin):
+        return jsonify({"message": "この操作を行う権限がありません"}), 403
+
+    try:
+        data = join_request_action_schema.load(request.get_json() or {})
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    try:
+        if data["action"] == "approve":
+            member = approve_join_request(group_id, target_user_id)
+            return jsonify({
+                "message": "参加申請を承認しました",
+                "member": group_member_res_schema.dump(build_group_member_response(member)),
+            })
+        else:
+            reject_join_request(group_id, target_user_id)
+            return "", 204
+    except ValueError as err:
+        return jsonify({"message": str(err)}), 404

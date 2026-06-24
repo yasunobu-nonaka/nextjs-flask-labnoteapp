@@ -4,12 +4,22 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
+import { usePendingCount } from "../pending-count-context";
 
 type GroupMember = {
   user_id: number;
   username: string;
   email: string;
   role: string;
+  status: string;
+  joined_at: string;
+};
+
+/** 参加申請中のメンバー（status='pending'）の表示用型 */
+type JoinRequest = {
+  user_id: number;
+  username: string;
+  email: string;
   joined_at: string;
 };
 
@@ -50,6 +60,9 @@ export default function GroupAdminMembersPage() {
   const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
   const router = useRouter();
 
+  // layout のサイドバーバッジを承認・拒否後に更新するための再取得関数
+  const { refreshPendingCount } = usePendingCount();
+
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -76,13 +89,19 @@ export default function GroupAdminMembersPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  // マウント時にグループメンバーと組織メンバー一覧を並行取得する
+  // 参加申請一覧の状態
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
+  const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
+
+  // マウント時にグループメンバーと組織メンバー一覧と参加申請を並行取得する
   useEffect(() => {
     async function fetchData() {
       try {
-        const [membersRes, orgMembersRes] = await Promise.all([
+        const [membersRes, orgMembersRes, joinRequestsRes] = await Promise.all([
           authFetch(`/api/organizations/${orgId}/groups/${groupId}/members`),
           authFetch(`/api/organizations/${orgId}/members`),
+          authFetch(`/api/organizations/${orgId}/groups/${groupId}/join-requests`),
         ]);
         if (membersRes.status === 401) {
           router.push("/login");
@@ -99,6 +118,11 @@ export default function GroupAdminMembersPage() {
         if (orgMembersRes.ok) {
           const orgMembersData: OrgMember[] = await orgMembersRes.json();
           setOrgMembers(orgMembersData);
+        }
+
+        if (joinRequestsRes.ok) {
+          const requestsData: JoinRequest[] = await joinRequestsRes.json();
+          setJoinRequests(requestsData);
         }
       } catch {
         setFetchError("サーバーへの接続に失敗しました");
@@ -189,6 +213,54 @@ export default function GroupAdminMembersPage() {
     }
 
     setIsSaving(false);
+  }
+
+  /** 参加申請を承認する。承認されたメンバーをアクティブメンバーリストに追加する */
+  async function handleApprove(req: JoinRequest) {
+    setProcessingIds((prev) => new Set(prev).add(req.user_id));
+    setJoinRequestError(null);
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join-requests/${req.user_id}`,
+        { method: "PATCH", body: JSON.stringify({ action: "approve" }) },
+      );
+      if (!res.ok) {
+        const json = await res.json();
+        setJoinRequestError(json.message ?? "承認に失敗しました");
+        return;
+      }
+      const json = await res.json();
+      setMembers((prev) => [...prev, json.member]);
+      setJoinRequests((prev) => prev.filter((r) => r.user_id !== req.user_id));
+      refreshPendingCount();
+    } catch {
+      setJoinRequestError("サーバーへの接続に失敗しました");
+    } finally {
+      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+    }
+  }
+
+  /** 参加申請を拒否する */
+  async function handleReject(req: JoinRequest) {
+    setProcessingIds((prev) => new Set(prev).add(req.user_id));
+    setJoinRequestError(null);
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/join-requests/${req.user_id}`,
+        { method: "PATCH", body: JSON.stringify({ action: "reject" }) },
+      );
+      if (!res.ok && res.status !== 204) {
+        const json = await res.json();
+        setJoinRequestError(json.message ?? "拒否に失敗しました");
+        return;
+      }
+      setJoinRequests((prev) => prev.filter((r) => r.user_id !== req.user_id));
+      refreshPendingCount();
+    } catch {
+      setJoinRequestError("サーバーへの接続に失敗しました");
+    } finally {
+      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+    }
   }
 
   /** メンバーをグループから削除する */
@@ -333,6 +405,54 @@ export default function GroupAdminMembersPage() {
           </button>
         )}
       </div>
+
+      {/* 参加申請一覧: 申請が1件以上あるときのみ表示する */}
+      {joinRequests.length > 0 && (
+        <section className="flex flex-col gap-3 p-5 rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30">
+          <h3 className="text-lg font-semibold">
+            参加申請（{joinRequests.length} 件）
+          </h3>
+          {joinRequestError && (
+            <p className="text-sm text-red-500">{joinRequestError}</p>
+          )}
+          <ul className="flex flex-col gap-2">
+            {joinRequests.map((req) => {
+              const isProcessing = processingIds.has(req.user_id);
+              return (
+                <li
+                  key={req.user_id}
+                  className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-medium truncate">{req.username}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {req.email}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(req)}
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 text-sm rounded-lg bg-foreground text-background font-medium hover:opacity-80 transition-opacity disabled:opacity-50"
+                    >
+                      承認
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReject(req)}
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                    >
+                      拒否
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* メンバー一覧 */}
       {loading ? (

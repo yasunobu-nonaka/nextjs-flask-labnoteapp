@@ -77,6 +77,7 @@ class GroupMemberResponseSchema(Schema):
     user_id = fields.Int(dump_only=True)
     group_id = fields.Int(dump_only=True)
     role = fields.Str(dump_only=True)
+    status = fields.Str(dump_only=True)
     joined_at = fields.DateTime(dump_only=True)
     # ユーザー情報（サービス側で付加）
     username = fields.Str(dump_only=True)
@@ -89,5 +90,15 @@ class UpdateGroupMemberRoleSchema(Schema):
     role = fields.Str(
         required=True,
         validate=validate.OneOf(GROUP_ROLES, error="無効なロールです"),
+        load_only=True,
+    )
+
+
+class JoinRequestActionSchema(Schema):
+    """参加申請の承認・拒否スキーマ。"""
+
+    action = fields.Str(
+        required=True,
+        validate=validate.OneOf(["approve", "reject"], error="無効なアクションです"),
         load_only=True,
     )

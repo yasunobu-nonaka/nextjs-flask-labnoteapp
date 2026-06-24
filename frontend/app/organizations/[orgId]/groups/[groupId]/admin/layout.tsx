@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
+import { PendingCountContext } from "./pending-count-context";
 
 /** グループ管理画面にアクセスできる組織ロール */
 const ORG_ADMIN_ROLES = ["owner", "sys_admin", "user_admin"];
@@ -29,6 +31,19 @@ export default function GroupAdminLayout({
    */
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [groupName, setGroupName] = useState("");
+  /** 未承認の参加申請数（メンバー管理ナビのバッジ用） */
+  const [pendingCount, setPendingCount] = useState(0);
+
+  /** join-requests/count を叩いて pendingCount を更新する。children から Context 経由で呼ばれる。 */
+  const fetchPendingCount = useCallback(async () => {
+    const countRes = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/join-requests/count`
+    );
+    if (countRes.ok) {
+      const countData = await countRes.json();
+      setPendingCount(countData.count ?? 0);
+    }
+  }, [orgId, groupId]);
 
   useEffect(() => {
     async function checkAccess() {
@@ -61,12 +76,15 @@ export default function GroupAdminLayout({
 
         setGroupName(groupData.name);
         setAuthorized(true);
+
+        // 権限確認後に参加申請数を取得する
+        await fetchPendingCount();
       } catch {
         router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
       }
     }
     checkAccess();
-  }, [orgId, groupId, router]);
+  }, [orgId, groupId, router, fetchPendingCount]);
 
   /* 権限チェック中はコンテンツを表示しない（ちらつき防止） */
   if (authorized === null) {
@@ -93,9 +111,16 @@ export default function GroupAdminLayout({
   ];
 
   return (
+    <PendingCountContext.Provider
+      value={{ pendingCount, refreshPendingCount: fetchPendingCount }}
+    >
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
-      {/* 左サイドバー: ナビゲーションリンクを縦に並べる */}
-      <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col px-4 py-8 gap-6">
+      {/* 左サイドバー: ナビゲーションリンクを縦に並べる（画面上端まで広がる） */}
+      <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col pt-4 px-4 gap-6">
+        {/* アプリロゴ: FolderSidebar と高さをそろえる */}
+        <div className="h-12 flex items-center px-2 pt-2 shrink-0">
+          <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+        </div>
         <div className="flex flex-col gap-2">
           {/* ノートページへ戻るリンク */}
           <Link
@@ -124,21 +149,33 @@ export default function GroupAdminLayout({
               <Link
                 key={href}
                 href={href}
-                className={`px-3 py-2 rounded-lg text-base transition-colors ${
+                className={`flex items-center px-3 py-2 rounded-lg text-base transition-colors ${
                   isActive
                     ? "bg-gray-100 dark:bg-gray-800 font-semibold"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 {label}
+                {/* メンバー管理ナビのみ未承認申請数バッジを表示する */}
+                {label === "メンバー管理" && pendingCount > 0 && (
+                  <span className="ml-auto text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 min-w-5 text-center leading-tight">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
       </aside>
 
-      {/* メインコンテンツエリア: 各ページの内容を表示する */}
-      <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
+      {/* 右カラム: ヘッダー＋メインコンテンツ */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
+        <AppHeader />
+        {/* メインコンテンツエリア: 各ページの内容を表示する */}
+        <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
+      </div>
     </div>
+    </PendingCountContext.Provider>
   );
 }
