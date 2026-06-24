@@ -169,6 +169,11 @@ export default function NotesPage() {
           setNotesLoading(false);
           return;
         }
+        // 非メンバーまたは private グループの非メンバーには 404 が返る
+        if (res.status === 404) {
+          router.replace(`/organizations/${orgIdNum}/groups`);
+          return;
+        }
         if (!res.ok) {
           setNotesError("ノートの取得に失敗しました");
           setNotesLoading(false);

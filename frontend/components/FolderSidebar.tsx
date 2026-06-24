@@ -162,6 +162,11 @@ export default function FolderSidebar({
           router.push("/login");
           return;
         }
+        // 非メンバーには 404 が返る（組織の存在を漏洩させないため）
+        if (res.status === 404 || res.status === 403) {
+          router.replace("/organizations");
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           setOrgName(data.name);

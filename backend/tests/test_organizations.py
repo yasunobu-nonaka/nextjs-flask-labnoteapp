@@ -123,12 +123,12 @@ class TestOrganizationRead:
         assert res.status_code == 404
 
     def test_get_organization_no_membership(self, client, auth_headers):
-        """所属していない組織は403を返す。"""
+        """所属していない組織は404を返す（組織の存在を漏洩させない）。"""
         org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
 
         other_headers = register_and_get_headers(client, "other", "other@example.com")
         res = client.get(f"/api/organizations/{org_id}", headers=other_headers)
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 ###############################################

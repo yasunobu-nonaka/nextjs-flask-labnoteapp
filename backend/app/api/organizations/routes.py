@@ -20,6 +20,7 @@ from app.api.organizations.organization_service import (
     get_organizations_for_user,
     get_organization_or_404,
     check_org_membership,
+    require_org_member,
     check_org_role,
     add_org_member,
     update_org_member_role,
@@ -35,6 +36,7 @@ from app.api.organizations.group_service import (
     get_accessible_groups,
     get_group_or_404,
     check_group_membership,
+    require_group_visible,
     get_any_membership,
     check_group_role,
     add_group_member,
@@ -121,10 +123,7 @@ def get_org(org_id):
     """組織の詳細情報を返す。メンバーのみアクセス可能。"""
 
     org = get_organization_or_404(org_id)
-    member = check_org_membership(current_user.id, org_id)
-
-    if not member:
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    member = require_org_member(current_user.id, org_id)
 
     return jsonify(build_org_response(org, member.role.name))
 
@@ -165,8 +164,7 @@ def update_org(org_id):
 def list_org_members(org_id):
     """組織のメンバー一覧を返す。メンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     org = get_organization_or_404(org_id)
     result = [build_member_response(m) for m in org.members]
@@ -285,8 +283,7 @@ def remove_member(org_id, member_user_id):
 def list_groups(org_id):
     """組織内のアクセス可能なグループ一覧を返す。組織メンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     groups = get_accessible_groups(org_id, current_user.id)
 
@@ -305,6 +302,7 @@ def list_groups(org_id):
 def create_grp(org_id):
     """グループを作成する。組織ポリシーに基づき権限を確認する。"""
 
+    require_org_member(current_user.id, org_id)
     org = get_organization_or_404(org_id)
 
     if not org.policy:
@@ -355,16 +353,12 @@ def create_grp(org_id):
 def get_grp(org_id, group_id):
     """グループの詳細情報を返す。アクセス可能なグループのみ。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
+
     member = check_group_membership(current_user.id, group_id)
-
-    # プライベートグループは所属メンバーのみ閲覧可能
-    if group.is_private and not member:
-        return jsonify({"message": "このグループへのアクセス権がありません"}), 403
-
     return jsonify(build_group_response(group, member.role.name if member else None))
 
 
@@ -432,14 +426,10 @@ def delete_grp(org_id, group_id):
 def list_group_members(org_id, group_id):
     """グループのメンバー一覧を返す。グループメンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
-    member = check_group_membership(current_user.id, group_id)
-
-    if group.is_private and not member:
-        return jsonify({"message": "このグループへのアクセス権がありません"}), 403
+    require_group_visible(current_user.id, group)
 
     from app.model.group import GroupMember
     from app.extensions import db as _db
@@ -570,10 +560,10 @@ def join_group(org_id, group_id):
     'invite_only' の場合は 403 を返す。
     """
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     try:
         member, result = request_to_join(group, current_user.id)
@@ -604,8 +594,7 @@ def cancel_join(org_id, group_id):
     pending 申請が存在しない場合は 404 を返す。
     """
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     get_group_or_404(group_id, org_id)
 

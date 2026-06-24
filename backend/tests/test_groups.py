@@ -90,7 +90,7 @@ class TestGroupCreation:
         assert res.status_code == 400
 
     def test_create_group_no_org_access(self, client, auth_headers):
-        """組織に所属していないユーザーはグループを作成できない。"""
+        """組織に所属していないユーザーはグループを作成できない（組織の存在を漏洩させないため404）。"""
         org_id = create_org(client, auth_headers["headers"])["id"]
         other_headers = register_and_get_headers(client, "other", "other@example.com")
 
@@ -99,7 +99,7 @@ class TestGroupCreation:
             json={"name": "不正なグループ"},
             headers=other_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
     def test_create_group_restricted_by_policy(self, client, auth_headers):
         """ポリシーで制限されているロールではグループを作成できない。"""
@@ -197,7 +197,7 @@ class TestGroupRead:
         assert res.get_json()["id"] == group_id
 
     def test_get_private_group_denied_for_non_members(self, client, auth_headers):
-        """プライベートグループは所属メンバー以外は詳細取得できない。"""
+        """プライベートグループは所属メンバー以外には404を返す（グループの存在を漏洩させない）。"""
         org_id = create_org(client, auth_headers["headers"])["id"]
         group_id = create_group(
             client, auth_headers["headers"], org_id, is_private=True
@@ -215,7 +215,7 @@ class TestGroupRead:
             f"/api/organizations/{org_id}/groups/{group_id}",
             headers=other_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 ###############################################
