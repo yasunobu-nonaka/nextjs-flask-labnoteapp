@@ -52,6 +52,11 @@ export default function NoteDetailPage() {
           setIsNotFound(true);
           return;
         }
+        if (res.status === 403) {
+          setError("このグループのメンバーではありません。グループ一覧からメンバー参加を申請してください。");
+          setStatus("error");
+          return;
+        }
         if (!res.ok) {
           setError("ノートの取得に失敗しました");
           setStatus("error");
