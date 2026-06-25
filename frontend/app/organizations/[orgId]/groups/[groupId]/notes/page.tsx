@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
@@ -9,7 +10,6 @@ import FolderSidebar from "@/components/FolderSidebar";
 import FolderCard from "@/components/FolderCard";
 import NoteCard, { type Note } from "@/components/NoteCard";
 import Modal from "@/components/Modal";
-import NotFoundScreen from "@/components/NotFoundScreen";
 import { type Folder } from "@/lib/folders";
 
 type NotesResponse = {
@@ -247,14 +247,9 @@ export default function NotesPage() {
   // グループ内のノート一覧ページのベース URL（Link href の組み立てに使う）
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
 
-  // 非メンバー・private グループ非メンバーの場合は 404 画面を表示する
+  // 非メンバー・private グループ非メンバーの場合は 404 ページを表示する
   if (isNotFound) {
-    return (
-      <NotFoundScreen
-        backLabel="グループ一覧に戻る"
-        backHref={`/organizations/${orgIdNum}/groups`}
-      />
-    );
+    notFound();
   }
 
   return (

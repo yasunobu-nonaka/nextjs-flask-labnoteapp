@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import CreateGroupWizard from "@/components/CreateGroupWizard";
-import NotFoundScreen from "@/components/NotFoundScreen";
 
 /**
  * グループ一覧リダイレクトページ。
@@ -58,7 +58,7 @@ export default function GroupsRedirectPage() {
   }, [orgId, router]);
 
   if (isNotFound) {
-    return <NotFoundScreen />;
+    notFound();
   }
 
   /* グループなし確定前はローディング表示 */
