@@ -7,6 +7,11 @@ import Modal from "@/components/Modal";
 import CreateGroupWizard from "@/components/CreateGroupWizard";
 import Link from "next/link";
 import clsx from "clsx";
+import {
+  GROUP_ROLE_LABELS,
+  JOIN_METHOD_OPTIONS,
+  WHO_CAN_CREATE_OPTIONS,
+} from "@/lib/constants";
 
 type Props = {
   orgId: string;
@@ -53,24 +58,6 @@ type OrgPolicy = {
   default_join_method: string;
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
-};
-
-const WHO_CAN_CREATE_OPTIONS = [
-  { value: "all", label: "全員" },
-  { value: "member", label: "メンバー" },
-  { value: "user_admin", label: "ユーザー管理者以上" },
-  { value: "sys_admin_only", label: "システム管理者のみ" },
-];
-
-const JOIN_METHOD_OPTIONS = [
-  { value: "invite_only", label: "招待のみ" },
-  { value: "request", label: "申請制" },
-  { value: "open", label: "誰でも参加" },
-];
 
 /**
  * ラジオボタングループ。
@@ -738,7 +725,7 @@ export default function FolderSidebar({
                           )}
                         </div>
                         <span className="text-sm text-gray-400">
-                          {ROLE_LABELS[group.role!] ?? group.role}
+                          {GROUP_ROLE_LABELS[group.role!] ?? group.role}
                         </span>
                       </Link>
                     </li>

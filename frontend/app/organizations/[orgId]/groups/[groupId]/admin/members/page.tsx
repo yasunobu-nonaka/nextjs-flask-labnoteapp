@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import { usePendingCount } from "../pending-count-context";
+import { GROUP_ROLE_LABELS } from "@/lib/constants";
 
 type GroupMember = {
   user_id: number;
@@ -37,12 +38,6 @@ type PendingMember = {
   username: string;
   email: string;
   role: string;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
 };
 
 /** グループ内で変更可能なロール一覧（全ロールが対象） */
@@ -518,7 +513,7 @@ export default function GroupAdminMembersPage() {
                       >
                         {ASSIGNABLE_ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                            {GROUP_ROLE_LABELS[role]}
                           </option>
                         ))}
                       </select>
@@ -604,7 +599,7 @@ export default function GroupAdminMembersPage() {
                 >
                   {ASSIGNABLE_ROLES.map((role) => (
                     <option key={role} value={role}>
-                      {ROLE_LABELS[role]}
+                      {GROUP_ROLE_LABELS[role]}
                     </option>
                   ))}
                 </select>
@@ -636,7 +631,7 @@ export default function GroupAdminMembersPage() {
                         {p.email}
                       </span>
                       <span className="text-gray-600 dark:text-gray-300 shrink-0">
-                        {ROLE_LABELS[p.role]}
+                        {GROUP_ROLE_LABELS[p.role]}
                       </span>
                       {/* 追加予定リストから取り除くボタン */}
                       <button

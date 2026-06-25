@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
+import { GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
 
 type OrgMember = {
   user_id: number;
@@ -20,17 +21,6 @@ type PendingMember = {
 
 const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
-};
-
-const JOIN_METHOD_OPTIONS = [
-  { value: "invite_only", label: "招待のみ" },
-  { value: "request", label: "申請制" },
-  { value: "open", label: "誰でも参加" },
-];
 
 /**
  * ラジオボタングループ（ローカル定義）。
@@ -348,7 +338,7 @@ export default function CreateGroupWizard({ orgId, onCreated }: Props) {
                       >
                         {ASSIGNABLE_ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                            {GROUP_ROLE_LABELS[role]}
                           </option>
                         ))}
                       </select>
@@ -381,7 +371,7 @@ export default function CreateGroupWizard({ orgId, onCreated }: Props) {
                             {p.email}
                           </span>
                           <span className="text-gray-600 dark:text-gray-300 shrink-0">
-                            {ROLE_LABELS[p.role]}
+                            {GROUP_ROLE_LABELS[p.role]}
                           </span>
                           {/* 追加予定リストから取り除くボタン */}
                           <button

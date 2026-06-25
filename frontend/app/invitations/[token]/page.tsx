@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
+import { ORG_ROLE_LABELS } from "@/lib/constants";
 
 type InvitationData = {
   token: string;
@@ -16,12 +17,6 @@ type InvitationData = {
   expires_at: string;
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "オーナー",
-  sys_admin: "システム管理者",
-  user_admin: "ユーザー管理者",
-  member: "メンバー",
-};
 
 /**
  * 招待承認ページ。
@@ -172,7 +167,7 @@ export default function InvitationAcceptPage() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-500">付与されるロール</dt>
-                    <dd>{ROLE_LABELS[invitation?.role ?? ""] ?? invitation?.role}</dd>
+                    <dd>{ORG_ROLE_LABELS[invitation?.role ?? ""] ?? invitation?.role}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-500">招待者</dt>

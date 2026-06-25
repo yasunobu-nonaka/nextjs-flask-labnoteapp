@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
 
 type OrgPolicy = {
   allow_private_groups: boolean;
@@ -12,37 +13,6 @@ type OrgPolicy = {
   default_join_method: string;
 };
 
-const WHO_CAN_CREATE_OPTIONS = [
-  { value: "sys_admin_only", label: "システム管理者のみ" },
-  { value: "user_admin", label: "ユーザー管理者以上" },
-  { value: "member", label: "メンバー以上" },
-  { value: "all", label: "全員" },
-];
-
-const JOIN_METHOD_OPTIONS: {
-  value: string;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "invite_only",
-    label: "招待のみ",
-    description:
-      "管理者が招待したユーザーのみ参加できます。外部からの参加申請は受け付けません。",
-  },
-  {
-    value: "request",
-    label: "招待または申請",
-    description:
-      "組織メンバーが参加を申請でき、管理者が承認または拒否します。管理者による直接招待も引き続き可能です。",
-  },
-  {
-    value: "open",
-    label: "オープン",
-    description:
-      "組織メンバーであれば誰でも自由に参加できます。管理者による直接招待も引き続き可能です。",
-  },
-];
 
 /**
  * ラジオボタングループ。

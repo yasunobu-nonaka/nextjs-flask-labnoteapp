@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
+import { ORG_ROLE_LABELS } from "@/lib/constants";
 
 type Member = {
   user_id: number;
@@ -12,13 +13,6 @@ type Member = {
   email: string;
   role: string;
   joined_at: string;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: "オーナー",
-  sys_admin: "システム管理者",
-  user_admin: "ユーザー管理者",
-  member: "メンバー",
 };
 
 // owner はオーナー譲渡フロー（未実装）があるため、通常のロール変更からは除外する
@@ -263,7 +257,7 @@ export default function ConsoleMembersPage() {
                       {/* owner は変更不可のため固定テキスト表示 */}
                       {m.role === "owner" ? (
                         <span className="text-gray-600 dark:text-gray-300">
-                          {ROLE_LABELS.owner}
+                          {ORG_ROLE_LABELS.owner}
                         </span>
                       ) : (
                         <select
@@ -281,7 +275,7 @@ export default function ConsoleMembersPage() {
                         >
                           {ASSIGNABLE_ROLES.map((role) => (
                             <option key={role} value={role}>
-                              {ROLE_LABELS[role]}
+                              {ORG_ROLE_LABELS[role]}
                             </option>
                           ))}
                         </select>
