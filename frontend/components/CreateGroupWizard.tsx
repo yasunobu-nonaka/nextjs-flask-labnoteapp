@@ -4,21 +4,7 @@ import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
 import RadioGroup from "@/components/RadioGroup";
-
-type OrgMember = {
-  user_id: number;
-  username: string;
-  email: string;
-  role: string;
-};
-
-/** ウィザードの Step 2 で積んだ追加予定メンバー */
-type PendingMember = {
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-};
+import { type OrgMember, type PendingMember } from "@/lib/types";
 
 
 

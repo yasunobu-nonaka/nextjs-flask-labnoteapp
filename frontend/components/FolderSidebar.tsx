@@ -9,6 +9,7 @@ import OrgCreateModal from "@/components/OrgCreateModal";
 import OrgSwitchModal from "@/components/OrgSwitchModal";
 import GroupCreateModal from "@/components/GroupCreateModal";
 import GroupListModal, { type Group } from "@/components/GroupListModal";
+import { type OrgPolicy } from "@/lib/types";
 
 type Props = {
   orgId: string;
@@ -25,12 +26,6 @@ type Props = {
   onTagToggle: (tag: string) => void;
 };
 
-type OrgPolicy = {
-  allow_private_groups: boolean;
-  allow_private_notes: boolean;
-  who_can_create_groups: string;
-  default_join_method: string;
-};
 
 /**
  * FolderSidebar コンポーネント

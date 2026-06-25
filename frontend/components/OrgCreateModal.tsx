@@ -5,13 +5,7 @@ import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import RadioGroup from "@/components/RadioGroup";
 import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
-
-type OrgPolicy = {
-  allow_private_groups: boolean;
-  allow_private_notes: boolean;
-  who_can_create_groups: string;
-  default_join_method: string;
-};
+import { type OrgPolicy } from "@/lib/types";
 
 const DEFAULT_POLICY: OrgPolicy = {
   allow_private_groups: true,

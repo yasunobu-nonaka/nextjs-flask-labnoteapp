@@ -7,6 +7,7 @@ import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import { usePendingCount } from "../pending-count-context";
 import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS } from "@/lib/constants";
+import { type OrgMember, type PendingMember } from "@/lib/types";
 
 type GroupMember = {
   user_id: number;
@@ -25,20 +26,6 @@ type JoinRequest = {
   joined_at: string;
 };
 
-type OrgMember = {
-  user_id: number;
-  username: string;
-  email: string;
-  role: string;
-};
-
-/** モーダル内で選択・追加予定のメンバー */
-type PendingMember = {
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-};
 
 
 /**

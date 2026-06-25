@@ -6,13 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
 import RadioGroup from "@/components/RadioGroup";
-
-type OrgPolicy = {
-  allow_private_groups: boolean;
-  allow_private_notes: boolean;
-  who_can_create_groups: string;
-  default_join_method: string;
-};
+import { type OrgPolicy } from "@/lib/types";
 
 /**
  * 組織管理: ポリシー管理ページ。
