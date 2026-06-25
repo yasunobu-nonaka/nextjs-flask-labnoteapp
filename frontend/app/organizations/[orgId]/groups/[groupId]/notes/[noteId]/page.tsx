@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
@@ -31,6 +32,7 @@ export default function NoteDetailPage() {
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
   const router = useRouter();
 
   const notesListHref = `/organizations/${orgId}/groups/${groupId}/notes`;
@@ -47,8 +49,7 @@ export default function NoteDetailPage() {
           return;
         }
         if (res.status === 404) {
-          setError("ノートが見つかりません");
-          setStatus("error");
+          setIsNotFound(true);
           return;
         }
         if (!res.ok) {
@@ -90,6 +91,10 @@ export default function NoteDetailPage() {
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  if (isNotFound) {
+    notFound();
   }
 
   if (status === "loading") {
