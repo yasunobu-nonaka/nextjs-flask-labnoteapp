@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import { type NoteFormValues } from "@/lib/noteSchema";
+import { type NoteFormValues } from "@/lib/schemas/noteSchema";
 import NoteForm from "@/components/NoteForm";
 
 type LoadStatus = "loading" | "ready" | "error";
