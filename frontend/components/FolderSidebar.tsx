@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Modal from "@/components/Modal";
 import CreateGroupWizard from "@/components/CreateGroupWizard";
 import Link from "next/link";
+import clsx from "clsx";
 
 type Props = {
   orgId: string;
@@ -457,18 +458,20 @@ export default function FolderSidebar({
               return (
                 <div
                   key={group.id}
-                  className={`flex items-center gap-0.5 rounded transition-colors ${
+                  className={clsx(
+                    "flex items-center gap-0.5 rounded transition-colors py-0.5",
                     isActive
-                      ? "py-0.5 bg-gray-300 dark:bg-gray-600"
-                      : "py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
+                      ? "bg-gray-300 dark:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                  )}
                 >
                   {/* グループ名: ノート一覧ページへのリンク */}
                   <Link
                     href={`/organizations/${orgId}/groups/${group.id}/notes`}
-                    className={`flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0 ${
-                      isActive ? "font-semibold" : ""
-                    }`}
+                    className={clsx(
+                      "flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0",
+                      isActive && "font-semibold",
+                    )}
                   >
                     <span className="truncate">{group.name}</span>
                     {/* 非公開グループにのみバッジを表示する */}
