@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
@@ -66,6 +67,7 @@ export default function GroupAdminMembersPage() {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   // user_id → 変更後のロール。変更があったメンバーのみ保持する
   const [pendingRoles, setPendingRoles] = useState<Record<number, string>>({});
@@ -105,6 +107,11 @@ export default function GroupAdminMembersPage() {
         ]);
         if (membersRes.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (membersRes.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!membersRes.ok) {
@@ -379,6 +386,10 @@ export default function GroupAdminMembersPage() {
     setAddUserId("");
     setAddRole("editor");
     setAddError(null);
+  }
+
+  if (isNotFound) {
+    notFound();
   }
 
   const hasPendingChanges = Object.keys(pendingRoles).length > 0;

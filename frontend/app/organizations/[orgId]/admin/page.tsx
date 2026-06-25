@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
@@ -28,6 +29,7 @@ export default function ConsoleBasicPage() {
   const [org, setOrg] = useState<OrgData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   // 組織名編集フォームの入力値と保存状態
   const [editName, setEditName] = useState("");
@@ -41,6 +43,11 @@ export default function ConsoleBasicPage() {
         const res = await authFetch(`/api/organizations/${orgId}`);
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!res.ok) {
@@ -89,6 +96,10 @@ export default function ConsoleBasicPage() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (isNotFound) {
+    notFound();
   }
 
   if (loading) return <p className="text-gray-500">読み込み中...</p>;

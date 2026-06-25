@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
@@ -30,6 +31,7 @@ export default function GroupAdminLayout({
    * true = アクセス許可
    */
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [groupName, setGroupName] = useState("");
   /** 未承認の参加申請数（メンバー管理ナビのバッジ用） */
   const [pendingCount, setPendingCount] = useState(0);
@@ -56,6 +58,10 @@ export default function GroupAdminLayout({
 
         if (groupRes.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (groupRes.status === 404 || orgRes.status === 404) {
+          setIsNotFound(true);
           return;
         }
         if (!groupRes.ok || !orgRes.ok) {
@@ -85,6 +91,10 @@ export default function GroupAdminLayout({
     }
     checkAccess();
   }, [orgId, groupId, router, fetchPendingCount]);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   /* 権限チェック中はコンテンツを表示しない（ちらつき防止） */
   if (authorized === null) {
