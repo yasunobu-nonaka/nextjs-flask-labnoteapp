@@ -12,6 +12,7 @@ import {
   JOIN_METHOD_OPTIONS,
   WHO_CAN_CREATE_OPTIONS,
 } from "@/lib/constants";
+import RadioGroup from "@/components/RadioGroup";
 
 type Props = {
   orgId: string;
@@ -58,42 +59,6 @@ type OrgPolicy = {
   default_join_method: string;
 };
 
-
-/**
- * ラジオボタングループ。
- * name に一意な文字列を指定することで同一ページ内の複数グループが干渉しない。
- */
-function RadioGroup<T extends string | boolean>({
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  name: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {options.map((opt) => (
-        <label
-          key={String(opt.value)}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value === opt.value}
-            onChange={() => onChange(opt.value)}
-            className="w-4 h-4 accent-foreground"
-          />
-          <span className="text-sm">{opt.label}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 /**
  * FolderSidebar コンポーネント

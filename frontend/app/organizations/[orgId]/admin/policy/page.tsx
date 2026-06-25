@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
+import RadioGroup from "@/components/RadioGroup";
 
 type OrgPolicy = {
   allow_private_groups: boolean;
@@ -12,52 +13,6 @@ type OrgPolicy = {
   who_can_create_groups: string;
   default_join_method: string;
 };
-
-
-/**
- * ラジオボタングループ。
- * name に一意な名前を指定することで同一ページ内の複数グループが干渉しない。
- * description が指定された場合はラベルの下に補足説明を表示する。
- */
-function RadioGroup<T extends string | boolean>({
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  name: string;
-  options: { value: T; label: string; description?: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      {options.map((opt) => (
-        <label
-          key={String(opt.value)}
-          className="flex items-start gap-2 cursor-pointer"
-        >
-          {/* ラジオボタンをテキスト行の先頭に揃える */}
-          <input
-            type="radio"
-            name={name}
-            checked={value === opt.value}
-            onChange={() => onChange(opt.value)}
-            className="w-4 h-4 mt-0.5 accent-foreground shrink-0"
-          />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-base">{opt.label}</span>
-            {opt.description && (
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {opt.description}
-              </span>
-            )}
-          </div>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 /**
  * 組織管理: ポリシー管理ページ。
@@ -184,6 +139,7 @@ export default function ConsolePolicyPage() {
               </p>
             </div>
             <RadioGroup
+              spacious
               name="allow_private_groups"
               options={[
                 { value: true, label: "許可" },
@@ -203,6 +159,7 @@ export default function ConsolePolicyPage() {
               </p>
             </div>
             <RadioGroup
+              spacious
               name="allow_private_notes"
               options={[
                 { value: true, label: "許可" },
@@ -222,6 +179,7 @@ export default function ConsolePolicyPage() {
               </p>
             </div>
             <RadioGroup
+              spacious
               name="who_can_create_groups"
               options={WHO_CAN_CREATE_OPTIONS}
               value={editPolicy.who_can_create_groups}
@@ -238,6 +196,7 @@ export default function ConsolePolicyPage() {
               </p>
             </div>
             <RadioGroup
+              spacious
               name="default_join_method"
               options={JOIN_METHOD_OPTIONS}
               value={editPolicy.default_join_method}
