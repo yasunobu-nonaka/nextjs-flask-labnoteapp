@@ -9,6 +9,7 @@ import FolderSidebar from "@/components/FolderSidebar";
 import FolderCard from "@/components/FolderCard";
 import NoteCard, { type Note } from "@/components/NoteCard";
 import Modal from "@/components/Modal";
+import NotFoundScreen from "@/components/NotFoundScreen";
 import { type Folder } from "@/lib/folders";
 
 type NotesResponse = {
@@ -66,6 +67,9 @@ export default function NotesPage() {
 
   // NoteCard の移動後にノート一覧を再フェッチするためのトリガー
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // API が 404 を返したとき（非メンバー・private グループ非メンバー）に true にする
+  const [isNotFound, setIsNotFound] = useState(false);
 
   const router = useRouter();
 
@@ -171,7 +175,8 @@ export default function NotesPage() {
         }
         // 非メンバーまたは private グループの非メンバーには 404 が返る
         if (res.status === 404) {
-          router.replace(`/organizations/${orgIdNum}/groups`);
+          setIsNotFound(true);
+          setNotesLoading(false);
           return;
         }
         if (!res.ok) {
@@ -241,6 +246,16 @@ export default function NotesPage() {
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
   // グループ内のノート一覧ページのベース URL（Link href の組み立てに使う）
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
+
+  // 非メンバー・private グループ非メンバーの場合は 404 画面を表示する
+  if (isNotFound) {
+    return (
+      <NotFoundScreen
+        backLabel="グループ一覧に戻る"
+        backHref={`/organizations/${orgIdNum}/groups`}
+      />
+    );
+  }
 
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground flex">
