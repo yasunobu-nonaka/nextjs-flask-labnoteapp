@@ -313,3 +313,71 @@ class TestOrganizationMembers:
             headers=auth_headers["headers"],
         )
         assert res.status_code == 400
+
+
+###############################################
+#  非メンバーアクセスの 404 テスト
+###############################################
+class TestNonMemberAccessReturns404:
+    """所属していない組織の管理系ルートは 404 を返す（存在を漏洩させない）。"""
+
+    def _setup(self, client, auth_headers):
+        """組織と非メンバーユーザーを用意する。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        outside_headers = register_and_get_headers(client, "outside", "outside@example.com")
+        # outside ユーザーは組織に追加しない
+        return org_id, outside_headers
+
+    def test_update_org_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーが組織名を変更しようとすると 404 を返す。"""
+        org_id, outside_headers = self._setup(client, auth_headers)
+
+        res = client.patch(
+            f"/api/organizations/{org_id}",
+            json={"name": "乗っ取り"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_add_member_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーがメンバーを追加しようとすると 404 を返す。"""
+        org_id, outside_headers = self._setup(client, auth_headers)
+
+        register_and_get_headers(client, "target2", "target2@example.com")
+        from app.extensions import db
+        from app.model import User
+        with client.application.app_context():
+            target = db.session.execute(
+                db.select(User).filter_by(email="target2@example.com")
+            ).scalar_one()
+            target_id = target.id
+
+        res = client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": target_id, "role": "member"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_update_member_role_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーがメンバーのロールを変更しようとすると 404 を返す。"""
+        org_id, outside_headers = self._setup(client, auth_headers)
+        owner_id = auth_headers["user_id"]
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/members/{owner_id}",
+            json={"role": "member"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_remove_member_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーがメンバーを削除しようとすると 404 を返す。"""
+        org_id, outside_headers = self._setup(client, auth_headers)
+        owner_id = auth_headers["user_id"]
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/members/{owner_id}",
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
