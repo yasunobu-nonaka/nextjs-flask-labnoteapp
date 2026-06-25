@@ -183,7 +183,7 @@ class TestJoinGroup:
         assert res.status_code == 409
 
     def test_join_not_org_member(self, client, auth_headers):
-        """組織外のユーザーが参加申請すると 403 を返す。"""
+        """組織外のユーザーが参加申請すると 404 を返す（組織の存在を漏洩させない）。"""
         org = create_org(client, auth_headers["headers"])
         group = create_group(client, auth_headers["headers"], org["id"])
         set_join_method(client, auth_headers["headers"], org["id"], group["id"], "open")
@@ -194,7 +194,7 @@ class TestJoinGroup:
             f"/api/organizations/{org['id']}/groups/{group['id']}/join",
             headers=outsider_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
     def test_join_unauthorized(self, client, auth_headers):
         """未認証で参加申請すると 401 を返す。"""
@@ -493,7 +493,7 @@ class TestCancelJoinRequest:
         assert res.status_code == 404
 
     def test_cancel_not_org_member(self, client, auth_headers):
-        """組織外のユーザーがキャンセルしようとすると 403 を返す。"""
+        """組織外のユーザーがキャンセルしようとすると 404 を返す（組織の存在を漏洩させない）。"""
         org = create_org(client, auth_headers["headers"])
         org_id = org["id"]
         group = create_group(client, auth_headers["headers"], org_id)
@@ -505,7 +505,7 @@ class TestCancelJoinRequest:
             f"/api/organizations/{org_id}/groups/{group_id}/join",
             headers=outsider_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
     def test_cancel_unauthorized(self, client, auth_headers):
         """未認証のリクエストは 401 を返す。"""

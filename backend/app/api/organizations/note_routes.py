@@ -17,6 +17,8 @@ from app.api.notes.note_service import (
     delete_note_service,
 )
 from app.api.notes.tag_service import get_group_tags
+from flask import abort
+
 from app.api.organizations.organization_service import check_org_permission
 from app.api.organizations.group_service import get_group_or_404, check_group_permission
 
@@ -31,16 +33,17 @@ def _check_access(org_id: int, group_id: int, permission_code: str):
     """組織メンバーシップとグループ権限をまとめて確認するヘルパー。
 
     org_id とのネスト整合性（group.organization_id == org_id）も検証する。
+    非メンバーや private グループの非メンバーには 404 を返し、存在を漏洩させない。
     権限不足の場合は (response, status_code) タプルを返す。問題なければ None を返す。
     """
     if not check_org_permission(current_user.id, org_id, "org:read"):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+        abort(404)
 
-    # グループが指定した組織に属するか確認
-    group = get_group_or_404(group_id, org_id)  # 存在しなければ 404
-    _ = group  # 参照のみ
+    group = get_group_or_404(group_id, org_id)
 
     if not check_group_permission(current_user.id, group_id, permission_code):
+        if group.is_private:
+            abort(404)
         return jsonify({"message": "権限がありません"}), 403
 
     return None

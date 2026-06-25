@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
+from flask import abort
+
 from app.extensions import db
 from app.model import User
 from app.model.group import Group, GroupMember, GroupPolicy
@@ -124,6 +126,13 @@ def get_accessible_groups(org_id: int, user_id: int) -> List[Group]:
         if not g.is_private or g.id in member_group_ids
     ]
     return accessible
+
+
+def require_group_visible(user_id: int, group: Group) -> None:
+    """プライベートグループの非メンバーには 404 を返す。403 を返さないことでグループの存在を漏洩させない。"""
+
+    if group.is_private and not check_group_membership(user_id, group.id):
+        abort(404)
 
 
 def get_group_or_404(group_id: int, org_id: int) -> Group:

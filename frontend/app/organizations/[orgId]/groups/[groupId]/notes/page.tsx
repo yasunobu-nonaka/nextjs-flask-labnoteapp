@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
@@ -66,6 +67,9 @@ export default function NotesPage() {
 
   // NoteCard の移動後にノート一覧を再フェッチするためのトリガー
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // API が 404 を返したとき（非メンバー・private グループ非メンバー）に true にする
+  const [isNotFound, setIsNotFound] = useState(false);
 
   const router = useRouter();
 
@@ -169,6 +173,12 @@ export default function NotesPage() {
           setNotesLoading(false);
           return;
         }
+        // 非メンバーまたは private グループの非メンバーには 404 が返る
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setNotesLoading(false);
+          return;
+        }
         if (!res.ok) {
           setNotesError("ノートの取得に失敗しました");
           setNotesLoading(false);
@@ -236,6 +246,11 @@ export default function NotesPage() {
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
   // グループ内のノート一覧ページのベース URL（Link href の組み立てに使う）
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
+
+  // 非メンバー・private グループ非メンバーの場合は 404 ページを表示する
+  if (isNotFound) {
+    notFound();
+  }
 
   return (
     <main className="h-screen overflow-hidden bg-background text-foreground flex">

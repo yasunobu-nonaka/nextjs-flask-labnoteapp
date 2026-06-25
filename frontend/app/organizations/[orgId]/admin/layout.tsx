@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
@@ -29,6 +30,7 @@ export default function ConsoleLayout({
    * false = アクセス拒否（リダイレクト済み）
    */
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [orgName, setOrgName] = useState("");
 
   useEffect(() => {
@@ -37,6 +39,10 @@ export default function ConsoleLayout({
         const res = await authFetch(`/api/organizations/${orgId}`);
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
           return;
         }
         if (!res.ok) {
@@ -56,6 +62,10 @@ export default function ConsoleLayout({
     }
     checkAccess();
   }, [orgId, router]);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   /* 権限チェック中はコンテンツを表示しない（ちらつき防止） */
   if (authorized === null) {

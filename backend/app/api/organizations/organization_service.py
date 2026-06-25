@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from flask import abort
+
 from app.extensions import db
 from app.model import User
 from app.model.organization import Organization, OrganizationMember, OrganizationPolicy
@@ -80,6 +82,15 @@ def check_org_membership(user_id: int, org_id: int) -> Optional[OrganizationMemb
     return db.session.execute(
         db.select(OrganizationMember).filter_by(user_id=user_id, organization_id=org_id)
     ).scalar_one_or_none()
+
+
+def require_org_member(user_id: int, org_id: int) -> OrganizationMember:
+    """組織メンバーでない場合は 404 を返す。403 を返さないことで組織の存在を漏洩させない。"""
+
+    member = check_org_membership(user_id, org_id)
+    if not member:
+        abort(404)
+    return member
 
 
 def check_org_role(user_id: int, org_id: int, required_roles: List[str]) -> bool:

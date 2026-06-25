@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
@@ -98,6 +99,7 @@ export default function GroupAdminPolicyPage() {
   const [editPolicy, setEditPolicy] = useState<GroupPolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -110,6 +112,11 @@ export default function GroupAdminPolicyPage() {
         );
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!res.ok) {
@@ -181,6 +188,10 @@ export default function GroupAdminPolicyPage() {
     savedPolicy !== null &&
     editPolicy !== null &&
     JSON.stringify(editPolicy) !== JSON.stringify(savedPolicy);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   return (
     <div className="max-w-xl flex flex-col gap-8">

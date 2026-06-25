@@ -161,7 +161,7 @@ class TestNoteCreation:
 
         res = create_note(client, non_member_headers, org_id, group_id, "Sneaky Note", "content")
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -292,7 +292,7 @@ class TestNoteIndex:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -348,7 +348,7 @@ class TestNoteDetail:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -411,7 +411,7 @@ class TestNoteEdit:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -466,7 +466,7 @@ class TestNoteDelete:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -518,4 +518,4 @@ class TestTagsIndex:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404

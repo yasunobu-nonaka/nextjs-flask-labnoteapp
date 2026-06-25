@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
@@ -24,6 +25,7 @@ export default function ConsoleGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   useEffect(() => {
     async function fetchGroups() {
@@ -31,6 +33,11 @@ export default function ConsoleGroupsPage() {
         const res = await authFetch(`/api/organizations/${orgId}/groups`);
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!res.ok) {
@@ -48,6 +55,10 @@ export default function ConsoleGroupsPage() {
     }
     fetchGroups();
   }, [orgId, router]);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-col gap-6">

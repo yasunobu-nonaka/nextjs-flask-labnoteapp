@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import CreateGroupWizard from "@/components/CreateGroupWizard";
@@ -17,6 +18,8 @@ export default function GroupsRedirectPage() {
 
   /* ローディングが終わりグループなしと確定したら true */
   const [showWizard, setShowWizard] = useState(false);
+  /* 非メンバーで API が 404 を返したとき true にする */
+  const [isNotFound, setIsNotFound] = useState(false);
 
   useEffect(() => {
     async function redirect() {
@@ -24,6 +27,10 @@ export default function GroupsRedirectPage() {
         const res = await authFetch(`/api/organizations/${orgId}/groups`);
         if (res.status === 401) {
           router.replace("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
           return;
         }
         if (!res.ok) {
@@ -49,6 +56,10 @@ export default function GroupsRedirectPage() {
     }
     redirect();
   }, [orgId, router]);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   /* グループなし確定前はローディング表示 */
   if (!showWizard) {

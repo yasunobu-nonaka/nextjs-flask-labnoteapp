@@ -20,6 +20,7 @@ from app.api.organizations.organization_service import (
     get_organizations_for_user,
     get_organization_or_404,
     check_org_membership,
+    require_org_member,
     check_org_role,
     add_org_member,
     update_org_member_role,
@@ -35,6 +36,7 @@ from app.api.organizations.group_service import (
     get_accessible_groups,
     get_group_or_404,
     check_group_membership,
+    require_group_visible,
     get_any_membership,
     check_group_role,
     add_group_member,
@@ -121,10 +123,7 @@ def get_org(org_id):
     """組織の詳細情報を返す。メンバーのみアクセス可能。"""
 
     org = get_organization_or_404(org_id)
-    member = check_org_membership(current_user.id, org_id)
-
-    if not member:
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    member = require_org_member(current_user.id, org_id)
 
     return jsonify(build_org_response(org, member.role.name))
 
@@ -134,6 +133,7 @@ def get_org(org_id):
 def update_org(org_id):
     """組織名・ポリシーを更新する。owner または sys_admin のみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     if not check_org_role(current_user.id, org_id, ["owner", "sys_admin"]):
         return jsonify({"message": "この操作を行う権限がありません"}), 403
 
@@ -165,8 +165,7 @@ def update_org(org_id):
 def list_org_members(org_id):
     """組織のメンバー一覧を返す。メンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     org = get_organization_or_404(org_id)
     result = [build_member_response(m) for m in org.members]
@@ -179,6 +178,7 @@ def list_org_members(org_id):
 def add_member(org_id):
     """組織にメンバーを追加する。sys_admin または user_admin のみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     if not check_org_role(
         current_user.id, org_id, ["owner", "sys_admin", "user_admin"]
     ):
@@ -210,6 +210,7 @@ def add_member(org_id):
 def update_member_role(org_id, member_user_id):
     """組織メンバーのロールを変更する。sys_admin のみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     if not check_org_role(current_user.id, org_id, ["owner", "sys_admin"]):
         return jsonify({"message": "この操作を行う権限がありません"}), 403
 
@@ -250,6 +251,7 @@ def update_member_role(org_id, member_user_id):
 def remove_member(org_id, member_user_id):
     """組織メンバーを削除する。sys_admin または user_admin のみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     if not check_org_role(
         current_user.id, org_id, ["owner", "sys_admin", "user_admin"]
     ):
@@ -285,8 +287,7 @@ def remove_member(org_id, member_user_id):
 def list_groups(org_id):
     """組織内のアクセス可能なグループ一覧を返す。組織メンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     groups = get_accessible_groups(org_id, current_user.id)
 
@@ -305,6 +306,7 @@ def list_groups(org_id):
 def create_grp(org_id):
     """グループを作成する。組織ポリシーに基づき権限を確認する。"""
 
+    require_org_member(current_user.id, org_id)
     org = get_organization_or_404(org_id)
 
     if not org.policy:
@@ -355,16 +357,12 @@ def create_grp(org_id):
 def get_grp(org_id, group_id):
     """グループの詳細情報を返す。アクセス可能なグループのみ。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
+
     member = check_group_membership(current_user.id, group_id)
-
-    # プライベートグループは所属メンバーのみ閲覧可能
-    if group.is_private and not member:
-        return jsonify({"message": "このグループへのアクセス権がありません"}), 403
-
     return jsonify(build_group_response(group, member.role.name if member else None))
 
 
@@ -373,7 +371,9 @@ def get_grp(org_id, group_id):
 def update_grp(org_id, group_id):
     """グループ情報・ポリシーを更新する。グループadminまたは組織sys_adminのみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     # グループadminまたは組織レベルの管理者
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
@@ -410,7 +410,9 @@ def update_grp(org_id, group_id):
 def delete_grp(org_id, group_id):
     """グループを削除する。グループadminまたは組織sys_adminのみ可能。"""
 
+    require_org_member(current_user.id, org_id)
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -432,14 +434,10 @@ def delete_grp(org_id, group_id):
 def list_group_members(org_id, group_id):
     """グループのメンバー一覧を返す。グループメンバーのみアクセス可能。"""
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
-    member = check_group_membership(current_user.id, group_id)
-
-    if group.is_private and not member:
-        return jsonify({"message": "このグループへのアクセス権がありません"}), 403
+    require_group_visible(current_user.id, group)
 
     from app.model.group import GroupMember
     from app.extensions import db as _db
@@ -455,7 +453,9 @@ def list_group_members(org_id, group_id):
 def add_grp_member(org_id, group_id):
     """グループにメンバーを追加する。グループadminのみ可能。追加対象は組織メンバーに限る。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -507,7 +507,9 @@ def add_grp_member(org_id, group_id):
 def update_grp_member_role(org_id, group_id, member_user_id):
     """グループメンバーのロールを変更する。グループadminのみ可能。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -541,7 +543,9 @@ def update_grp_member_role(org_id, group_id, member_user_id):
 def remove_grp_member(org_id, group_id, member_user_id):
     """グループメンバーを削除する。グループadminのみ可能。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -570,10 +574,10 @@ def join_group(org_id, group_id):
     'invite_only' の場合は 403 を返す。
     """
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     try:
         member, result = request_to_join(group, current_user.id)
@@ -604,8 +608,7 @@ def cancel_join(org_id, group_id):
     pending 申請が存在しない場合は 404 を返す。
     """
 
-    if not check_org_membership(current_user.id, org_id):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+    require_org_member(current_user.id, org_id)
 
     get_group_or_404(group_id, org_id)
 
@@ -622,7 +625,9 @@ def cancel_join(org_id, group_id):
 def list_join_requests(org_id, group_id):
     """グループへの参加申請一覧を返す。グループadminまたは組織adminのみアクセス可能。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -640,7 +645,9 @@ def list_join_requests(org_id, group_id):
 def count_join_requests(org_id, group_id):
     """グループの未承認参加申請数を返す（バッジ表示用）。グループadminのみアクセス可能。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])
@@ -660,7 +667,9 @@ def count_join_requests(org_id, group_id):
 def process_join_request(org_id, group_id, target_user_id):
     """参加申請を承認または拒否する。グループadminまたは組織adminのみ可能。"""
 
-    get_group_or_404(group_id, org_id)
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
 
     is_group_admin = check_group_role(current_user.id, group_id, ["admin"])
     is_org_admin = check_org_role(current_user.id, org_id, ["owner", "sys_admin"])

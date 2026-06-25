@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
@@ -39,6 +40,7 @@ export default function ConsoleMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [page, setPage] = useState(1);
 
   // user_id → 変更後のロール。変更があったメンバーのみ保持する
@@ -54,6 +56,11 @@ export default function ConsoleMembersPage() {
         const res = await authFetch(`/api/organizations/${orgId}/members`);
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!res.ok) {
@@ -189,6 +196,10 @@ export default function ConsoleMembersPage() {
     } catch {
       alert("サーバーへの接続に失敗しました");
     }
+  }
+
+  if (isNotFound) {
+    notFound();
   }
 
   const totalPages = Math.max(1, Math.ceil(members.length / PER_PAGE));

@@ -122,7 +122,7 @@ class TestFolderCreation:
             org_id, group_id, "Sneaky Folder",
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -163,7 +163,7 @@ class TestFolderIndex:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -270,7 +270,7 @@ class TestFolderRename:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 #############################################
@@ -342,4 +342,4 @@ class TestFolderDelete:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
-        assert res.status_code == 403
+        assert res.status_code == 404

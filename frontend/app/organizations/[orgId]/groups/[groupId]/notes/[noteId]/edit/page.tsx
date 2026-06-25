@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/noteSchema";
@@ -20,6 +21,7 @@ export default function EditNotePage() {
 
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   // NoteForm に渡す初期値。API 取得後にセットする。
   const [noteData, setNoteData] = useState<NoteFormValues | null>(null);
@@ -40,7 +42,11 @@ export default function EditNotePage() {
           return;
         }
         if (res.status === 404) {
-          setLoadError("ノートが見つかりません");
+          setIsNotFound(true);
+          return;
+        }
+        if (res.status === 403) {
+          setLoadError("このグループのメンバーではありません。グループ一覧からメンバー参加を申請してください。");
           setLoadStatus("error");
           return;
         }
@@ -84,6 +90,10 @@ export default function EditNotePage() {
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
     }
+  }
+
+  if (isNotFound) {
+    notFound();
   }
 
   if (loadStatus === "loading") {

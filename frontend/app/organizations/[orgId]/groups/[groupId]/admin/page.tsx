@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 
@@ -28,6 +29,7 @@ export default function GroupAdminBasicPage() {
   const [group, setGroup] = useState<GroupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   // 編集フォームの入力値（saved との差分を保存ボタン表示の判定に使う）
   const [editState, setEditState] = useState<EditState>({
@@ -46,6 +48,11 @@ export default function GroupAdminBasicPage() {
         );
         if (res.status === 401) {
           router.push("/login");
+          return;
+        }
+        if (res.status === 404) {
+          setIsNotFound(true);
+          setLoading(false);
           return;
         }
         if (!res.ok) {
@@ -110,6 +117,10 @@ export default function GroupAdminBasicPage() {
     group !== null &&
     (editState.name.trim() !== group.name ||
       editState.is_private !== group.is_private);
+
+  if (isNotFound) {
+    notFound();
+  }
 
   if (loading) return <p className="text-gray-500">読み込み中...</p>;
   if (fetchError) return <p className="text-red-500 text-sm">{fetchError}</p>;

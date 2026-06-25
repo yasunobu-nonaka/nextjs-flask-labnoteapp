@@ -90,7 +90,7 @@ class TestGroupCreation:
         assert res.status_code == 400
 
     def test_create_group_no_org_access(self, client, auth_headers):
-        """組織に所属していないユーザーはグループを作成できない。"""
+        """組織に所属していないユーザーはグループを作成できない（組織の存在を漏洩させないため404）。"""
         org_id = create_org(client, auth_headers["headers"])["id"]
         other_headers = register_and_get_headers(client, "other", "other@example.com")
 
@@ -99,7 +99,7 @@ class TestGroupCreation:
             json={"name": "不正なグループ"},
             headers=other_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
     def test_create_group_restricted_by_policy(self, client, auth_headers):
         """ポリシーで制限されているロールではグループを作成できない。"""
@@ -197,7 +197,7 @@ class TestGroupRead:
         assert res.get_json()["id"] == group_id
 
     def test_get_private_group_denied_for_non_members(self, client, auth_headers):
-        """プライベートグループは所属メンバー以外は詳細取得できない。"""
+        """プライベートグループは所属メンバー以外には404を返す（グループの存在を漏洩させない）。"""
         org_id = create_org(client, auth_headers["headers"])["id"]
         group_id = create_group(
             client, auth_headers["headers"], org_id, is_private=True
@@ -215,7 +215,7 @@ class TestGroupRead:
             f"/api/organizations/{org_id}/groups/{group_id}",
             headers=other_headers,
         )
-        assert res.status_code == 403
+        assert res.status_code == 404
 
 
 ###############################################
@@ -402,3 +402,104 @@ class TestGroupMembers:
             headers=auth_headers["headers"],
         )
         assert res.status_code == 204
+
+
+###############################################
+#  非メンバーアクセスの 404 テスト
+###############################################
+class TestNonMemberGroupAccessReturns404:
+    """非組織メンバー、またはプライベートグループ非メンバーによる
+    グループ管理系ルートへのアクセスは 404 を返す。"""
+
+    def _non_org_member_headers(self, client):
+        """組織に所属していないユーザーの認証ヘッダーを返す。"""
+        return register_and_get_headers(client, "outsider2", "outsider2@example.com")
+
+    def test_update_group_returns_404_for_non_org_member(self, client, auth_headers):
+        """非組織メンバーがグループを更新しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = self._non_org_member_headers(client)
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}",
+            json={"name": "乗っ取り"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_delete_group_returns_404_for_non_org_member(self, client, auth_headers):
+        """非組織メンバーがグループを削除しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = self._non_org_member_headers(client)
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}",
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_add_group_member_returns_404_for_non_org_member(self, client, auth_headers):
+        """非組織メンバーがグループにメンバーを追加しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = self._non_org_member_headers(client)
+        owner_id = auth_headers["user_id"]
+
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            json={"user_id": owner_id, "role": "editor"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_update_group_member_role_returns_404_for_non_org_member(self, client, auth_headers):
+        """非組織メンバーがグループメンバーのロールを変更しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = self._non_org_member_headers(client)
+        owner_id = auth_headers["user_id"]
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{owner_id}",
+            json={"role": "viewer"},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_remove_group_member_returns_404_for_non_org_member(self, client, auth_headers):
+        """非組織メンバーがグループメンバーを削除しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = self._non_org_member_headers(client)
+        owner_id = auth_headers["user_id"]
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{owner_id}",
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+    def test_update_private_group_returns_404_for_non_group_member(self, client, auth_headers):
+        """組織メンバーでもプライベートグループ非メンバーがグループを更新しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(
+            client, auth_headers["headers"], org_id, is_private=True
+        ).get_json()["group"]["id"]
+
+        # org メンバーだがグループには追加しない
+        org_member_headers = register_and_get_headers(client, "orgmember3", "orgmember3@example.com")
+        org_member_id = get_user_id(client, "orgmember3@example.com")
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": org_member_id, "role": "member"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}",
+            json={"name": "乗っ取り"},
+            headers=org_member_headers,
+        )
+        assert res.status_code == 404

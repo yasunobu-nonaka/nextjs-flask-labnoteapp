@@ -2,7 +2,7 @@
 グループスコープのフォルダー API。
 URL: /api/organizations/<org_id>/groups/<group_id>/folders/...
 """
-from flask import jsonify, request
+from flask import abort, jsonify, request
 from flask_jwt_extended import jwt_required, current_user
 from marshmallow import ValidationError
 
@@ -29,14 +29,17 @@ def _check_access(org_id: int, group_id: int, permission_code: str):
     """組織メンバーシップとグループ権限をまとめて確認するヘルパー。
 
     org_id とのネスト整合性（group.organization_id == org_id）も検証する。
+    非メンバーや private グループの非メンバーには 404 を返し、存在を漏洩させない。
     権限不足の場合は (response, status_code) タプルを返す。問題なければ None を返す。
     """
     if not check_org_permission(current_user.id, org_id, "org:read"):
-        return jsonify({"message": "この組織へのアクセス権がありません"}), 403
+        abort(404)
 
-    get_group_or_404(group_id, org_id)  # 存在しなければ 404
+    group = get_group_or_404(group_id, org_id)
 
     if not check_group_permission(current_user.id, group_id, permission_code):
+        if group.is_private:
+            abort(404)
         return jsonify({"message": "権限がありません"}), 403
 
     return None
