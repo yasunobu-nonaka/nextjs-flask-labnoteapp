@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
+import { formatDateTime } from "@/lib/utils";
 
 /** 管理者向け: グループへの参加申請 */
 type JoinRequestNotification = {
@@ -226,12 +227,7 @@ export default function AppHeader() {
                           </p>
                           {n.requested_at && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {new Date(n.requested_at).toLocaleString("ja-JP", {
-                                month: "numeric",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {formatDateTime(n.requested_at)}
                             </p>
                           )}
                         </Link>
@@ -254,12 +250,7 @@ export default function AppHeader() {
                           </p>
                           {n.approved_at && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {new Date(n.approved_at).toLocaleString("ja-JP", {
-                                month: "numeric",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {formatDateTime(n.approved_at)}
                             </p>
                           )}
                         </Link>
@@ -278,12 +269,7 @@ export default function AppHeader() {
                           </p>
                           {n.rejected_at && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {new Date(n.rejected_at).toLocaleString("ja-JP", {
-                                month: "numeric",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {formatDateTime(n.rejected_at)}
                             </p>
                           )}
                         </div>

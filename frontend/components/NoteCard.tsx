@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
 import Modal from "@/components/Modal";
+import { formatDate } from "@/lib/utils";
 
 export type Note = {
   id: number;
@@ -48,11 +49,7 @@ export default function NoteCard({
   // 移動先フォルダーの選択値（null = フォルダーなし）
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
 
-  const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const date = formatDate(note.updated_at);
 
   async function handleMove() {
     const res = await authFetch(
