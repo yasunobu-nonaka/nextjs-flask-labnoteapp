@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import { usePendingCount } from "../pending-count-context";
-import { GROUP_ROLE_LABELS } from "@/lib/constants";
+import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS } from "@/lib/constants";
 
 type GroupMember = {
   user_id: number;
@@ -40,8 +40,6 @@ type PendingMember = {
   role: string;
 };
 
-/** グループ内で変更可能なロール一覧（全ロールが対象） */
-const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
 
 /**
  * グループ管理: メンバー管理ページ。
@@ -511,7 +509,7 @@ export default function GroupAdminMembersPage() {
                             : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300",
                         ].join(" ")}
                       >
-                        {ASSIGNABLE_ROLES.map((role) => (
+                        {ASSIGNABLE_GROUP_ROLES.map((role) => (
                           <option key={role} value={role}>
                             {GROUP_ROLE_LABELS[role]}
                           </option>
@@ -597,7 +595,7 @@ export default function GroupAdminMembersPage() {
                   onChange={(e) => setAddRole(e.target.value)}
                   className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
                 >
-                  {ASSIGNABLE_ROLES.map((role) => (
+                  {ASSIGNABLE_GROUP_ROLES.map((role) => (
                     <option key={role} value={role}>
                       {GROUP_ROLE_LABELS[role]}
                     </option>

@@ -20,6 +20,12 @@ export const GROUP_ROLE_LABELS: Record<string, string> = {
 };
 
 /**
+ * グループメンバーに割り当て可能なロール一覧（権限が強い順）。
+ * ロール選択 `<select>` や RadioGroup で選択肢として使う。
+ */
+export const ASSIGNABLE_GROUP_ROLES = ["admin", "editor", "viewer"] as const;
+
+/**
  * グループへの参加方式の選択肢。
  * label は UI 上の短い表示名、description はポリシー設定画面での補足説明。
  * description を表示しないラジオグループでも同じ配列を渡してよい（無視される）。

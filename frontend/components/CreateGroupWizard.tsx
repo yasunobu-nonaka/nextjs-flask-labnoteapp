@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
-import { GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
+import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
 import RadioGroup from "@/components/RadioGroup";
 
 type OrgMember = {
@@ -20,7 +20,6 @@ type PendingMember = {
   role: string;
 };
 
-const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
 
 
 type Props = {
@@ -301,7 +300,7 @@ export default function CreateGroupWizard({ orgId, onCreated }: Props) {
                         onChange={(e) => setAddRole(e.target.value)}
                         className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
                       >
-                        {ASSIGNABLE_ROLES.map((role) => (
+                        {ASSIGNABLE_GROUP_ROLES.map((role) => (
                           <option key={role} value={role}>
                             {GROUP_ROLE_LABELS[role]}
                           </option>
