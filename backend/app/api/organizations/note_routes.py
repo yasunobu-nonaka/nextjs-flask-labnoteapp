@@ -144,8 +144,14 @@ def get_note(org_id, group_id, note_id):
 )
 @jwt_required()
 def edit_note(org_id, group_id, note_id):
-    """ノートを更新する。プライベートノートは owner/editor のみ編集可。"""
-    err = _check_access(org_id, group_id, "note:edit")
+    """ノートを更新する。プライベートノートは owner/editor のみ編集可。
+
+    プライベートノートの場合は PrivateNoteMember のロールで編集可否を判断するため、
+    グループレベルの note:edit 権限チェックをスキップする。
+    非プライベートノートはグループレベルの note:edit 権限が必要。
+    """
+    # 組織・グループへの基本アクセスを確認する（note:read で membership を検証）
+    err = _check_access(org_id, group_id, "note:read")
     if err:
         return err
 
@@ -155,6 +161,13 @@ def edit_note(org_id, group_id, note_id):
         return jsonify({"message": "validation error", "errors": e.messages}), 400
 
     note = get_note_or_404_service(note_id, group_id, current_user_id=current_user.id)
+
+    # 非プライベートノートはグループレベルの note:edit 権限が必要
+    # プライベートノートは update_note_service 内で PrivateNoteMember のロールを確認する
+    if not note.is_private:
+        if not check_group_permission(current_user.id, group_id, "note:edit"):
+            return jsonify({"message": "権限がありません"}), 403
+
     note = update_note_service(note, data, group_id, current_user_id=current_user.id)
     return jsonify({"message": "Note updated successfully!", "note": res_schema_note.dump(note)})
 
@@ -164,12 +177,24 @@ def edit_note(org_id, group_id, note_id):
 )
 @jwt_required()
 def delete_note(org_id, group_id, note_id):
-    """ノートを削除する。プライベートノートは owner のみ削除可。"""
-    err = _check_access(org_id, group_id, "note:delete")
+    """ノートを削除する。プライベートノートは owner のみ削除可。
+
+    プライベートノートの場合は PrivateNoteMember の owner ロールで削除可否を判断するため、
+    グループレベルの note:delete 権限チェックをスキップする。
+    """
+    # 組織・グループへの基本アクセスを確認する（note:read で membership を検証）
+    err = _check_access(org_id, group_id, "note:read")
     if err:
         return err
 
     note = get_note_or_404_service(note_id, group_id, current_user_id=current_user.id)
+
+    # 非プライベートノートはグループレベルの note:delete 権限が必要
+    # プライベートノートは delete_note_service 内で PrivateNoteMember の owner ロールを確認する
+    if not note.is_private:
+        if not check_group_permission(current_user.id, group_id, "note:delete"):
+            return jsonify({"message": "権限がありません"}), 403
+
     delete_note_service(note, current_user_id=current_user.id)
     return "", 204
 

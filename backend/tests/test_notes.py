@@ -57,36 +57,48 @@ def create_private_note(client, headers, org_id, group_id, title, content_md="co
 
 
 def add_second_member(client, owner_headers, org_id, group_id):
-    """2ユーザー目を組織とグループに追加してそのユーザーのヘッダーを返す。"""
-    register_user(client, username="member2", email="member2@example.com")
-    token2 = login_and_get_token(client, identifier="member2@example.com")
+    """2ユーザー目を組織とグループに editor として追加してそのユーザーのヘッダーを返す。"""
+    return _add_member(client, owner_headers, org_id, group_id,
+                       username="member2", email="member2@example.com", group_role="editor")
+
+
+def add_second_member_as_viewer(client, owner_headers, org_id, group_id):
+    """2ユーザー目を組織とグループに viewer として追加してそのユーザーのヘッダーを返す。"""
+    return _add_member(client, owner_headers, org_id, group_id,
+                       username="member2", email="member2@example.com", group_role="viewer")
+
+
+def _add_member(client, owner_headers, org_id, group_id, *, username, email, group_role):
+    """ユーザーを登録して組織・グループに指定ロールで追加する共通ヘルパー。"""
+    register_user(client, username=username, email=email)
+    token = login_and_get_token(client, identifier=email)
 
     # user_id を取得するため自分のプロフィールを /api/auth/me で取得する
     res = client.get(
         "/api/auth/me",
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token2}"},
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
     )
-    user2_id = res.get_json()["id"]
+    user_id = res.get_json()["id"]
 
     # 組織メンバーに追加する
     client.post(
         f"/api/organizations/{org_id}/members",
-        json={"user_id": user2_id, "role": "member"},
+        json={"user_id": user_id, "role": "member"},
         headers=owner_headers,
     )
 
-    # グループメンバーに追加する（editor として）
+    # グループメンバーに指定ロールで追加する
     client.post(
         f"/api/organizations/{org_id}/groups/{group_id}/members",
-        json={"user_id": user2_id, "role": "editor"},
+        json={"user_id": user_id, "role": group_role},
         headers=owner_headers,
     )
 
-    headers2 = {
+    headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {token2}",
+        "Authorization": f"Bearer {token}",
     }
-    return user2_id, headers2
+    return user_id, headers
 
 
 #############################################
@@ -786,3 +798,38 @@ class TestPrivateNotes:
         assert edited["content_md"] == "編集後の内容"
         # ユーザー2は is_owner=False であること
         assert edited["is_owner"] is False
+
+    def test_group_viewer_with_note_editor_role_can_edit_private_note(self, client, auth_headers):
+        """グループ viewer ロールのユーザーでも、プライベートノートの editor として招待されれば編集できる。
+
+        これは note_routes.py の PATCH ルートがグループレベル note:edit をバイパスし、
+        PrivateNoteMember のロールで編集可否を判断するための回帰テスト。
+        """
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        # ユーザー1: プライベートノートを作成する
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "viewerユーザーへ共有", "元の内容"
+        ).get_json()["note"]["id"]
+
+        # ユーザー2をグループに viewer として追加する（note:edit グループ権限なし）
+        user2_id, headers2 = add_second_member_as_viewer(
+            client, auth_headers["headers"], org_id, group_id
+        )
+
+        # ユーザー1: ユーザー2を private note editor として招待する
+        res_share = client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+        assert res_share.status_code == 201
+
+        # ユーザー2（グループ viewer）がプライベートノートを編集できる
+        res_edit = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"title": "viewerユーザーが編集", "content_md": "編集後の内容"},
+            headers=headers2,
+        )
+        assert res_edit.status_code == 200
+        assert res_edit.get_json()["note"]["title"] == "viewerユーザーが編集"
