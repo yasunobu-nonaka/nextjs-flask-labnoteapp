@@ -711,3 +711,45 @@ class TestPrivateNotes:
 
         res = create_private_note(client, auth_headers["headers"], org_id, group_id, "作れないノート")
         assert res.status_code == 403
+
+    def test_public_to_private_conversion_allows_subsequent_edit(self, client, auth_headers):
+        """publicで作成したノートをprivateに変更後、再度編集できる（バグ修正確認）。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        # 1. public で作成
+        note_id = create_note(
+            client, auth_headers["headers"], org_id, group_id, "最初はpublic"
+        ).get_json()["note"]["id"]
+
+        # 2. is_private=True に変更して保存
+        res = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"is_private": True},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+        assert res.get_json()["note"]["is_private"] is True
+
+        # 3. 再度内容を編集して保存できることを確認する
+        res2 = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"title": "privateになったあとも編集できる"},
+            headers=auth_headers["headers"],
+        )
+        assert res2.status_code == 200
+        assert res2.get_json()["note"]["title"] == "privateになったあとも編集できる"
+
+    def test_non_creator_cannot_convert_public_to_private(self, client, auth_headers):
+        """ノートの作成者以外はpublic→private変換を行えない。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_note(
+            client, auth_headers["headers"], org_id, group_id, "作成者以外は変更できない"
+        ).get_json()["note"]["id"]
+
+        _, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        res = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"is_private": True},
+            headers=headers2,
+        )
+        assert res.status_code == 403

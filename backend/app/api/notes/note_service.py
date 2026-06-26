@@ -151,7 +151,16 @@ def create_note_service(data, group_id, user_id):
 
 
 def update_note_service(note, data, group_id, current_user_id=None):
-    """ノート更新。プライベートノートは owner/editor のみ編集可。"""
+    """ノート更新。プライベートノートは owner/editor のみ編集可。
+
+    public → private への変換は作成者のみ実行できる。
+    変換時に PrivateNoteMember に owner が未登録なら作成者を owner として登録する。
+    """
+
+    # public → private への変換は作成者のみ許可する
+    if data.get("is_private") and not note.is_private:
+        if current_user_id is not None and current_user_id != note.created_by_user_id:
+            abort(403, description="非公開への変更はノートの作成者のみ行えます")
 
     if note.is_private and current_user_id is not None:
         member = next(
@@ -178,8 +187,19 @@ def update_note_service(note, data, group_id, current_user_id=None):
 
     if "is_private" in data:
         note.is_private = data["is_private"]
+        # public → private への変換時に owner が未登録なら作成者を owner として追加する
+        if note.is_private and current_user_id is not None:
+            existing_owner = next(
+                (m for m in note.private_members if m.role == "owner"),
+                None,
+            )
+            if existing_owner is None:
+                db.session.add(
+                    PrivateNoteMember(note_id=note.id, user_id=current_user_id, role="owner")
+                )
 
     db.session.commit()
+    db.session.refresh(note)
 
     if current_user_id is not None:
         _set_is_owner(note, current_user_id)
