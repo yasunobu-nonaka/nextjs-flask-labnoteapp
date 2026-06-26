@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import AppHeader from "@/components/AppHeader";
 import FolderSidebar from "@/components/FolderSidebar";
 import FolderCard from "@/components/FolderCard";
 import NoteCard, { type Note } from "@/components/NoteCard";
-import Modal from "@/components/Modal";
+import FolderCreateModal from "@/components/FolderCreateModal";
+import NewItemButton from "@/components/NewItemButton";
+import FolderBreadcrumb from "@/components/FolderBreadcrumb";
 import { type Folder } from "@/lib/folders";
 
 type NotesResponse = {
@@ -58,12 +59,8 @@ export default function NotesPage() {
   // 全フォルダー一覧: ブレッドクラム構築・カレントレベル算出・NoteCard の移動先に使う
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
 
-  // 新規作成ポップオーバーの開閉
-  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
-
-  // フォルダー新規作成モーダルの開閉と入力値
+  // フォルダー新規作成モーダルの開閉（NewItemButton → FolderCreateModal のブリッジ）
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
 
   // NoteCard の移動後にノート一覧を再フェッチするためのトリガー
   const [refreshKey, setRefreshKey] = useState(0);
@@ -224,24 +221,6 @@ export default function NotesPage() {
     return [{ id: null, name: "ルート" }, ...path];
   }
 
-  // 現在のフォルダー位置にフォルダーを新規作成する
-  async function handleCreateFolder() {
-    const trimmed = newFolderName.trim();
-    if (!trimmed) return;
-    const res = await authFetch(
-      `/api/organizations/${orgIdNum}/groups/${groupIdNum}/folders`,
-      {
-        method: "POST",
-        body: JSON.stringify({ name: trimmed, parent_id: currentFolderId }),
-      },
-    );
-    if (res.ok) {
-      setIsFolderModalOpen(false);
-      setNewFolderName("");
-      fetchAllFolders();
-    }
-  }
-
   const breadcrumb = getBreadcrumb();
   const isFiltering = !!submittedQuery || selectedTags.length > 0;
   // グループ内のノート一覧ページのベース URL（Link href の組み立てに使う）
@@ -285,78 +264,19 @@ export default function NotesPage() {
               </div>
               <div className="flex gap-2">
                 {/* 新規作成ポップオーバー: ノート or フォルダーを選択する */}
-                <div className="relative">
-                  {isNewMenuOpen && (
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setIsNewMenuOpen(false)}
-                    />
-                  )}
-                  <button
-                    onClick={() => setIsNewMenuOpen((v) => !v)}
-                    className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
-                  >
-                    新規作成
-                  </button>
-                  {isNewMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32">
-                      <Link
-                        href={
-                          currentFolderId
-                            ? `${notesBase}/new?folder_id=${currentFolderId}`
-                            : `${notesBase}/new`
-                        }
-                        className="block w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
-                        onClick={() => setIsNewMenuOpen(false)}
-                      >
-                        ノート
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setIsNewMenuOpen(false);
-                          setIsFolderModalOpen(true);
-                        }}
-                        className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        フォルダー
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <NewItemButton
+                  currentFolderId={currentFolderId}
+                  notesBase={notesBase}
+                  onCreateFolder={() => setIsFolderModalOpen(true)}
+                />
               </div>
             </div>
 
             {/* ブレッドクラム */}
-            <nav
-              aria-label="フォルダーの階層"
-              className="flex items-center gap-1 text-base text-gray-500 flex-wrap"
-            >
-              {breadcrumb.map((item, index) => {
-                const isLast = index === breadcrumb.length - 1;
-                return (
-                  <span
-                    key={item.id ?? "root"}
-                    className="flex items-center gap-1"
-                  >
-                    {index > 0 && (
-                      <span className="text-gray-400 select-none">›</span>
-                    )}
-                    {isLast ? (
-                      <span className="text-foreground font-medium">
-                        {item.name}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleNavigate(item.id)}
-                        className="hover:underline hover:text-foreground transition-colors"
-                      >
-                        {item.name}
-                      </button>
-                    )}
-                  </span>
-                );
-              })}
-            </nav>
+            <FolderBreadcrumb
+              breadcrumb={breadcrumb}
+              onNavigate={handleNavigate}
+            />
 
             {/* フィルター中バナー */}
             {isFiltering && (
@@ -456,49 +376,14 @@ export default function NotesPage() {
       </div>
 
       {/* フォルダー新規作成モーダル */}
-      {isFolderModalOpen && (
-        <Modal
-          title="フォルダーを作成"
-          onClose={() => {
-            setIsFolderModalOpen(false);
-            setNewFolderName("");
-          }}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleCreateFolder();
-            }}
-            className="flex flex-col gap-4"
-          >
-            <input
-              autoFocus
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="フォルダー名"
-              className="w-full px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFolderModalOpen(false);
-                  setNewFolderName("");
-                }}
-                className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
-              >
-                作成
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      <FolderCreateModal
+        isOpen={isFolderModalOpen}
+        onClose={() => setIsFolderModalOpen(false)}
+        orgId={orgIdNum}
+        groupId={groupIdNum}
+        currentFolderId={currentFolderId}
+        onCreated={fetchAllFolders}
+      />
     </main>
   );
 }
