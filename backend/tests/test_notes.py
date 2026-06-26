@@ -753,3 +753,36 @@ class TestPrivateNotes:
             headers=headers2,
         )
         assert res.status_code == 403
+
+    def test_shared_member_can_edit_private_note(self, client, auth_headers):
+        """ユーザー1がprivateノートを作成し、ユーザー2に共有後、ユーザー2が編集できる。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        # ユーザー1: プライベートノートを作成する
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "共有テストノート", "元の内容"
+        ).get_json()["note"]["id"]
+
+        # ユーザー2をグループに追加する
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # ユーザー1: ユーザー2を editor として招待する
+        res_share = client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+        assert res_share.status_code == 201
+
+        # ユーザー2: ノートを編集できることを確認する
+        res_edit = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"title": "ユーザー2が編集", "content_md": "編集後の内容"},
+            headers=headers2,
+        )
+        assert res_edit.status_code == 200
+        edited = res_edit.get_json()["note"]
+        assert edited["title"] == "ユーザー2が編集"
+        assert edited["content_md"] == "編集後の内容"
+        # ユーザー2は is_owner=False であること
+        assert edited["is_owner"] is False
