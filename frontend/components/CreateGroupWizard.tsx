@@ -2,71 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
+import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
+import RadioGroup from "@/components/RadioGroup";
+import { type OrgMember, type PendingMember } from "@/lib/types";
 
-type OrgMember = {
-  user_id: number;
-  username: string;
-  email: string;
-  role: string;
-};
 
-/** ウィザードの Step 2 で積んだ追加予定メンバー */
-type PendingMember = {
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-};
-
-const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
-};
-
-const JOIN_METHOD_OPTIONS = [
-  { value: "invite_only", label: "招待のみ" },
-  { value: "request", label: "申請制" },
-  { value: "open", label: "誰でも参加" },
-];
-
-/**
- * ラジオボタングループ（ローカル定義）。
- * name に一意な文字列を指定することで同一ページ内の複数グループが干渉しない。
- */
-function RadioGroup<T extends string | boolean>({
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  name: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {options.map((opt) => (
-        <label
-          key={String(opt.value)}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value === opt.value}
-            onChange={() => onChange(opt.value)}
-            className="w-4 h-4 accent-foreground"
-          />
-          <span className="text-sm">{opt.label}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 type Props = {
   orgId: string;
@@ -346,9 +286,9 @@ export default function CreateGroupWizard({ orgId, onCreated }: Props) {
                         onChange={(e) => setAddRole(e.target.value)}
                         className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
                       >
-                        {ASSIGNABLE_ROLES.map((role) => (
+                        {ASSIGNABLE_GROUP_ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                            {GROUP_ROLE_LABELS[role]}
                           </option>
                         ))}
                       </select>
@@ -381,7 +321,7 @@ export default function CreateGroupWizard({ orgId, onCreated }: Props) {
                             {p.email}
                           </span>
                           <span className="text-gray-600 dark:text-gray-300 shrink-0">
-                            {ROLE_LABELS[p.role]}
+                            {GROUP_ROLE_LABELS[p.role]}
                           </span>
                           {/* 追加予定リストから取り除くボタン */}
                           <button

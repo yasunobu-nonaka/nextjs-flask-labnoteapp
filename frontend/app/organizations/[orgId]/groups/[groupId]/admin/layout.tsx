@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import AppHeader from "@/components/AppHeader";
 import { PendingCountContext } from "./pending-count-context";
@@ -159,11 +160,12 @@ export default function GroupAdminLayout({
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center px-3 py-2 rounded-lg text-base transition-colors ${
+                className={clsx(
+                  "flex items-center px-3 py-2 rounded-lg text-base transition-colors",
                   isActive
                     ? "bg-gray-100 dark:bg-gray-800 font-semibold"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
+                )}
               >
                 {label}
                 {/* メンバー管理ナビのみ未承認申請数バッジを表示する */}

@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
 import Modal from "@/components/Modal";
+import { formatDate } from "@/lib/utils";
 
 export type Note = {
   id: number;
@@ -47,11 +49,7 @@ export default function NoteCard({
   // 移動先フォルダーの選択値（null = フォルダーなし）
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
 
-  const date = new Date(note.updated_at).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const date = formatDate(note.updated_at);
 
   async function handleMove() {
     const res = await authFetch(
@@ -125,11 +123,12 @@ export default function NoteCard({
               key={tag}
               type="button"
               onClick={() => onTagToggle(tag)}
-              className={`px-2 py-0.5 text-base rounded-full transition-colors max-w-32 truncate ${
+              className={clsx(
+                "px-2 py-0.5 text-base rounded-full transition-colors max-w-32 truncate",
                 selectedTags.includes(tag)
                   ? "bg-foreground text-background"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
+              )}
             >
               {tag}
             </button>
@@ -150,11 +149,12 @@ export default function NoteCard({
                     key={tag}
                     type="button"
                     onClick={() => onTagToggle(tag)}
-                    className={`px-2 py-0.5 text-base rounded-full transition-colors ${
+                    className={clsx(
+                      "px-2 py-0.5 text-base rounded-full transition-colors",
                       selectedTags.includes(tag)
                         ? "bg-foreground text-background"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
+                    )}
                   >
                     {tag}
                   </button>

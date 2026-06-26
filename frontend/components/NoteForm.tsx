@@ -2,8 +2,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { noteSchema, type NoteFormValues } from "@/lib/noteSchema";
-import { useTagInput } from "@/lib/useTagInput";
+import { noteSchema, type NoteFormValues } from "@/lib/schemas/noteSchema";
+import { useTagInput } from "@/lib/hooks/useTagInput";
 import MarkdownEditor from "@/components/MarkdownEditor";
 
 type Props = {

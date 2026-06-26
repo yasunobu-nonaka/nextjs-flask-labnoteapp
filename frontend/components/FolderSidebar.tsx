@@ -3,9 +3,13 @@
 import { authFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Modal from "@/components/Modal";
-import CreateGroupWizard from "@/components/CreateGroupWizard";
 import Link from "next/link";
+import clsx from "clsx";
+import OrgCreateModal from "@/components/OrgCreateModal";
+import OrgSwitchModal from "@/components/OrgSwitchModal";
+import GroupCreateModal from "@/components/GroupCreateModal";
+import GroupListModal, { type Group } from "@/components/GroupListModal";
+import { type OrgPolicy } from "@/lib/types";
 
 type Props = {
   orgId: string;
@@ -22,96 +26,13 @@ type Props = {
   onTagToggle: (tag: string) => void;
 };
 
-type Group = {
-  id: number;
-  name: string;
-  is_private: boolean;
-  role: string | null;
-  /** APIから返される参加ステータス: "active" | "pending" | null */
-  join_status: "active" | "pending" | null;
-  policy: {
-    join_method: string;
-    allow_private_notes: boolean;
-    is_notes_visible_to_org: boolean;
-  } | null;
-};
-
-/** 未所属グループごとの参加処理状態 */
-type JoinStatus = "idle" | "requesting" | "requested" | "canceling" | "joined";
-
-type Organization = {
-  id: number;
-  name: string;
-  role: string;
-};
-
-type OrgPolicy = {
-  allow_private_groups: boolean;
-  allow_private_notes: boolean;
-  who_can_create_groups: string;
-  default_join_method: string;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
-};
-
-const WHO_CAN_CREATE_OPTIONS = [
-  { value: "all", label: "全員" },
-  { value: "member", label: "メンバー" },
-  { value: "user_admin", label: "ユーザー管理者以上" },
-  { value: "sys_admin_only", label: "システム管理者のみ" },
-];
-
-const JOIN_METHOD_OPTIONS = [
-  { value: "invite_only", label: "招待のみ" },
-  { value: "request", label: "申請制" },
-  { value: "open", label: "誰でも参加" },
-];
-
-/**
- * ラジオボタングループ。
- * name に一意な文字列を指定することで同一ページ内の複数グループが干渉しない。
- */
-function RadioGroup<T extends string | boolean>({
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  name: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {options.map((opt) => (
-        <label
-          key={String(opt.value)}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value === opt.value}
-            onChange={() => onChange(opt.value)}
-            className="w-4 h-4 accent-foreground"
-          />
-          <span className="text-sm">{opt.label}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 /**
  * FolderSidebar コンポーネント
  * 現在の組織名・グループ一覧、キーワード検索フォーム、タグフィルターを表示する左サイドバー。
  * 「作成」ボタンで組織・グループの作成モーダルを開く。
  * 「切り替え」ボタンで組織一覧モーダル、「一覧」ボタンでグループ一覧モーダルを開く。
+ * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal / GroupListModal）に委任する。
  */
 export default function FolderSidebar({
   orgId,
@@ -129,7 +50,6 @@ export default function FolderSidebar({
   const [orgPolicy, setOrgPolicy] = useState<OrgPolicy | null>(null);
   // 全グループ（所属・未所属）を保持し、描画時にフィルターする
   const [groups, setGroups] = useState<Group[]>([]);
-  const [orgs, setOrgs] = useState<Organization[]>([]);
 
   // モーダルの開閉状態
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
@@ -137,22 +57,7 @@ export default function FolderSidebar({
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
   const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
 
-  // 組織一覧モーダルのロード状態
-  const [orgsLoading, setOrgsLoading] = useState(false);
-  const [orgsError, setOrgsError] = useState<string | null>(null);
-
   const router = useRouter();
-
-  // ---- 組織作成フォームの状態 ----
-  const [newOrgName, setNewOrgName] = useState("");
-  const [newOrgPolicy, setNewOrgPolicy] = useState({
-    allow_private_groups: true,
-    allow_private_notes: true,
-    who_can_create_groups: "member",
-    default_join_method: "invite_only",
-  });
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
-  const [orgCreateError, setOrgCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchCurrentOrganization() {
@@ -187,14 +92,6 @@ export default function FolderSidebar({
           const data: Group[] = await res.json();
           // 全グループ（所属・未所属）を保持する。表示時にフィルターする。
           setGroups(data);
-          // pending 状態のグループを「申請済み」として初期化する（リロード後の復元）
-          const initialJoinStatus = new Map<number, JoinStatus>();
-          data.forEach((g) => {
-            if (g.join_status === "pending") {
-              initialJoinStatus.set(g.id, "requested");
-            }
-          });
-          setJoinStatusMap(initialJoinStatus);
         }
       } catch (err) {
         console.error("グループ一覧の取得に失敗しました", err);
@@ -202,69 +99,6 @@ export default function FolderSidebar({
     }
     fetchGroups();
   }, [orgId, router]);
-
-  /** 組織切り替えモーダルを開く。初回のみ組織一覧を取得する。 */
-  async function handleOpenOrgSwitchModal() {
-    setIsOrgSwitchModalOpen(true);
-    if (orgs.length > 0) return;
-
-    setOrgsLoading(true);
-    setOrgsError(null);
-    try {
-      const res = await authFetch("/api/organizations");
-      if (res.ok) {
-        setOrgs(await res.json());
-      } else {
-        setOrgsError("組織一覧の取得に失敗しました");
-      }
-    } catch {
-      setOrgsError("サーバーへの接続に失敗しました");
-    } finally {
-      setOrgsLoading(false);
-    }
-  }
-
-  /** 組織作成モーダルを閉じてフォームをリセットする */
-  function handleCloseOrgCreateModal() {
-    setIsOrgCreateModalOpen(false);
-    setNewOrgName("");
-    setNewOrgPolicy({
-      allow_private_groups: true,
-      allow_private_notes: true,
-      who_can_create_groups: "member",
-      default_join_method: "invite_only",
-    });
-    setOrgCreateError(null);
-  }
-
-  /** 組織を作成してモーダルを閉じ、新組織のグループ一覧へ遷移する */
-  async function handleCreateOrg(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = newOrgName.trim();
-    if (!trimmed) return;
-
-    setIsCreatingOrg(true);
-    setOrgCreateError(null);
-    try {
-      const res = await authFetch("/api/organizations", {
-        method: "POST",
-        body: JSON.stringify({ name: trimmed, policy: newOrgPolicy }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        setOrgCreateError(json.message ?? "作成に失敗しました");
-        return;
-      }
-      const data = await res.json();
-      setOrgs((prev) => [...prev, { ...data.organization, role: "owner" }]);
-      handleCloseOrgCreateModal();
-      router.push(`/organizations/${data.organization.id}/groups`);
-    } catch {
-      setOrgCreateError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsCreatingOrg(false);
-    }
-  }
 
   // グループ作成権限の判定: orgPolicy.who_can_create_groups と orgRole を照合する
   function canCreateGroup(): boolean {
@@ -279,94 +113,6 @@ export default function FolderSidebar({
     return false;
   }
 
-  // 未所属グループごとの参加処理状態（groupId → JoinStatus）
-  const [joinStatusMap, setJoinStatusMap] = useState<Map<number, JoinStatus>>(
-    new Map(),
-  );
-  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(
-    new Map(),
-  );
-
-  /** グループへの参加申請または即時参加を行う */
-  async function handleJoin(groupId: number) {
-    setJoinStatusMap((prev) => new Map(prev).set(groupId, "requesting"));
-    setJoinErrorMap((prev) => {
-      const m = new Map(prev);
-      m.delete(groupId);
-      return m;
-    });
-    try {
-      const res = await authFetch(
-        `/api/organizations/${orgId}/groups/${groupId}/join`,
-        {
-          method: "POST",
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
-        setJoinErrorMap((prev) =>
-          new Map(prev).set(groupId, data.message ?? "参加に失敗しました"),
-        );
-        return;
-      }
-      if (data.result === "joined") {
-        // 即時参加: グループリストを更新してモーダルを閉じる
-        setGroups((prev) =>
-          prev.map((g) =>
-            g.id === groupId ? { ...g, role: "editor", join_status: "active" } : g,
-          ),
-        );
-        setIsGroupListModalOpen(false);
-        router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
-      } else {
-        // 申請送信: ボタンを「申請済み」状態にする
-        setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
-      }
-    } catch {
-      setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
-      setJoinErrorMap((prev) =>
-        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
-      );
-    }
-  }
-
-  /** グループへの参加申請をキャンセルする */
-  async function handleCancelJoin(groupId: number) {
-    setJoinStatusMap((prev) => new Map(prev).set(groupId, "canceling"));
-    setJoinErrorMap((prev) => {
-      const m = new Map(prev);
-      m.delete(groupId);
-      return m;
-    });
-    try {
-      const res = await authFetch(
-        `/api/organizations/${orgId}/groups/${groupId}/join`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
-        setJoinErrorMap((prev) =>
-          new Map(prev).set(groupId, data.message ?? "キャンセルに失敗しました"),
-        );
-        return;
-      }
-      // キャンセル成功: 申請前の状態に戻す
-      setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === groupId ? { ...g, join_status: null } : g,
-        ),
-      );
-    } catch {
-      setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
-      setJoinErrorMap((prev) =>
-        new Map(prev).set(groupId, "サーバーへの接続に失敗しました"),
-      );
-    }
-  }
-
   // サイドバーには所属グループのみ表示する（最大5件）
   const joinedGroups = groups.filter((g) => g.role !== null);
   // グループ一覧モーダル用に所属・未所属を分ける
@@ -378,6 +124,7 @@ export default function FolderSidebar({
       <div className="h-12 flex items-center px-2 pt-2 shrink-0">
         <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
       </div>
+
       {/* 現在の組織名と操作ボタン */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between px-2">
@@ -396,7 +143,7 @@ export default function FolderSidebar({
             )}
             {/* 組織切り替えボタン */}
             <button
-              onClick={handleOpenOrgSwitchModal}
+              onClick={() => setIsOrgSwitchModalOpen(true)}
               className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
             >
               切り替え
@@ -457,18 +204,20 @@ export default function FolderSidebar({
               return (
                 <div
                   key={group.id}
-                  className={`flex items-center gap-0.5 rounded transition-colors ${
+                  className={clsx(
+                    "flex items-center gap-0.5 rounded transition-colors py-0.5",
                     isActive
-                      ? "py-0.5 bg-gray-300 dark:bg-gray-600"
-                      : "py-0.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
+                      ? "bg-gray-300 dark:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                  )}
                 >
                   {/* グループ名: ノート一覧ページへのリンク */}
                   <Link
                     href={`/organizations/${orgId}/groups/${group.id}/notes`}
-                    className={`flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0 ${
-                      isActive ? "font-semibold" : ""
-                    }`}
+                    className={clsx(
+                      "flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0",
+                      isActive && "font-semibold",
+                    )}
                   >
                     <span className="truncate">{group.name}</span>
                     {/* 非公開グループにのみバッジを表示する */}
@@ -549,277 +298,71 @@ export default function FolderSidebar({
       )}
 
       {/* 組織作成モーダル */}
-      {isOrgCreateModalOpen && (
-        <Modal title="組織を作成" onClose={handleCloseOrgCreateModal}>
-          <form onSubmit={handleCreateOrg} className="flex flex-col gap-5">
-            {/* 組織名 */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold">組織名</label>
-              <input
-                autoFocus
-                type="text"
-                value={newOrgName}
-                onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="組織名を入力"
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-              />
-            </div>
-
-            {/* プライベートグループの作成 */}
-            <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">
-                プライベートグループの作成
-              </p>
-              <RadioGroup
-                name="org_allow_private_groups"
-                options={[
-                  { value: true, label: "許可" },
-                  { value: false, label: "禁止" },
-                ]}
-                value={newOrgPolicy.allow_private_groups}
-                onChange={(v) =>
-                  setNewOrgPolicy((p) => ({ ...p, allow_private_groups: v }))
-                }
-              />
-            </div>
-
-            {/* プライベートノートの作成 */}
-            <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">プライベートノートの作成</p>
-              <RadioGroup
-                name="org_allow_private_notes"
-                options={[
-                  { value: true, label: "許可" },
-                  { value: false, label: "禁止" },
-                ]}
-                value={newOrgPolicy.allow_private_notes}
-                onChange={(v) =>
-                  setNewOrgPolicy((p) => ({ ...p, allow_private_notes: v }))
-                }
-              />
-            </div>
-
-            {/* グループ作成権限 */}
-            <div className="flex flex-col gap-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">グループ作成権限</p>
-              <RadioGroup
-                name="org_who_can_create_groups"
-                options={WHO_CAN_CREATE_OPTIONS}
-                value={newOrgPolicy.who_can_create_groups}
-                onChange={(v) =>
-                  setNewOrgPolicy((p) => ({ ...p, who_can_create_groups: v }))
-                }
-              />
-            </div>
-
-            {/* デフォルト参加方式 */}
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">
-                グループへのデフォルト参加方式
-              </p>
-              <RadioGroup
-                name="org_default_join_method"
-                options={JOIN_METHOD_OPTIONS}
-                value={newOrgPolicy.default_join_method}
-                onChange={(v) =>
-                  setNewOrgPolicy((p) => ({ ...p, default_join_method: v }))
-                }
-              />
-            </div>
-
-            {orgCreateError && (
-              <p className="text-sm text-red-500">{orgCreateError}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={isCreatingOrg || !newOrgName.trim()}
-              className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
-            >
-              {isCreatingOrg ? "作成中..." : "作成"}
-            </button>
-          </form>
-        </Modal>
-      )}
+      <OrgCreateModal
+        isOpen={isOrgCreateModalOpen}
+        onClose={() => setIsOrgCreateModalOpen(false)}
+        onCreated={(org) => router.push(`/organizations/${org.id}/groups`)}
+      />
 
       {/* 組織切り替えモーダル */}
-      {isOrgSwitchModalOpen && (
-        <Modal
-          title="組織を選択"
-          onClose={() => setIsOrgSwitchModalOpen(false)}
-        >
-          <section className="flex flex-col gap-3">
-            {orgsLoading ? (
-              <p className="text-gray-500 text-base">読み込み中...</p>
-            ) : orgsError ? (
-              <p className="text-red-500 text-sm">{orgsError}</p>
-            ) : orgs.length === 0 ? (
-              <p className="text-gray-500 text-base">
-                所属している組織がありません。
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {orgs.map((org) => (
-                  <li key={org.id}>
-                    <Link
-                      href={`/organizations/${org.id}/groups`}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm transition-all"
-                      onClick={() => setIsOrgSwitchModalOpen(false)}
-                    >
-                      <span className="text-base font-medium">{org.name}</span>
-                      <span className="text-sm text-gray-400">{org.role}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </Modal>
-      )}
+      <OrgSwitchModal
+        isOpen={isOrgSwitchModalOpen}
+        onClose={() => setIsOrgSwitchModalOpen(false)}
+      />
 
-      {/* グループ作成ウィザード */}
-      {isGroupCreateModalOpen && (
-        <Modal
-          title="グループを作成"
-          onClose={() => setIsGroupCreateModalOpen(false)}
-        >
-          <CreateGroupWizard
-            orgId={orgId}
-            onCreated={(group) => {
-              // 作成者は自動的に admin になる
-              setGroups((prev) => [
-                ...prev,
-                {
-                  id: group.id,
-                  name: group.name,
-                  is_private: false,
-                  role: "admin",
-                  join_status: "active",
-                  policy: null,
-                },
-              ]);
-              setIsGroupCreateModalOpen(false);
-              router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
-            }}
-          />
-        </Modal>
-      )}
+      {/* グループ作成モーダル */}
+      <GroupCreateModal
+        orgId={orgId}
+        isOpen={isGroupCreateModalOpen}
+        onClose={() => setIsGroupCreateModalOpen(false)}
+        onCreated={(group) => {
+          // 作成者は自動的に admin になる
+          setGroups((prev) => [
+            ...prev,
+            {
+              id: group.id,
+              name: group.name,
+              is_private: false,
+              role: "admin",
+              join_status: "active",
+              policy: null,
+            },
+          ]);
+          setIsGroupCreateModalOpen(false);
+          router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
+        }}
+      />
 
-      {/* グループ一覧モーダル: 所属・未所属グループを表示する（作成フォームは独立モーダルに移動） */}
-      {isGroupListModalOpen && (
-        <Modal
-          title="グループ一覧"
-          onClose={() => setIsGroupListModalOpen(false)}
-        >
-          <div className="flex flex-col gap-6">
-            {/* 所属グループ */}
-            {joinedGroups.length > 0 && (
-              <section className="flex flex-col gap-2">
-                <h2 className="text-base font-semibold">所属グループ</h2>
-                <ul className="flex flex-col gap-2">
-                  {joinedGroups.map((group) => (
-                    <li key={group.id}>
-                      <Link
-                        href={`/organizations/${orgId}/groups/${group.id}/notes`}
-                        onClick={() => setIsGroupListModalOpen(false)}
-                        className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm transition-all"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-base font-medium">
-                            {group.name}
-                          </span>
-                          {group.is_private && (
-                            <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
-                              非公開
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-sm text-gray-400">
-                          {ROLE_LABELS[group.role!] ?? group.role}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* 未所属グループ */}
-            {unjoinedGroups.length > 0 && (
-              <section className="flex flex-col gap-2">
-                <h2 className="text-base font-semibold">未所属グループ</h2>
-                <ul className="flex flex-col gap-2">
-                  {unjoinedGroups.map((group) => {
-                    const joinMethod =
-                      group.policy?.join_method ?? "invite_only";
-                    const status = joinStatusMap.get(group.id) ?? "idle";
-                    const error = joinErrorMap.get(group.id);
-                    return (
-                      <li key={group.id}>
-                        <div className="flex flex-col gap-1 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base font-medium">
-                                {group.name}
-                              </span>
-                              {group.is_private && (
-                                <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
-                                  非公開
-                                </span>
-                              )}
-                            </div>
-                            {/* join_method に応じてボタンを切り替える */}
-                            {joinMethod === "invite_only" ? (
-                              <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-2 py-1">
-                                招待制
-                              </span>
-                            ) : status === "requested" || status === "canceling" ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-green-600 dark:text-green-400">
-                                  ✓ 申請済み
-                                </span>
-                                <button
-                                  type="button"
-                                  disabled={status === "canceling"}
-                                  onClick={() => handleCancelJoin(group.id)}
-                                  className="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {status === "canceling" ? "キャンセル中..." : "申請をキャンセル"}
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={status === "requesting"}
-                                onClick={() => handleJoin(group.id)}
-                                className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {status === "requesting"
-                                  ? "処理中..."
-                                  : joinMethod === "open"
-                                    ? "グループに参加"
-                                    : "参加を申請する"}
-                              </button>
-                            )}
-                          </div>
-                          {/* エラーメッセージ */}
-                          {error && (
-                            <p className="text-xs text-red-500">{error}</p>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
-
-            {groups.length === 0 && (
-              <p className="text-gray-500 text-base">グループがありません。</p>
-            )}
-          </div>
-        </Modal>
-      )}
+      {/* グループ一覧モーダル */}
+      <GroupListModal
+        orgId={orgId}
+        isOpen={isGroupListModalOpen}
+        onClose={() => setIsGroupListModalOpen(false)}
+        joinedGroups={joinedGroups}
+        unjoinedGroups={unjoinedGroups}
+        onImmediateJoin={(joinedGroupId) => {
+          // 即時参加: グループリストを更新してモーダルを閉じ、グループページへ遷移する
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === joinedGroupId
+                ? { ...g, role: "editor", join_status: "active" }
+                : g,
+            ),
+          );
+          setIsGroupListModalOpen(false);
+          router.push(
+            `/organizations/${orgId}/groups/${joinedGroupId}/notes`,
+          );
+        }}
+        onCancelledRequest={(cancelledGroupId) => {
+          // 申請キャンセル: join_status を null にリセットする
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === cancelledGroupId ? { ...g, join_status: null } : g,
+            ),
+          );
+        }}
+      />
     </aside>
   );
 }

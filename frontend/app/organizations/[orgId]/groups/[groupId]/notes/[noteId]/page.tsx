@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
 import { authFetch } from "@/lib/api";
+import { formatDate } from "@/lib/utils";
 
 type Note = {
   id: number;
@@ -121,16 +122,8 @@ export default function NoteDetailPage() {
     );
   }
 
-  const createdAt = new Date(note.created_at).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const updatedAt = new Date(note.updated_at).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const createdAt = formatDate(note.created_at);
+  const updatedAt = formatDate(note.updated_at);
 
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-10">

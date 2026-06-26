@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import { usePendingCount } from "../pending-count-context";
+import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS } from "@/lib/constants";
+import { type OrgMember, type PendingMember } from "@/lib/types";
 
 type GroupMember = {
   user_id: number;
@@ -24,29 +26,7 @@ type JoinRequest = {
   joined_at: string;
 };
 
-type OrgMember = {
-  user_id: number;
-  username: string;
-  email: string;
-  role: string;
-};
 
-/** モーダル内で選択・追加予定のメンバー */
-type PendingMember = {
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
-};
-
-/** グループ内で変更可能なロール一覧（全ロールが対象） */
-const ASSIGNABLE_ROLES = ["admin", "editor", "viewer"] as const;
 
 /**
  * グループ管理: メンバー管理ページ。
@@ -516,9 +496,9 @@ export default function GroupAdminMembersPage() {
                             : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300",
                         ].join(" ")}
                       >
-                        {ASSIGNABLE_ROLES.map((role) => (
+                        {ASSIGNABLE_GROUP_ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
+                            {GROUP_ROLE_LABELS[role]}
                           </option>
                         ))}
                       </select>
@@ -602,9 +582,9 @@ export default function GroupAdminMembersPage() {
                   onChange={(e) => setAddRole(e.target.value)}
                   className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
                 >
-                  {ASSIGNABLE_ROLES.map((role) => (
+                  {ASSIGNABLE_GROUP_ROLES.map((role) => (
                     <option key={role} value={role}>
-                      {ROLE_LABELS[role]}
+                      {GROUP_ROLE_LABELS[role]}
                     </option>
                   ))}
                 </select>
@@ -636,7 +616,7 @@ export default function GroupAdminMembersPage() {
                         {p.email}
                       </span>
                       <span className="text-gray-600 dark:text-gray-300 shrink-0">
-                        {ROLE_LABELS[p.role]}
+                        {GROUP_ROLE_LABELS[p.role]}
                       </span>
                       {/* 追加予定リストから取り除くボタン */}
                       <button

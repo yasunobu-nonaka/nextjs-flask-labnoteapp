@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import { ORG_ROLE_LABELS } from "@/lib/constants";
 
 type OrgData = {
   id: number;
@@ -11,12 +12,6 @@ type OrgData = {
   role: string;
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "オーナー",
-  sys_admin: "システム管理者",
-  user_admin: "ユーザー管理者",
-  member: "メンバー",
-};
 
 /**
  * 組織管理: 基本設定ページ。
@@ -148,7 +143,7 @@ export default function ConsoleBasicPage() {
       <section className="flex flex-col gap-2">
         <h3 className="text-lg font-semibold">あなたのロール</h3>
         <p className="text-base text-gray-600 dark:text-gray-300">
-          {ROLE_LABELS[org?.role ?? ""] ?? org?.role}
+          {ORG_ROLE_LABELS[org?.role ?? ""] ?? org?.role}
         </p>
       </section>
     </div>

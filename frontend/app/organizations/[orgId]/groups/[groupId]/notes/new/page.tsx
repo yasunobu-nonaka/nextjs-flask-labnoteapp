@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import { type NoteFormValues } from "@/lib/noteSchema";
+import { type NoteFormValues } from "@/lib/schemas/noteSchema";
 import NoteForm from "@/components/NoteForm";
 
 /**
