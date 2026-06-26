@@ -57,7 +57,7 @@ export default function EditNotePage() {
         }
 
         const note = await res.json();
-        setNoteData({ title: note.title, content_md: note.content_md, tags: note.tags });
+        setNoteData({ title: note.title, content_md: note.content_md, tags: note.tags, is_private: note.is_private ?? false });
         setLoadStatus("ready");
       } catch {
         setLoadError("サーバーへの接続に失敗しました");

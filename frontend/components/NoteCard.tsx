@@ -6,7 +6,14 @@ import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
 import Modal from "@/components/Modal";
+import NoteShareModal from "@/components/NoteShareModal";
 import { formatDate } from "@/lib/utils";
+
+export type PrivateMember = {
+  user_id: number;
+  username: string;
+  role: string;
+};
 
 export type Note = {
   id: number;
@@ -16,13 +23,17 @@ export type Note = {
   updated_at: string;
   tags: string[];
   folder_id: number | null;
+  is_private: boolean;
+  is_owner: boolean;
+  private_members: PrivateMember[];
 };
 
 /**
  * NoteCard コンポーネント
  * ノートを紙風のカード形式で表示する。
  * タイトルをリンクとして表示し、タグはクリックでフィルター ON/OFF。
- * ··· ボタンでフォルダー移動メニューを開く。
+ * ··· ボタンでフォルダー移動・共有メニューを開く。
+ * プライベートノートには鍵アイコンのバッジを表示する。
  */
 export default function NoteCard({
   note,
@@ -41,15 +52,21 @@ export default function NoteCard({
   folders: Folder[];
   onMoved: () => void;
 }) {
-  // カードの表示モードを3状態で管理する
-  //   idle   : 通常表示
-  //   menu   : ··· ボタンを押したときのドロップダウン表示
-  //   moving : フォルダー移動フォームの表示
-  const [mode, setMode] = useState<"idle" | "menu" | "moving">("idle");
+  // カードの表示モードを4状態で管理する
+  //   idle    : 通常表示
+  //   menu    : ··· ボタンを押したときのドロップダウン表示
+  //   moving  : フォルダー移動フォームの表示
+  //   sharing : プライベートノートのメンバー共有モーダル
+  const [mode, setMode] = useState<"idle" | "menu" | "moving" | "sharing">("idle");
   // 移動先フォルダーの選択値（null = フォルダーなし）
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
+  // 共有後にカード内の private_members を更新するためのローカルコピー
+  const [privateMembers, setPrivateMembers] = useState<PrivateMember[]>(
+    note.private_members ?? [],
+  );
 
   const date = formatDate(note.updated_at);
+  const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
 
   async function handleMove() {
     const res = await authFetch(
@@ -75,12 +92,37 @@ export default function NoteCard({
       {/* 罫線オーバーレイ: mx-4 で左右に余白を持たせてノート風の横罫線を表示する。
           isolate + [z-index:-1] でテキストより背面に配置する。 */}
       <div className="absolute inset-0 mx-4 pointer-events-none z-[-1] bg-[repeating-linear-gradient(transparent,transparent_23px,#f0f1f4_23px,#f0f1f4_24px)] dark:bg-[repeating-linear-gradient(transparent,transparent_23px,#2b3544_23px,#2b3544_24px)]" />
+
+      {/* プライベートノートの鍵アイコンバッジ（左上） */}
+      {note.is_private && (
+        <span
+          className="absolute top-2 left-2 text-gray-400 dark:text-gray-500"
+          title="非公開ノート"
+          aria-label="非公開"
+        >
+          {/* 鍵アイコン（SVG） */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className="w-3.5 h-3.5"
+          >
+            <path
+              fillRule="evenodd"
+              d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-.5V4.5A3.5 3.5 0 0 0 8 1Zm2 5V4.5a2 2 0 1 0-4 0V6h4Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </span>
+      )}
+
       {/* ドロップダウンメニュー: 透明オーバーレイ + メニュー本体 */}
       {mode === "menu" && (
         <>
           {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
           <div className="fixed inset-0 z-10" onClick={() => setMode("idle")} />
           <div className="absolute right-4 top-10 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-36">
+            {/* フォルダー移動 */}
             <button
               onClick={() => {
                 // 現在のフォルダーを初期値として移動フォームを開く
@@ -91,6 +133,15 @@ export default function NoteCard({
             >
               移動
             </button>
+            {/* 共有メニュー: プライベートノートのオーナーのみ表示 */}
+            {note.is_private && note.is_owner && (
+              <button
+                onClick={() => setMode("sharing")}
+                className="w-full text-left px-4 py-2 text-base hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                他メンバーに共有
+              </button>
+            )}
           </div>
         </>
       )}
@@ -106,7 +157,7 @@ export default function NoteCard({
 
       {/* タイトルリンク: 3行で折り返しを止めて省略 */}
       <Link
-        href={`/organizations/${orgId}/groups/${groupId}/notes/${note.id}`}
+        href={`${notesBase}/${note.id}`}
         className="font-semibold text-base leading-snug hover:underline pr-6 line-clamp-3"
       >
         {note.title}
@@ -115,7 +166,7 @@ export default function NoteCard({
       {/* フレキシブルスペーサー: 下部コンテンツをカード底部に固定する */}
       <div className="flex-1" />
 
-      {/* タグ一覧: 最大2件を表示し、超過分は「他X件」ボタンでポップオーバー表示 */}
+      {/* タグ一覧: 最大3件を表示し、超過分は「他X件」ボタンでポップオーバー表示 */}
       {note.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2 overflow-hidden">
           {note.tags.slice(0, 3).map((tag) => (
@@ -201,6 +252,18 @@ export default function NoteCard({
           </div>
         </Modal>
       )}
+
+      {/* 共有メンバー管理モーダル */}
+      <NoteShareModal
+        isOpen={mode === "sharing"}
+        onClose={() => setMode("idle")}
+        noteId={note.id}
+        orgId={orgId}
+        groupId={groupId}
+        notesBase={notesBase}
+        privateMembers={privateMembers}
+        onUpdated={setPrivateMembers}
+      />
     </li>
   );
 }

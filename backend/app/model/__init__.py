@@ -1,10 +1,11 @@
 from .rbac import Permission, RoleGlobal, RoleLocal
 from .user import User
-from .note import Note, Tag
+from .note import Note, Tag, PrivateNoteMember
 from .folder import Folder
 from .organization import Organization, OrganizationMember, OrganizationPolicy
 from .group import Group, GroupMember, GroupPolicy
 from .invitation import Invitation
+from .notification import Notification
 
 __all__ = [
     "Permission",
@@ -13,6 +14,7 @@ __all__ = [
     "User",
     "Note",
     "Tag",
+    "PrivateNoteMember",
     "Folder",
     "Organization",
     "OrganizationMember",
@@ -21,4 +23,5 @@ __all__ = [
     "GroupMember",
     "GroupPolicy",
     "Invitation",
+    "Notification",
 ]

@@ -36,7 +36,21 @@ type JoinRejectedNotification = {
   rejected_at: string | null;
 };
 
-type Notification = JoinRequestNotification | JoinApprovedNotification | JoinRejectedNotification;
+/** プライベートノートへの招待 */
+type PrivateNoteInvitationNotification = {
+  type: "private_note_invitation";
+  id: number;
+  message: string;
+  link_url: string | null;
+  is_read: boolean;
+  created_at: string | null;
+};
+
+type Notification =
+  | JoinRequestNotification
+  | JoinApprovedNotification
+  | JoinRejectedNotification
+  | PrivateNoteInvitationNotification;
 
 const POLL_INTERVAL_MS = 30_000;
 /** localStorage に保存する最終既読タイムスタンプのキー */
@@ -115,6 +129,10 @@ export default function AppHeader() {
       if (n.type === "join_request_rejected") {
         return true;
       }
+      // プライベートノート招待: is_read=false のものを未読とする
+      if (n.type === "private_note_invitation") {
+        return !n.is_read;
+      }
       return false;
     });
 
@@ -142,6 +160,14 @@ export default function AppHeader() {
       if (hasRejected) {
         authFetch("/api/notifications/rejected", { method: "DELETE" }).catch(() => {});
       }
+      // プライベートノート招待通知の未読を既読にする
+      notifications
+        .filter((n): n is PrivateNoteInvitationNotification =>
+          n.type === "private_note_invitation" && !n.is_read,
+        )
+        .forEach((n) => {
+          authFetch(`/api/notifications/${n.id}/read`, { method: "PATCH" }).catch(() => {});
+        });
     }
     setIsBellOpen((v) => !v);
     setIsUserMenuOpen(false);
@@ -273,6 +299,37 @@ export default function AppHeader() {
                             </p>
                           )}
                         </div>
+                      </li>
+                    );
+                  }
+
+                  /* プライベートノート招待: リンク先ノートへ遷移 */
+                  if (n.type === "private_note_invitation") {
+                    const inner = (
+                      <div className="px-4 py-3">
+                        <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                          {n.message}
+                        </p>
+                        {n.created_at && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {formatDateTime(n.created_at)}
+                          </p>
+                        )}
+                      </div>
+                    );
+                    return (
+                      <li key={`invite-${n.id}`}>
+                        {n.link_url ? (
+                          <Link
+                            href={n.link_url}
+                            onClick={() => setIsBellOpen(false)}
+                            className="block hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            {inner}
+                          </Link>
+                        ) : (
+                          inner
+                        )}
                       </li>
                     );
                   }

@@ -33,6 +33,8 @@ class Note(db.Model):
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content_md: Mapped[str] = mapped_column(Text, nullable=False)
+    # is_private=True のノートは作成者と PrivateNoteMember に登録されたユーザーのみに公開される
+    is_private: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_jst, index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=now_jst, onupdate=now_jst, index=True
@@ -53,8 +55,32 @@ class Note(db.Model):
     # タグ：多対多
     tags: Mapped[List[Tag]] = relationship(secondary=notes_tags, back_populates="notes")
 
+    # プライベートノート共有メンバー（is_private=True のときのみ使用）
+    private_members: Mapped[List["PrivateNoteMember"]] = relationship(
+        cascade="all, delete-orphan", lazy="select"
+    )
+
     def __repr__(self):
         return f"<Note {self.id} group={self.group_id}>"
+
+
+class PrivateNoteMember(db.Model):
+    """プライベートノートの共有メンバーテーブル。
+    作成者は role="owner" として登録される。
+    招待されたメンバーは role="editor" または "viewer" として登録される。
+    """
+    __tablename__ = "private_note_members"
+
+    note_id: Mapped[int] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    # "owner" | "editor" | "viewer"
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    invited_at: Mapped[datetime] = mapped_column(DateTime, default=now_jst)
+
+    # メンバーユーザー（username 参照のため joined ロード）
+    user: Mapped["User"] = relationship(lazy="joined")
 
 
 class Tag(db.Model):

@@ -10,6 +10,7 @@ export const noteSchema = z.object({
   tags: z
     .array(z.string().min(1).max(20, "タグ名は20文字以内で入力してください"))
     .max(10, "タグは最大10個までです"),
+  is_private: z.boolean(),
 });
 
 // noteSchema から TypeScript の型を自動生成する

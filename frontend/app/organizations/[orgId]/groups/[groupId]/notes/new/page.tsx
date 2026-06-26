@@ -67,7 +67,7 @@ export default function NewNotePage() {
         </div>
 
         <NoteForm
-          defaultValues={{ title: "", content_md: "", tags: [] }}
+          defaultValues={{ title: "", content_md: "", tags: [], is_private: false }}
           onSubmit={onSubmit}
           submitLabel="作成する"
           submittingLabel="作成中..."

@@ -47,6 +47,48 @@ def create_folder(client, headers, org_id, group_id, name):
     )
 
 
+def create_private_note(client, headers, org_id, group_id, title, content_md="content"):
+    """プライベートノートを作成するヘルパー。"""
+    return client.post(
+        notes_url(org_id, group_id),
+        json={"title": title, "content_md": content_md, "is_private": True},
+        headers=headers,
+    )
+
+
+def add_second_member(client, owner_headers, org_id, group_id):
+    """2ユーザー目を組織とグループに追加してそのユーザーのヘッダーを返す。"""
+    register_user(client, username="member2", email="member2@example.com")
+    token2 = login_and_get_token(client, identifier="member2@example.com")
+
+    # user_id を取得するため自分のプロフィールを /api/auth/me で取得する
+    res = client.get(
+        "/api/auth/me",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token2}"},
+    )
+    user2_id = res.get_json()["id"]
+
+    # 組織メンバーに追加する
+    client.post(
+        f"/api/organizations/{org_id}/members",
+        json={"user_id": user2_id, "role": "member"},
+        headers=owner_headers,
+    )
+
+    # グループメンバーに追加する（editor として）
+    client.post(
+        f"/api/organizations/{org_id}/groups/{group_id}/members",
+        json={"user_id": user2_id, "role": "editor"},
+        headers=owner_headers,
+    )
+
+    headers2 = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token2}",
+    }
+    return user2_id, headers2
+
+
 #############################################
 # tests for note creation
 #############################################
@@ -519,3 +561,153 @@ class TestTagsIndex:
         )
 
         assert res.status_code == 404
+
+
+#############################################
+# tests for private notes
+#############################################
+class TestPrivateNotes:
+    def test_create_private_note_returns_is_private_and_is_owner(self, client, auth_headers):
+        """プライベートノートを作成すると is_private=True・is_owner=True が返る。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        res = create_private_note(client, auth_headers["headers"], org_id, group_id, "秘密のノート")
+
+        data = res.get_json()
+        assert res.status_code == 201
+        assert data["note"]["is_private"] is True
+        assert data["note"]["is_owner"] is True
+
+    def test_private_note_not_visible_to_other_group_member(self, client, auth_headers):
+        """プライベートノートは他のグループメンバーの一覧に含まれない。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        create_private_note(client, auth_headers["headers"], org_id, group_id, "秘密のノート")
+
+        _, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        res = client.get(notes_url(org_id, group_id), headers=headers2)
+        assert res.status_code == 200
+        titles = [n["title"] for n in res.get_json()["notes"]]
+        assert "秘密のノート" not in titles
+
+    def test_private_note_detail_returns_404_for_non_member(self, client, auth_headers):
+        """プライベートノートは共有されていないメンバーには 404 を返す（存在を隠す）。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "秘密のノート"
+        ).get_json()["note"]["id"]
+
+        _, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        res = client.get(notes_url(org_id, group_id, note_id), headers=headers2)
+        assert res.status_code == 404
+
+    def test_private_note_visible_after_sharing(self, client, auth_headers):
+        """プライベートノートを共有すると、招待メンバーの一覧に表示される。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "共有後に見えるノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # オーナーが共有する
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "viewer"},
+            headers=auth_headers["headers"],
+        )
+
+        # 共有後は一覧に表示される
+        res = client.get(notes_url(org_id, group_id), headers=headers2)
+        titles = [n["title"] for n in res.get_json()["notes"]]
+        assert "共有後に見えるノート" in titles
+
+        # 詳細も取得できる
+        res2 = client.get(notes_url(org_id, group_id, note_id), headers=headers2)
+        assert res2.status_code == 200
+
+    def test_viewer_cannot_edit_private_note(self, client, auth_headers):
+        """viewer 権限のメンバーはプライベートノートを編集できない。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "編集不可ノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "viewer"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"title": "勝手に変えた"},
+            headers=headers2,
+        )
+        assert res.status_code == 403
+
+    def test_non_owner_cannot_delete_private_note(self, client, auth_headers):
+        """editor 権限のメンバーはプライベートノートを削除できない。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "削除不可ノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.delete(notes_url(org_id, group_id, note_id), headers=headers2)
+        assert res.status_code == 403
+
+    def test_only_owner_can_add_members(self, client, auth_headers):
+        """editor はメンバーを招待できない（オーナーのみ）。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "招待テストノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # オーナーが user2 を editor として招待
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        # user2（editor）が自分以外を招待しようとしても 403
+        register_user(client, username="member3", email="member3@example.com")
+        token3 = login_and_get_token(client, identifier="member3@example.com")
+        res3 = client.get(
+            "/api/auth/me",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token3}"},
+        )
+        user3_id = res3.get_json()["id"]
+
+        res = client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user3_id, "role": "viewer"},
+            headers=headers2,
+        )
+        assert res.status_code == 403
+
+    def test_allow_private_notes_false_rejects_creation(self, client, auth_headers):
+        """グループポリシーで allow_private_notes=False のときプライベートノート作成を拒否する。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        # グループポリシーを allow_private_notes=False に更新する
+        client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}",
+            json={"policy": {"allow_private_notes": False}},
+            headers=auth_headers["headers"],
+        )
+
+        res = create_private_note(client, auth_headers["headers"], org_id, group_id, "作れないノート")
+        assert res.status_code == 403
