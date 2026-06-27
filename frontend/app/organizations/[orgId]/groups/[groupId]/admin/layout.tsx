@@ -183,7 +183,7 @@ export default function GroupAdminLayout({
       {/* 右カラム: ヘッダー＋メインコンテンツ */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
-        <AppHeader />
+        <AppHeader showLogo={false} backHref={`/organizations/${orgId}/groups/${groupId}/notes`} backLabel="ノート一覧へ" />
         {/* メインコンテンツエリア: 各ページの内容を表示する */}
         <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
       </div>
