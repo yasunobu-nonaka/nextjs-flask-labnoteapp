@@ -70,6 +70,14 @@ export default function NotesPage() {
 
   const router = useRouter();
 
+  // このページを訪れたことを記録し、設定画面などから戻れるようにする
+  useEffect(() => {
+    localStorage.setItem(
+      "last_notes_url",
+      `/organizations/${orgId}/groups/${groupId}/notes`,
+    );
+  }, [orgId, groupId]);
+
   // グループ情報を取得してグループ名をセットする
   useEffect(() => {
     async function fetchGroupName() {

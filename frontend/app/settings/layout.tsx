@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import AppHeader from "@/components/AppHeader";
 
@@ -11,8 +12,20 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get("returnTo") ?? "/organizations";
   const pathname = usePathname();
+
+  /* returnTo クエリパラメータを優先し、なければ localStorage の最終訪問ノート一覧 URL、
+     それもなければ組織一覧をデフォルトにする */
+  const [backHref, setBackHref] = useState(
+    searchParams.get("returnTo") ?? null,
+  );
+  useEffect(() => {
+    if (!backHref) {
+      setBackHref(
+        localStorage.getItem("last_notes_url") ?? "/organizations",
+      );
+    }
+  }, []);
 
   const navItems = [
     { label: "基本設定", href: `/settings` },
@@ -66,8 +79,8 @@ export default function SettingsLayout({
         {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
         <AppHeader
           showLogo={false}
-          backHref={returnTo}
-          backLabel="戻る"
+          backHref={backHref ?? "/organizations"}
+          backLabel="ノート一覧へ"
         />
         {/* メインコンテンツエリア: 各ページの内容を表示する */}
         <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
