@@ -73,6 +73,8 @@ export default function GroupAdminMembersPage() {
   const [addError, setAddError] = useState<string | null>(null);
   // 削除確認モーダルの対象（null = 非表示）
   const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null);
+  // プライベートノートオーナー警告モーダルの内容（null = 非表示）
+  const [ownerBlockInfo, setOwnerBlockInfo] = useState<{ message: string; noteList: string } | null>(null);
 
   // 参加申請一覧の状態
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -266,10 +268,10 @@ export default function GroupAdminMembersPage() {
       }
       if (res.status === 409) {
         const json = await res.json();
-        const noteTitles = (json.owned_notes as { title: string }[])
+        const noteList = (json.owned_notes as { title: string }[])
           .map((n) => `・${n.title}`)
           .join("\n");
-        alert(`${json.message}\n\n${noteTitles}`);
+        setOwnerBlockInfo({ message: json.message, noteList });
         return;
       }
       if (!res.ok) {
@@ -554,6 +556,17 @@ export default function GroupAdminMembersPage() {
       )}
 
       {/* メンバー追加モーダル */}
+      {/* プライベートノートオーナー警告モーダル */}
+      <ConfirmModal
+        isOpen={ownerBlockInfo !== null}
+        title="メンバーを削除できません"
+        message={`${ownerBlockInfo?.message ?? ""}\n\n${ownerBlockInfo?.noteList ?? ""}`}
+        confirmLabel="閉じる"
+        hideCancelButton
+        onConfirm={() => setOwnerBlockInfo(null)}
+        onCancel={() => setOwnerBlockInfo(null)}
+      />
+
       {/* メンバー削除確認モーダル */}
       <ConfirmModal
         isOpen={memberToRemove !== null}

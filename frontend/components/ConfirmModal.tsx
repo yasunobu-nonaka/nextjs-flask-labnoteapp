@@ -17,6 +17,8 @@ type Props = {
    * "default" — 実行ボタンをデフォルト前景色にする
    */
   variant?: "danger" | "default";
+  /** true のときキャンセルボタンを非表示にする（情報表示のみのモーダルに使う） */
+  hideCancelButton?: boolean;
   /** 実行ボタン押下時のコールバック */
   onConfirm: () => void;
   /** キャンセルボタン押下またはバックドロップクリック時のコールバック */
@@ -35,6 +37,7 @@ export default function ConfirmModal({
   confirmLabel = "実行",
   cancelLabel = "キャンセル",
   variant = "default",
+  hideCancelButton = false,
   onConfirm,
   onCancel,
 }: Props) {
@@ -46,9 +49,9 @@ export default function ConfirmModal({
       : "px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity";
 
   return (
-    /* バックドロップ: z-[60] で他モーダルより前面に表示する */
+    /* バックドロップ: z-60 で他モーダルより前面に表示する */
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/40"
       onClick={onCancel}
     >
       {/* ダイアログ本体: クリックの伝播を止めてバックドロップの onClick を防ぐ */}
@@ -60,13 +63,15 @@ export default function ConfirmModal({
         {/* whitespace-pre-wrap で \n を改行として表示する */}
         <p className="text-base text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{message}</p>
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            {cancelLabel}
-          </button>
+          {!hideCancelButton && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             type="button"
             onClick={onConfirm}
