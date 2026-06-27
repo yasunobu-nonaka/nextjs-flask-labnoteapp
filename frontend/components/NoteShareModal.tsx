@@ -49,6 +49,8 @@ export default function NoteShareModal({
   const [error, setError] = useState<string | null>(null);
   // 追加中フラグ
   const [isAdding, setIsAdding] = useState(false);
+  // ロール変更中のユーザーID（複数同時操作防止）
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<number | null>(null);
   // 現在のメンバー一覧（親から受け取り、操作のたびに更新）
   const [members, setMembers] = useState<PrivateMember[]>(privateMembers);
 
@@ -101,6 +103,26 @@ export default function NoteShareModal({
     setIsAdding(false);
   }
 
+  async function handleRoleChange(targetUserId: number, newRole: "editor" | "viewer") {
+    setUpdatingRoleUserId(targetUserId);
+    setError(null);
+    const res = await authFetch(`${membersApiBase}/${targetUserId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role: newRole }),
+    });
+    if (res.ok) {
+      const updated = members.map((m) =>
+        m.user_id === targetUserId ? { ...m, role: newRole } : m,
+      );
+      setMembers(updated);
+      onUpdated(updated);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      setError(json.message ?? "ロールの変更に失敗しました");
+    }
+    setUpdatingRoleUserId(null);
+  }
+
   async function handleRemove(targetUserId: number) {
     const res = await authFetch(`${membersApiBase}/${targetUserId}`, {
       method: "DELETE",
@@ -129,26 +151,36 @@ export default function NoteShareModal({
               {members.map((m) => (
                 <li
                   key={m.user_id}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm"
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-base"
                 >
-                  <span>
-                    {m.username}
-                    {/* owner は削除できないためロールのみ表示 */}
-                    <span className="ml-2 text-gray-400">
-                      {m.role === "owner"
-                        ? "（オーナー）"
-                        : GROUP_ROLE_LABELS[m.role] ?? m.role}
-                    </span>
-                  </span>
-                  {/* owner は一覧から削除できない */}
-                  {m.role !== "owner" && (
-                    <button
-                      onClick={() => handleRemove(m.user_id)}
-                      className="text-red-500 hover:text-red-700 text-sm underline"
-                    >
-                      削除
-                    </button>
-                  )}
+                  <span className="font-medium">{m.username}</span>
+                  <div className="flex items-center gap-2">
+                    {/* owner はロール変更・削除不可 */}
+                    {m.role === "owner" ? (
+                      <span className="text-gray-400 text-base">オーナー</span>
+                    ) : (
+                      <>
+                        {/* ロール変更セレクタ */}
+                        <select
+                          value={m.role}
+                          disabled={updatingRoleUserId === m.user_id}
+                          onChange={(e) =>
+                            handleRoleChange(m.user_id, e.target.value as "editor" | "viewer")
+                          }
+                          className="px-2 py-1 text-base border border-gray-300 dark:border-gray-600 rounded bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
+                        >
+                          <option value="editor">編集者</option>
+                          <option value="viewer">閲覧者</option>
+                        </select>
+                        <button
+                          onClick={() => handleRemove(m.user_id)}
+                          className="text-red-500 hover:text-red-700 text-base underline"
+                        >
+                          削除
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

@@ -8,7 +8,7 @@ from flask import jsonify, request
 from flask_jwt_extended import jwt_required, current_user
 from marshmallow import ValidationError
 
-from app.schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, PrivateNoteMemberSchema
+from app.schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, PrivateNoteMemberSchema
 from app.api.notes.note_service import (
     get_notes_service,
     get_note_or_404_service,
@@ -17,6 +17,7 @@ from app.api.notes.note_service import (
     delete_note_service,
     get_private_note_members_service,
     add_private_note_member_service,
+    update_private_note_member_service,
     remove_private_note_member_service,
 )
 from app.api.notes.tag_service import get_group_tags
@@ -34,6 +35,7 @@ create_schema = NoteCreateSchema()
 res_schema_note = NoteResponseSchema()
 res_schema_notes = NoteResponseSchema(many=True)
 share_schema = NoteShareSchema()
+role_update_schema = NoteRoleUpdateSchema()
 res_schema_members = PrivateNoteMemberSchema(many=True)
 
 
@@ -247,6 +249,29 @@ def add_note_member(org_id, group_id, note_id):
 
     from app.schema.note_schema import PrivateNoteMemberSchema as _MemberSchema
     return jsonify({"message": "メンバーを招待しました", "member": _MemberSchema().dump(new_member)}), 201
+
+
+@organizations_bp.route(
+    "/<int:org_id>/groups/<int:group_id>/notes/<int:note_id>/members/<int:target_user_id>",
+    methods=["PATCH"],
+)
+@jwt_required()
+def update_note_member(org_id, group_id, note_id, target_user_id):
+    """プライベートノートのメンバーロールを変更する。オーナーのみ実行可。"""
+    err = _check_access(org_id, group_id, "note:read")
+    if err:
+        return err
+
+    try:
+        data = role_update_schema.load(request.get_json())
+    except ValidationError as e:
+        return jsonify({"message": "validation error", "errors": e.messages}), 400
+
+    note = get_note_or_404_service(note_id, group_id, current_user_id=current_user.id)
+    member = update_private_note_member_service(note, target_user_id, data["role"], current_user.id)
+
+    from app.schema.note_schema import PrivateNoteMemberSchema as _MemberSchema
+    return jsonify({"message": "ロールを変更しました", "member": _MemberSchema().dump(member)})
 
 
 @organizations_bp.route(

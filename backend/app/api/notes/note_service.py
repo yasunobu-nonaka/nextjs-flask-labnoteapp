@@ -32,15 +32,24 @@ def _private_access_filter(current_user_id: int):
 def _set_is_owner(note: Note, current_user_id: int) -> None:
     """スキーマが参照する is_owner 属性をノートオブジェクトに動的にセットする。"""
     owner_member = next(
-        (m for m in note.private_members if m.user_id == current_user_id and m.role == "owner"),
+        (
+            m
+            for m in note.private_members
+            if m.user_id == current_user_id and m.role == "owner"
+        ),
         None,
     )
     note.is_owner = owner_member is not None
 
 
 def get_notes_service(
-    group_id, query_word=None, tag_names=None, folder_id=None, page=1, per_page=10,
-    current_user_id=None
+    group_id,
+    query_word=None,
+    tag_names=None,
+    folder_id=None,
+    page=1,
+    per_page=10,
+    current_user_id=None,
 ):
     """ノート一覧取得。プライベートノートは作成者・共有メンバーのみに返す。"""
 
@@ -96,7 +105,10 @@ def get_note_or_404_service(note_id, group_id, current_user_id=None):
 
     if note.is_private and current_user_id is not None:
         allowed_user_ids = {m.user_id for m in note.private_members}
-        if current_user_id != note.created_by_user_id and current_user_id not in allowed_user_ids:
+        if (
+            current_user_id != note.created_by_user_id
+            and current_user_id not in allowed_user_ids
+        ):
             # 存在を隠すために 404 を返す
             abort(404)
 
@@ -136,7 +148,9 @@ def create_note_service(data, group_id, user_id):
     if is_private:
         # note.id を確定させてから PrivateNoteMember を追加する
         db.session.flush()
-        db.session.add(PrivateNoteMember(note_id=note.id, user_id=user_id, role="owner"))
+        db.session.add(
+            PrivateNoteMember(note_id=note.id, user_id=user_id, role="owner")
+        )
 
     db.session.commit()
 
@@ -195,7 +209,9 @@ def update_note_service(note, data, group_id, current_user_id=None):
             )
             if existing_owner is None:
                 db.session.add(
-                    PrivateNoteMember(note_id=note.id, user_id=current_user_id, role="owner")
+                    PrivateNoteMember(
+                        note_id=note.id, user_id=current_user_id, role="owner"
+                    )
                 )
 
     db.session.commit()
@@ -238,7 +254,9 @@ def get_private_note_members_service(note, current_user_id: int):
     return note.private_members
 
 
-def add_private_note_member_service(note, invitee_user_id: int, role: str, current_user_id: int):
+def add_private_note_member_service(
+    note, invitee_user_id: int, role: str, current_user_id: int
+):
     """プライベートノートにメンバーを追加する。オーナーのみ実行可。"""
 
     if not note.is_private:
@@ -246,7 +264,11 @@ def add_private_note_member_service(note, invitee_user_id: int, role: str, curre
 
     # オーナー確認
     owner = next(
-        (m for m in note.private_members if m.user_id == current_user_id and m.role == "owner"),
+        (
+            m
+            for m in note.private_members
+            if m.user_id == current_user_id and m.role == "owner"
+        ),
         None,
     )
     if owner is None:
@@ -268,6 +290,38 @@ def add_private_note_member_service(note, invitee_user_id: int, role: str, curre
     return new_member
 
 
+def update_private_note_member_service(note, target_user_id: int, new_role: str, current_user_id: int):
+    """プライベートノートのメンバーロールを変更する。オーナーのみ実行可。"""
+
+    if not note.is_private:
+        abort(400, description="このノートはプライベートノートではありません")
+
+    # オーナー確認
+    owner = next(
+        (m for m in note.private_members if m.user_id == current_user_id and m.role == "owner"),
+        None,
+    )
+    if owner is None:
+        abort(403, description="ロールの変更はオーナーのみ行えます")
+
+    # owner 自身のロール変更は不可
+    if target_user_id == current_user_id:
+        abort(400, description="オーナー自身のロールは変更できません")
+
+    target = next(
+        (m for m in note.private_members if m.user_id == target_user_id),
+        None,
+    )
+    if target is None:
+        abort(404, description="指定したユーザーは共有メンバーではありません")
+
+    target.role = new_role
+    db.session.commit()
+    db.session.refresh(target)
+
+    return target
+
+
 def remove_private_note_member_service(note, target_user_id: int, current_user_id: int):
     """プライベートノートのメンバーを削除する。オーナーのみ実行可。"""
 
@@ -276,7 +330,11 @@ def remove_private_note_member_service(note, target_user_id: int, current_user_i
 
     # オーナー確認
     owner = next(
-        (m for m in note.private_members if m.user_id == current_user_id and m.role == "owner"),
+        (
+            m
+            for m in note.private_members
+            if m.user_id == current_user_id and m.role == "owner"
+        ),
         None,
     )
     if owner is None:

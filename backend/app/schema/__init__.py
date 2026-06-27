@@ -4,7 +4,7 @@ from .user_schema import (
     EmailSchema,
     PasswordResetSchema,
 )
-from .note_schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, PrivateNoteMemberSchema
+from .note_schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, PrivateNoteMemberSchema
 from .notification_schema import NotificationSchema
 from .folder_schema import FolderCreateSchema, FolderRenameSchema, FolderResponseSchema
 from .organization_schema import (

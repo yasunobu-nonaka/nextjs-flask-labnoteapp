@@ -61,3 +61,11 @@ class NoteShareSchema(Schema):
         required=True,
         validate=validate.OneOf(["editor", "viewer"], error="role は editor または viewer のみ指定できます"),
     )
+
+
+class NoteRoleUpdateSchema(Schema):
+    """プライベートノートのメンバーロール変更スキーマ。"""
+    role = fields.Str(
+        required=True,
+        validate=validate.OneOf(["editor", "viewer"], error="role は editor または viewer のみ指定できます"),
+    )
