@@ -833,3 +833,42 @@ class TestPrivateNotes:
         )
         assert res_edit.status_code == 200
         assert res_edit.get_json()["note"]["title"] == "viewerユーザーが編集"
+
+    def test_editor_cannot_convert_private_to_public(self, client, auth_headers):
+        """editor 権限のメンバーはプライベートノートを公開に戻せない（オーナーのみ可）。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "公開に戻せないノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 を editor として招待する
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        # editor が private → public 変換を試みる → 403
+        res = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"is_private": False},
+            headers=headers2,
+        )
+        assert res.status_code == 403
+
+    def test_owner_can_convert_private_to_public(self, client, auth_headers):
+        """オーナーはプライベートノートを公開に戻せる。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "公開に戻すノート"
+        ).get_json()["note"]["id"]
+
+        res = client.patch(
+            notes_url(org_id, group_id, note_id),
+            json={"is_private": False},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+        assert res.get_json()["note"]["is_private"] is False
