@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 
-type UserData = {
-  id: number;
-  name: string;
-};
-
 export default function SettingHomePage() {
-  const [user, setUser] = useState<UserData | null>(null);
+  // 保存済みのユーザー名: 変更前との比較に使う
+  const [savedUsername, setSavedUsername] = useState("");
 
   // ユーザー名編集フォームの入力値と保存状態
   const [editName, setEditName] = useState("");
@@ -21,8 +17,8 @@ export default function SettingHomePage() {
     authFetch("/api/auth/me").then(async (res) => {
       if (res.ok) {
         const data = await res.json();
+        setSavedUsername(data.username);
         setEditName(data.username);
-        setUser({ id: data.id, name: data.username });
       }
     });
   }, []);
@@ -30,7 +26,7 @@ export default function SettingHomePage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = editName.trim();
-    if (!trimmed || trimmed === user?.name) return;
+    if (!trimmed || trimmed === savedUsername) return;
 
     setIsSaving(true);
     setSaveError(null);
@@ -46,7 +42,7 @@ export default function SettingHomePage() {
         return;
       }
       const json = await res.json();
-      setUser((prev) => (prev ? { ...prev, name: json.username } : prev));
+      setSavedUsername(json.username);
       setEditName(json.username);
       setSaveSuccess(true);
     } catch {
@@ -82,7 +78,7 @@ export default function SettingHomePage() {
             <button
               type="submit"
               disabled={
-                isSaving || !editName.trim() || editName.trim() === user?.name
+                isSaving || !editName.trim() || editName.trim() === savedUsername
               }
               className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
             >
