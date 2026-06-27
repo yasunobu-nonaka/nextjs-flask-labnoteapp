@@ -14,9 +14,19 @@ export const ORG_ROLE_LABELS: Record<string, string> = {
  * グループメンバー管理画面・グループ一覧モーダルなど、グループスコープのロールを表示する箇所で使う。
  */
 export const GROUP_ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
+  admin: "グループ管理者",
+  editor: "グループ内編集者",
+  viewer: "グループ内閲覧者",
+};
+
+/**
+ * プライベートノートのロール（owner / editor / viewer）の表示ラベル。
+ * グループロールの「編集者」「閲覧者」と区別するため、異なる表現を使う。
+ */
+export const PRIVATE_NOTE_ROLE_LABELS: Record<string, string> = {
+  owner: "オーナー",
+  editor: "共同編集者",
+  viewer: "読み取り専用",
 };
 
 /**

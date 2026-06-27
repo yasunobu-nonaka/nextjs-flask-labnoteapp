@@ -134,6 +134,22 @@ export default function NoteForm({
         )}
       </div>
 
+      {/* 非公開設定: チェックをいれると作成者と共有メンバーのみが閲覧できるプライベートノートになる */}
+      <div className="flex items-center gap-3">
+        <input
+          id="is_private"
+          type="checkbox"
+          {...register("is_private")}
+          className="w-4 h-4 accent-foreground"
+        />
+        <label htmlFor="is_private" className="text-sm font-medium select-none">
+          非公開ノートにする
+          <span className="ml-2 text-xs text-gray-400 font-normal">
+            （自分と共有したメンバーのみ閲覧できます）
+          </span>
+        </label>
+      </div>
+
       {globalError && <p className="text-sm text-red-500">{globalError}</p>}
 
       <button

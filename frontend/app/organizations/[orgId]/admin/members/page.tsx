@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { ORG_ROLE_LABELS } from "@/lib/constants";
+import ConfirmModal from "@/components/ConfirmModal";
 
 type Member = {
   user_id: number;
@@ -42,6 +43,8 @@ export default function ConsoleMembersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // 削除確認モーダルの対象（null = 非表示）
+  const [memberToRemove, setMemberToRemove] = useState<Member | null>(null);
 
   // マウント時にメンバー一覧を取得する
   useEffect(() => {
@@ -157,15 +160,8 @@ export default function ConsoleMembersPage() {
     setIsSaving(false);
   }
 
-  /** メンバーを組織から削除する */
+  /** メンバーを組織から削除する（確認モーダル経由で呼ばれる） */
   async function handleRemoveMember(member: Member) {
-    if (
-      !window.confirm(
-        `${member.username} をこの組織から削除しますか？この操作は取り消せません。`,
-      )
-    )
-      return;
-
     try {
       const res = await authFetch(
         `/api/organizations/${orgId}/members/${member.user_id}`,
@@ -286,7 +282,7 @@ export default function ConsoleMembersPage() {
                       {m.role !== "owner" && (
                         <button
                           type="button"
-                          onClick={() => handleRemoveMember(m)}
+                          onClick={() => setMemberToRemove(m)}
                           className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
                           aria-label={`${m.username} を削除`}
                         >
@@ -351,6 +347,22 @@ export default function ConsoleMembersPage() {
           )}
         </>
       )}
+      {/* メンバー削除確認モーダル */}
+      <ConfirmModal
+        isOpen={memberToRemove !== null}
+        title="メンバーを削除"
+        message={`${memberToRemove?.username} をこの組織から削除しますか？\nこの操作は取り消せません。`}
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={() => {
+          if (memberToRemove) {
+            const target = memberToRemove;
+            setMemberToRemove(null);
+            handleRemoveMember(target);
+          }
+        }}
+        onCancel={() => setMemberToRemove(null)}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ from typing import List
 
 from app.extensions import db
 from app.model.group import GroupMember
+from app.model.notification import Notification
 from app.model.rbac import RoleLocal
 
 
@@ -97,6 +98,58 @@ def get_member_result_notifications(user_id: int) -> List[dict]:
         })
 
     return notifications
+
+
+def create_private_note_invitation_notification(
+    invitee_user_id: int,
+    note_title: str,
+    inviter_username: str,
+    link_url: str,
+) -> None:
+    """プライベートノートへの招待通知を作成する。"""
+    notification = Notification(
+        user_id=invitee_user_id,
+        message=f"{inviter_username} さんがノート「{note_title}」をあなたと共有しました",
+        link_url=link_url,
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+
+def get_private_note_notifications(user_id: int) -> List[dict]:
+    """プライベートノート招待通知（未読）を返す。"""
+    notifications = db.session.execute(
+        db.select(Notification)
+        .filter_by(user_id=user_id, is_read=False)
+        .order_by(Notification.created_at.desc())
+        .limit(20)
+    ).scalars().all()
+
+    return [
+        {
+            "type": "private_note_invitation",
+            "id": n.id,
+            "message": n.message,
+            "link_url": n.link_url,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        }
+        for n in notifications
+    ]
+
+
+def mark_notification_as_read(notification_id: int, user_id: int) -> bool:
+    """指定した通知を既読にする。自分宛の通知のみ操作可。"""
+    notification = db.session.execute(
+        db.select(Notification).filter_by(id=notification_id, user_id=user_id)
+    ).scalar_one_or_none()
+
+    if notification is None:
+        return False
+
+    notification.is_read = True
+    db.session.commit()
+    return True
 
 
 def dismiss_rejected_notifications(user_id: int) -> None:
