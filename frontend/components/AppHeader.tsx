@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
@@ -79,7 +79,12 @@ type AppHeaderProps = {
   showLogo?: boolean;
 };
 
-export default function AppHeader({ backHref, backLabel, showLogo = true }: AppHeaderProps = {}) {
+export default function AppHeader({
+  backHref,
+  backLabel,
+  showLogo = true,
+}: AppHeaderProps = {}) {
+  const pathname = usePathname();
   const router = useRouter();
 
   const [username, setUsername] = useState<string>("");
@@ -169,17 +174,24 @@ export default function AppHeader({ backHref, backLabel, showLogo = true }: AppH
       localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
       setUnreadCount(0);
       // 拒否通知をサーバーから削除する（確認済みとして処理）
-      const hasRejected = notifications.some((n) => n.type === "join_request_rejected");
+      const hasRejected = notifications.some(
+        (n) => n.type === "join_request_rejected",
+      );
       if (hasRejected) {
-        authFetch("/api/notifications/rejected", { method: "DELETE" }).catch(() => {});
+        authFetch("/api/notifications/rejected", { method: "DELETE" }).catch(
+          () => {},
+        );
       }
       // プライベートノート招待通知の未読を既読にする
       notifications
-        .filter((n): n is PrivateNoteInvitationNotification =>
-          n.type === "private_note_invitation" && !n.is_read,
+        .filter(
+          (n): n is PrivateNoteInvitationNotification =>
+            n.type === "private_note_invitation" && !n.is_read,
         )
         .forEach((n) => {
-          authFetch(`/api/notifications/${n.id}/read`, { method: "PATCH" }).catch(() => {});
+          authFetch(`/api/notifications/${n.id}/read`, {
+            method: "PATCH",
+          }).catch(() => {});
         });
     }
     setIsBellOpen((v) => !v);
@@ -202,7 +214,9 @@ export default function AppHeader({ backHref, backLabel, showLogo = true }: AppH
     <header className="shrink-0 h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 gap-2 bg-background">
       {/* 左端: アプリ名 + 戻るリンク */}
       <div className="flex items-center gap-4">
-        {showLogo && <span className="text-lg font-bold tracking-tight">LabNoteApp</span>}
+        {showLogo && (
+          <span className="text-lg font-bold tracking-tight">LabNoteApp</span>
+        )}
         {backHref && (
           <Link
             href={backHref}
@@ -214,204 +228,222 @@ export default function AppHeader({ backHref, backLabel, showLogo = true }: AppH
       </div>
       {/* 右端: ベルアイコン・ユーザーメニュー */}
       <div className="flex items-center gap-2">
-      {/* ベルアイコン（通知ポップオーバー） */}
-      <div className="relative">
-        {isBellOpen && (
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsBellOpen(false)}
-          />
-        )}
-        <button
-          onClick={handleBellToggle}
-          className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="通知"
-        >
-          {/* ベルアイコン（SVG） */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5 text-gray-600 dark:text-gray-300"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.8}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+        {/* ベルアイコン（通知ポップオーバー） */}
+        <div className="relative">
+          {isBellOpen && (
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setIsBellOpen(false)}
             />
-          </svg>
-          {/* 未読バッジ */}
-          {unreadCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 min-w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
           )}
-        </button>
+          <button
+            onClick={handleBellToggle}
+            className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="通知"
+          >
+            {/* ベルアイコン（SVG） */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 text-gray-600 dark:text-gray-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            {/* 未読バッジ */}
+            {unreadCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 min-w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
 
-        {/* 通知ポップオーバー */}
-        {isBellOpen && (
-          <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-80">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-semibold">通知</p>
-            </div>
-            {notifications.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                新しい通知はありません
-              </p>
-            ) : (
-              <ul className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-                {notifications.map((n, i) => {
-                  /* 管理者向け: 申請を承認・拒否するページへのリンク */
-                  if (n.type === "join_request") {
-                    return (
-                      <li key={`req-${n.group_id}-${n.requester_user_id}`}>
-                        <Link
-                          href={`/organizations/${n.org_id}/groups/${n.group_id}/admin/members`}
-                          onClick={() => setIsBellOpen(false)}
-                          className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                            <span className="font-medium">{n.requester_username}</span>
-                            {" さんが "}
-                            <span className="font-medium">{n.group_name}</span>
-                            {" への参加を申請しました"}
-                          </p>
-                          {n.requested_at && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {formatDateTime(n.requested_at)}
+          {/* 通知ポップオーバー */}
+          {isBellOpen && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-80">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                <p className="text-sm font-semibold">通知</p>
+              </div>
+              {notifications.length === 0 ? (
+                <p className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                  新しい通知はありません
+                </p>
+              ) : (
+                <ul className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                  {notifications.map((n, i) => {
+                    /* 管理者向け: 申請を承認・拒否するページへのリンク */
+                    if (n.type === "join_request") {
+                      return (
+                        <li key={`req-${n.group_id}-${n.requester_user_id}`}>
+                          <Link
+                            href={`/organizations/${n.org_id}/groups/${n.group_id}/admin/members`}
+                            onClick={() => setIsBellOpen(false)}
+                            className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                              <span className="font-medium">
+                                {n.requester_username}
+                              </span>
+                              {" さんが "}
+                              <span className="font-medium">
+                                {n.group_name}
+                              </span>
+                              {" への参加を申請しました"}
                             </p>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  }
+                            {n.requested_at && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {formatDateTime(n.requested_at)}
+                              </p>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    }
 
-                  /* 申請者向け: 承認されたらグループのノートページへ遷移 */
-                  if (n.type === "join_request_approved") {
-                    return (
-                      <li key={`approved-${n.group_id}-${i}`}>
-                        <Link
-                          href={`/organizations/${n.org_id}/groups/${n.group_id}/notes`}
-                          onClick={() => setIsBellOpen(false)}
-                          className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                            <span className="font-medium">{n.group_name}</span>
-                            {" への参加が承認されました"}
-                          </p>
-                          {n.approved_at && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {formatDateTime(n.approved_at)}
+                    /* 申請者向け: 承認されたらグループのノートページへ遷移 */
+                    if (n.type === "join_request_approved") {
+                      return (
+                        <li key={`approved-${n.group_id}-${i}`}>
+                          <Link
+                            href={`/organizations/${n.org_id}/groups/${n.group_id}/notes`}
+                            onClick={() => setIsBellOpen(false)}
+                            className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                              <span className="font-medium">
+                                {n.group_name}
+                              </span>
+                              {" への参加が承認されました"}
                             </p>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  }
+                            {n.approved_at && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {formatDateTime(n.approved_at)}
+                              </p>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    }
 
-                  /* 申請者向け: 拒否された（リンクなし、メッセージのみ） */
-                  if (n.type === "join_request_rejected") {
-                    return (
-                      <li key={`rejected-${n.group_id}-${i}`}>
+                    /* 申請者向け: 拒否された（リンクなし、メッセージのみ） */
+                    if (n.type === "join_request_rejected") {
+                      return (
+                        <li key={`rejected-${n.group_id}-${i}`}>
+                          <div className="px-4 py-3">
+                            <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
+                              <span className="font-medium">
+                                {n.group_name}
+                              </span>
+                              {" への参加申請が却下されました"}
+                            </p>
+                            {n.rejected_at && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {formatDateTime(n.rejected_at)}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    }
+
+                    /* プライベートノート招待: リンク先ノートへ遷移 */
+                    if (n.type === "private_note_invitation") {
+                      const inner = (
                         <div className="px-4 py-3">
                           <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                            <span className="font-medium">{n.group_name}</span>
-                            {" への参加申請が却下されました"}
+                            {n.message}
                           </p>
-                          {n.rejected_at && (
+                          {n.created_at && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {formatDateTime(n.rejected_at)}
+                              {formatDateTime(n.created_at)}
                             </p>
                           )}
                         </div>
-                      </li>
-                    );
-                  }
+                      );
+                      return (
+                        <li key={`invite-${n.id}`}>
+                          {n.link_url ? (
+                            <Link
+                              href={n.link_url}
+                              onClick={() => setIsBellOpen(false)}
+                              className="block hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                              {inner}
+                            </Link>
+                          ) : (
+                            inner
+                          )}
+                        </li>
+                      );
+                    }
 
-                  /* プライベートノート招待: リンク先ノートへ遷移 */
-                  if (n.type === "private_note_invitation") {
-                    const inner = (
-                      <div className="px-4 py-3">
-                        <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                          {n.message}
-                        </p>
-                        {n.created_at && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {formatDateTime(n.created_at)}
-                          </p>
-                        )}
-                      </div>
-                    );
-                    return (
-                      <li key={`invite-${n.id}`}>
-                        {n.link_url ? (
-                          <Link
-                            href={n.link_url}
-                            onClick={() => setIsBellOpen(false)}
-                            className="block hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                          >
-                            {inner}
-                          </Link>
-                        ) : (
-                          inner
-                        )}
-                      </li>
-                    );
-                  }
-
-                  return null;
-                })}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ユーザーメニュー */}
-      {username && (
-        <div className="relative">
-          {isUserMenuOpen && (
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setIsUserMenuOpen(false)}
-            />
-          )}
-          {/* トリガー: アイコン + 省略ユーザー名 */}
-          <button
-            onClick={handleUserMenuToggle}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold shrink-0">
-              {username.charAt(0).toUpperCase()}
-            </span>
-            <span className="max-w-28 truncate text-sm text-gray-600 dark:text-gray-300">
-              {username}
-            </span>
-          </button>
-          {/* ポップオーバーメニュー */}
-          {isUserMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-48 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-base font-semibold shrink-0">
-                  {username.charAt(0).toUpperCase()}
-                </span>
-                <span className="text-base font-medium break-all">{username}</span>
-              </div>
-              <button
-                onClick={() => {
-                  setIsUserMenuOpen(false);
-                  handleLogout();
-                }}
-                className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                ログアウト
-              </button>
+                    return null;
+                  })}
+                </ul>
+              )}
             </div>
           )}
         </div>
-      )}
+
+        {/* ユーザーメニュー */}
+        {username && (
+          <div className="relative">
+            {isUserMenuOpen && (
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsUserMenuOpen(false)}
+              />
+            )}
+            {/* トリガー: アイコン + 省略ユーザー名 */}
+            <button
+              onClick={handleUserMenuToggle}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-semibold shrink-0">
+                {username.charAt(0).toUpperCase()}
+              </span>
+              <span className="max-w-28 truncate text-sm text-gray-600 dark:text-gray-300">
+                {username}
+              </span>
+            </button>
+            {/* ポップオーバーメニュー */}
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-48 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-base font-semibold shrink-0">
+                    {username.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="text-base font-medium break-all">
+                    {username}
+                  </span>
+                </div>
+                <div>
+                  <Link
+                    href={`/settings?returnTo=${encodeURIComponent(pathname)}`}
+                    className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    設定
+                  </Link>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  ログアウト
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
