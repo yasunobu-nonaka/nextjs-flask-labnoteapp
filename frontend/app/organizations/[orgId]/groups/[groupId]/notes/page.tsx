@@ -251,7 +251,7 @@ export default function NotesPage() {
       {/* 右カラム: ヘッダー＋メインコンテンツ */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
-        <AppHeader />
+        <AppHeader showLogo={false} />
         {/* メインコンテンツ */}
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="max-w-6xl mx-auto flex flex-col gap-6">

@@ -7,6 +7,7 @@ import Link from "next/link";
 import Markdown from "react-markdown";
 import { authFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import AppHeader from "@/components/AppHeader";
 
 type Note = {
   id: number;
@@ -105,20 +106,23 @@ export default function NoteDetailPage() {
 
   if (status === "loading") {
     return (
-      <main className="flex items-center justify-center min-h-screen bg-background text-foreground">
-        <p className="text-gray-500">読み込み中...</p>
-      </main>
+      <div className="flex flex-col min-h-screen bg-background text-foreground">
+        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500">読み込み中...</p>
+        </main>
+      </div>
     );
   }
 
   if (status === "error" || !note) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground gap-4">
-        <p className="text-red-500">{error}</p>
-        <Link href={notesListHref} className="text-sm underline text-gray-500">
-          一覧へ戻る
-        </Link>
-      </main>
+      <div className="flex flex-col min-h-screen bg-background text-foreground">
+        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <main className="flex-1 flex flex-col items-center justify-center gap-4">
+          <p className="text-red-500">{error}</p>
+        </main>
+      </div>
     );
   }
 
@@ -126,13 +130,12 @@ export default function NoteDetailPage() {
   const updatedAt = formatDate(note.updated_at);
 
   return (
-    <main className="min-h-screen bg-background text-foreground px-6 py-10">
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+      <main className="flex-1 px-6 py-10">
       <div className="max-w-3xl mx-auto flex flex-col gap-6">
-        {/* ヘッダー */}
-        <div className="flex items-center justify-between">
-          <Link href={notesListHref} className="text-sm text-gray-500 underline">
-            ← 一覧へ戻る
-          </Link>
+        {/* 編集・削除ボタン */}
+        <div className="flex justify-end">
           <div className="flex gap-2">
             <Link
               href={`/organizations/${orgId}/groups/${groupId}/notes/${noteId}/edit`}
@@ -179,6 +182,7 @@ export default function NoteDetailPage() {
           <Markdown>{note.content_md}</Markdown>
         </div>
       </div>
-    </main>
+      </main>
+    </div>
   );
 }

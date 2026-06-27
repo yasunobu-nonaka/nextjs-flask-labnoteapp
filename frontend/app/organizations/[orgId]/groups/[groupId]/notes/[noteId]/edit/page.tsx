@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/schemas/noteSchema";
 import NoteForm from "@/components/NoteForm";
+import AppHeader from "@/components/AppHeader";
 
 type LoadStatus = "loading" | "ready" | "error";
 
@@ -98,43 +98,44 @@ export default function EditNotePage() {
 
   if (loadStatus === "loading") {
     return (
-      <main className="flex items-center justify-center min-h-screen bg-background text-foreground">
-        <p className="text-gray-500">読み込み中...</p>
-      </main>
+      <div className="flex flex-col min-h-screen bg-background text-foreground">
+        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500">読み込み中...</p>
+        </main>
+      </div>
     );
   }
 
   if (loadStatus === "error") {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground gap-4">
-        <p className="text-red-500">{loadError}</p>
-        <Link href={notesListHref} className="text-sm underline text-gray-500">
-          一覧へ戻る
-        </Link>
-      </main>
+      <div className="flex flex-col min-h-screen bg-background text-foreground">
+        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <main className="flex-1 flex flex-col items-center justify-center gap-4">
+          <p className="text-red-500">{loadError}</p>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground px-6 py-10">
-      <div className="max-w-full mx-auto flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+      <main className="flex-1 px-6 py-10">
+        <div className="max-w-full mx-auto flex flex-col gap-6">
           <h1 className="text-3xl font-bold">ノートを編集</h1>
-          <Link href={noteDetailHref} className="text-sm text-gray-500 underline">
-            詳細へ戻る
-          </Link>
-        </div>
 
-        {/* loadStatus === "ready" のときだけレンダリングするため、
-            noteData は必ず非 null。NoteForm は正しい defaultValues でマウントされる。 */}
-        <NoteForm
-          defaultValues={noteData!}
-          onSubmit={onSubmit}
-          submitLabel="保存する"
-          submittingLabel="保存中..."
-          globalError={globalError}
-        />
-      </div>
-    </main>
+          {/* loadStatus === "ready" のときだけレンダリングするため、
+              noteData は必ず非 null。NoteForm は正しい defaultValues でマウントされる。 */}
+          <NoteForm
+            defaultValues={noteData!}
+            onSubmit={onSubmit}
+            submitLabel="保存する"
+            submittingLabel="保存中..."
+            globalError={globalError}
+          />
+        </div>
+      </main>
+    </div>
   );
 }

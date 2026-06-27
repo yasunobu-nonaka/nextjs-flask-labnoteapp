@@ -66,7 +66,20 @@ const LAST_SEEN_KEY = "notifications_last_seen";
  * - ベルアイコンをクリックするとポップオーバーで通知一覧を表示し、last_seen を更新する
  * - 各通知をクリックすると該当グループのメンバー管理ページへ遷移する
  */
-export default function AppHeader() {
+/**
+ * AppHeader の props。
+ * backHref / backLabel を渡すとヘッダー左端に戻るリンクを表示する。
+ */
+type AppHeaderProps = {
+  /** 戻るリンクの遷移先 URL */
+  backHref?: string;
+  /** 戻るリンクのラベル。省略時は "戻る" */
+  backLabel?: string;
+  /** アプリ名 "LabNoteApp" を表示するか。サイドバーに既に表示されるページでは false を渡す。デフォルト true */
+  showLogo?: boolean;
+};
+
+export default function AppHeader({ backHref, backLabel, showLogo = true }: AppHeaderProps = {}) {
   const router = useRouter();
 
   const [username, setUsername] = useState<string>("");
@@ -186,7 +199,21 @@ export default function AppHeader() {
   }
 
   return (
-    <header className="shrink-0 h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-end px-4 gap-2 bg-background">
+    <header className="shrink-0 h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 gap-2 bg-background">
+      {/* 左端: アプリ名 + 戻るリンク */}
+      <div className="flex items-center gap-4">
+        {showLogo && <span className="text-lg font-bold tracking-tight">LabNoteApp</span>}
+        {backHref && (
+          <Link
+            href={backHref}
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
+          >
+            {backLabel ?? "戻る"}
+          </Link>
+        )}
+      </div>
+      {/* 右端: ベルアイコン・ユーザーメニュー */}
+      <div className="flex items-center gap-2">
       {/* ベルアイコン（通知ポップオーバー） */}
       <div className="relative">
         {isBellOpen && (
@@ -385,6 +412,7 @@ export default function AppHeader() {
           )}
         </div>
       )}
+      </div>
     </header>
   );
 }
