@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import current_app
+from flask import current_app, render_template
 from flask_mail import Message
 
 from app.extensions import db, mail
@@ -64,10 +64,16 @@ def _send_invitation_email(invitation: Invitation, org: Organization) -> None:
     frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
     accept_url = f"{frontend_url}/invitations/{invitation.token}"
 
+    html_body = render_template(
+        "email/invitation.html",
+        org_name=org.name,
+        accept_url=accept_url,
+    )
     msg = Message(
         subject=f"【LabNote】{org.name} への招待",
         sender="noreply@example.com",
         recipients=[invitation.email],
+        html=html_body,
         body=(
             f"{org.name} への参加招待が届いています。\n\n"
             f"以下のリンクをクリックして招待を承認してください。\n"

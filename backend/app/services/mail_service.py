@@ -13,16 +13,6 @@ logging.basicConfig(
 )
 
 
-def send_welcome_email(user_email: str, username: str):
-    msg = Message(
-        subject=f"ノートアプリ登録完了",
-        sender="noreply@example.com",
-        recipients=[user_email],
-    )
-    msg.body = f"ようこそ{username}さん！ラボノートアプリへの登録が完了しました。"
-    mail.send(msg)
-
-
 def generate_email_verification_token(email):
     """メール認証用のトークンを生成"""
     serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
@@ -128,7 +118,9 @@ def send_email_change_confirmation(pending_email, token):
         logging.info(f"Email change confirmation sent to {pending_email}")
         return True
     except Exception as e:
-        logging.error(f"Failed to send email change confirmation to {pending_email}: {str(e)}")
+        logging.error(
+            f"Failed to send email change confirmation to {pending_email}: {str(e)}"
+        )
         return False
 
 
