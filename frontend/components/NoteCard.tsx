@@ -43,6 +43,7 @@ export default function NoteCard({
   onTagToggle,
   folders,
   onMoved,
+  onDeleted,
 }: {
   note: Note;
   orgId: number;
@@ -51,6 +52,7 @@ export default function NoteCard({
   onTagToggle: (tag: string) => void;
   folders: Folder[];
   onMoved: () => void;
+  onDeleted: () => void;
 }) {
   // カードの表示モードを4状態で管理する
   //   idle    : 通常表示
@@ -67,6 +69,17 @@ export default function NoteCard({
 
   const date = formatDate(note.updated_at);
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
+
+  async function handleDelete() {
+    if (!confirm(`「${note.title}」を削除しますか？`)) return;
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/notes/${note.id}`,
+      { method: "DELETE" },
+    );
+    if (res.ok) {
+      onDeleted();
+    }
+  }
 
   async function handleMove() {
     const res = await authFetch(
@@ -142,6 +155,13 @@ export default function NoteCard({
                 他メンバーに共有
               </button>
             )}
+            {/* 削除 */}
+            <button
+              onClick={() => { setMode("idle"); handleDelete(); }}
+              className="w-full text-left px-4 py-2 text-base text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+            >
+              削除
+            </button>
           </div>
         </>
       )}

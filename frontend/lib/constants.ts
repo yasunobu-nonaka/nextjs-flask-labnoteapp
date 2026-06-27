@@ -20,6 +20,16 @@ export const GROUP_ROLE_LABELS: Record<string, string> = {
 };
 
 /**
+ * プライベートノートのロール（owner / editor / viewer）の表示ラベル。
+ * グループロールの「編集者」「閲覧者」と区別するため、異なる表現を使う。
+ */
+export const PRIVATE_NOTE_ROLE_LABELS: Record<string, string> = {
+  owner: "オーナー",
+  editor: "共同編集者",
+  viewer: "読み取り専用",
+};
+
+/**
  * グループメンバーに割り当て可能なロール一覧（権限が強い順）。
  * ロール選択 `<select>` や RadioGroup で選択肢として使う。
  */

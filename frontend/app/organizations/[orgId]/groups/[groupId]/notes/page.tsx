@@ -343,6 +343,7 @@ export default function NotesPage() {
                       onTagToggle={handleTagToggle}
                       folders={allFolders}
                       onMoved={handleNoteMoved}
+                      onDeleted={handleNoteMoved}
                     />
                   ))}
                 </ul>

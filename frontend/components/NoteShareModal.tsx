@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
 import { type PrivateMember } from "@/components/NoteCard";
-import { GROUP_ROLE_LABELS } from "@/lib/constants";
+import { GROUP_ROLE_LABELS, PRIVATE_NOTE_ROLE_LABELS } from "@/lib/constants";
 
 /** グループメンバー（招待先候補として取得するもの） */
 type GroupMember = {
@@ -169,8 +169,8 @@ export default function NoteShareModal({
                           }
                           className="px-2 py-1 text-base border border-gray-300 dark:border-gray-600 rounded bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground disabled:opacity-50"
                         >
-                          <option value="editor">編集者</option>
-                          <option value="viewer">閲覧者</option>
+                          <option value="editor">{PRIVATE_NOTE_ROLE_LABELS.editor}</option>
+                          <option value="viewer">{PRIVATE_NOTE_ROLE_LABELS.viewer}</option>
                         </select>
                         <button
                           onClick={() => handleRemove(m.user_id)}
@@ -214,10 +214,10 @@ export default function NoteShareModal({
               onChange={(e) =>
                 setSelectedRole(e.target.value as "editor" | "viewer")
               }
-              className="w-28 px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+              className="w-36 px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
             >
-              <option value="editor">編集者</option>
-              <option value="viewer">閲覧者</option>
+              <option value="editor">{PRIVATE_NOTE_ROLE_LABELS.editor}</option>
+              <option value="viewer">{PRIVATE_NOTE_ROLE_LABELS.viewer}</option>
             </select>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
