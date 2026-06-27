@@ -79,6 +79,29 @@ def check_password_and_get_tokens(user, password):
     return None, None
 
 
+def get_user_by_pending_email(email):
+    """pending_email が一致するユーザーを返す。メール変更確定時のユーザー特定に使う。"""
+    user = db.session.execute(
+        db.select(User).filter_by(pending_email=email)
+    ).scalar_one_or_none()
+    return user
+
+
+def initiate_email_change(user, new_email):
+    """pending_email に新メールアドレスを保存する。呼び出し前に重複チェックを済ませること。"""
+    user.pending_email = new_email
+    db.session.commit()
+    return user
+
+
+def confirm_email_change(user):
+    """pending_email を本メールアドレスに昇格し、pending_email をクリアする。"""
+    user.email = user.pending_email
+    user.pending_email = None
+    db.session.commit()
+    return user
+
+
 def update_username(user, new_username):
     """ユーザー名を変更する。呼び出し前に重複チェックを済ませること。"""
     user.username = new_username
