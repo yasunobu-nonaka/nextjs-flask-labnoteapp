@@ -14,9 +14,9 @@ export const ORG_ROLE_LABELS: Record<string, string> = {
  * グループメンバー管理画面・グループ一覧モーダルなど、グループスコープのロールを表示する箇所で使う。
  */
 export const GROUP_ROLE_LABELS: Record<string, string> = {
-  admin: "管理者",
-  editor: "編集者",
-  viewer: "閲覧者",
+  admin: "グループ管理者",
+  editor: "グループ内編集者",
+  viewer: "グループ内閲覧者",
 };
 
 /**
