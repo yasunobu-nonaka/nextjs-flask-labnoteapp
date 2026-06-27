@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
+import ConfirmModal from "@/components/ConfirmModal";
 import { type PrivateMember } from "@/components/NoteCard";
 import { GROUP_ROLE_LABELS, PRIVATE_NOTE_ROLE_LABELS } from "@/lib/constants";
 
@@ -53,6 +54,8 @@ export default function NoteShareModal({
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState<number | null>(null);
   // オーナー移管処理中フラグ
   const [isTransferring, setIsTransferring] = useState(false);
+  // 移管確認モーダルの対象（null = 非表示）
+  const [transferTarget, setTransferTarget] = useState<{ userId: number; username: string } | null>(null);
   // 現在のメンバー一覧（親から受け取り、操作のたびに更新）
   const [members, setMembers] = useState<PrivateMember[]>(privateMembers);
 
@@ -125,8 +128,7 @@ export default function NoteShareModal({
     setUpdatingRoleUserId(null);
   }
 
-  async function handleTransferOwner(targetUserId: number, targetUsername: string) {
-    if (!confirm(`「${targetUsername}」にオーナーを移管しますか？\nあなたは共同編集者に変わります。この操作は取り消せません。`)) return;
+  async function executeTransferOwner(targetUserId: number) {
     setIsTransferring(true);
     setError(null);
     const res = await authFetch(
@@ -162,6 +164,7 @@ export default function NoteShareModal({
   if (!isOpen) return null;
 
   return (
+    <>
     <Modal title="ノートを共有" onClose={onClose}>
       <div className="flex flex-col gap-5">
         {/* 現在の共有メンバー一覧 */}
@@ -199,7 +202,7 @@ export default function NoteShareModal({
                         </select>
                         {/* オーナー移管ボタン */}
                         <button
-                          onClick={() => handleTransferOwner(m.user_id, m.username)}
+                          onClick={() => setTransferTarget({ userId: m.user_id, username: m.username })}
                           disabled={isTransferring}
                           className="text-blue-500 hover:text-blue-700 text-base underline disabled:opacity-50"
                         >
@@ -286,5 +289,23 @@ export default function NoteShareModal({
         </div>
       </div>
     </Modal>
+
+    {/* オーナー移管確認モーダル: Modal より前面に表示するため Fragment の兄弟要素として配置する */}
+    <ConfirmModal
+      isOpen={transferTarget !== null}
+      title="オーナーを移管"
+      message={`「${transferTarget?.username}」にオーナーを移管しますか？\nあなたは共同編集者に変わります。この操作は取り消せません。`}
+      confirmLabel="移管する"
+      variant="default"
+      onConfirm={() => {
+        if (transferTarget) {
+          const { userId } = transferTarget;
+          setTransferTarget(null);
+          executeTransferOwner(userId);
+        }
+      }}
+      onCancel={() => setTransferTarget(null)}
+    />
+    </>
   );
 }

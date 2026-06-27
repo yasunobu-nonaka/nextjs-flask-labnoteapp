@@ -8,6 +8,7 @@ import Markdown from "react-markdown";
 import { authFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import AppHeader from "@/components/AppHeader";
+import ConfirmModal from "@/components/ConfirmModal";
 import NoteShareModal from "@/components/NoteShareModal";
 import { type PrivateMember } from "@/components/NoteCard";
 
@@ -39,6 +40,7 @@ export default function NoteDetailPage() {
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isNotFound, setIsNotFound] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const router = useRouter();
@@ -83,8 +85,6 @@ export default function NoteDetailPage() {
   }, [noteApiPath, router]);
 
   async function handleDelete() {
-    if (!confirm("このノートを削除しますか？")) return;
-
     setIsDeleting(true);
     try {
       const res = await authFetch(noteApiPath, { method: "DELETE" });
@@ -158,7 +158,7 @@ export default function NoteDetailPage() {
             編集
           </Link>
           <button
-            onClick={handleDelete}
+            onClick={() => setIsDeleteConfirmOpen(true)}
             disabled={isDeleting}
             className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50"
           >
@@ -208,6 +208,17 @@ export default function NoteDetailPage() {
         </div>
       </div>
       </main>
+
+      {/* 削除確認モーダル */}
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="ノートを削除"
+        message={`「${note.title}」を削除しますか？\nこの操作は取り消せません。`}
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={() => { setIsDeleteConfirmOpen(false); handleDelete(); }}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
+      />
 
       {/* 共有設定モーダル: オーナーが共有メンバーを管理する */}
       <NoteShareModal

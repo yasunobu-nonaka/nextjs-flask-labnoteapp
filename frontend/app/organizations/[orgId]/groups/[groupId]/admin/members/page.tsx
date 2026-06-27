@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import Modal from "@/components/Modal";
+import ConfirmModal from "@/components/ConfirmModal";
 import { usePendingCount } from "../pending-count-context";
 import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS } from "@/lib/constants";
 import { type OrgMember, type PendingMember } from "@/lib/types";
@@ -70,6 +71,8 @@ export default function GroupAdminMembersPage() {
 
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  // 削除確認モーダルの対象（null = 非表示）
+  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null);
 
   // 参加申請一覧の状態
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -250,15 +253,8 @@ export default function GroupAdminMembersPage() {
     }
   }
 
-  /** メンバーをグループから削除する */
+  /** メンバーをグループから削除する（確認モーダル経由で呼ばれる） */
   async function handleRemoveMember(member: GroupMember) {
-    if (
-      !window.confirm(
-        `${member.username} をこのグループから削除しますか？この操作は取り消せません。`,
-      )
-    )
-      return;
-
     try {
       const res = await authFetch(
         `/api/organizations/${orgId}/groups/${groupId}/members/${member.user_id}`,
@@ -514,7 +510,7 @@ export default function GroupAdminMembersPage() {
                     <td className="py-3 px-3 text-right whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => handleRemoveMember(m)}
+                        onClick={() => setMemberToRemove(m)}
                         className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
                         aria-label={`${m.username} を削除`}
                       >
@@ -558,6 +554,23 @@ export default function GroupAdminMembersPage() {
       )}
 
       {/* メンバー追加モーダル */}
+      {/* メンバー削除確認モーダル */}
+      <ConfirmModal
+        isOpen={memberToRemove !== null}
+        title="メンバーを削除"
+        message={`${memberToRemove?.username} をこのグループから削除しますか？\nこの操作は取り消せません。`}
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={() => {
+          if (memberToRemove) {
+            const target = memberToRemove;
+            setMemberToRemove(null);
+            handleRemoveMember(target);
+          }
+        }}
+        onCancel={() => setMemberToRemove(null)}
+      />
+
       {isAddModalOpen && (
         <Modal title="メンバーを追加" onClose={handleCloseModal}>
           <div className="flex flex-col gap-5">

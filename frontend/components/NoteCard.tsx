@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
 import Modal from "@/components/Modal";
+import ConfirmModal from "@/components/ConfirmModal";
 import NoteShareModal from "@/components/NoteShareModal";
 import { formatDate } from "@/lib/utils";
 
@@ -60,6 +61,8 @@ export default function NoteCard({
   //   moving  : フォルダー移動フォームの表示
   //   sharing : プライベートノートのメンバー共有モーダル
   const [mode, setMode] = useState<"idle" | "menu" | "moving" | "sharing">("idle");
+  // 削除確認モーダルの表示フラグ
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   // 移動先フォルダーの選択値（null = フォルダーなし）
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
   // 共有後にカード内の private_members を更新するためのローカルコピー
@@ -71,7 +74,6 @@ export default function NoteCard({
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
 
   async function handleDelete() {
-    if (!confirm(`「${note.title}」を削除しますか？`)) return;
     const res = await authFetch(
       `/api/organizations/${orgId}/groups/${groupId}/notes/${note.id}`,
       { method: "DELETE" },
@@ -157,7 +159,7 @@ export default function NoteCard({
             )}
             {/* 削除 */}
             <button
-              onClick={() => { setMode("idle"); handleDelete(); }}
+              onClick={() => { setMode("idle"); setIsDeleteConfirmOpen(true); }}
               className="w-full text-left px-4 py-2 text-base text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
             >
               削除
@@ -272,6 +274,17 @@ export default function NoteCard({
           </div>
         </Modal>
       )}
+
+      {/* 削除確認モーダル */}
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        title="ノートを削除"
+        message={`「${note.title}」を削除しますか？\nこの操作は取り消せません。`}
+        confirmLabel="削除"
+        variant="danger"
+        onConfirm={() => { setIsDeleteConfirmOpen(false); handleDelete(); }}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
+      />
 
       {/* 共有メンバー管理モーダル */}
       <NoteShareModal
