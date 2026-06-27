@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_tok
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema, UsernameUpdateSchema, EmailUpdateSchema
+from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordChangeSchema
 from app.extensions import db
 from app.services.mail_service import (
     send_verification_email,
@@ -38,6 +38,7 @@ email_schema = EmailSchema()
 password_reset_schema = PasswordResetSchema()
 username_update_schema = UsernameUpdateSchema()
 email_update_schema = EmailUpdateSchema()
+password_change_schema = PasswordChangeSchema()
 
 #########################################################
 # ユーザー登録処理
@@ -210,6 +211,22 @@ def update_me_username():
 
     update_username(current_user, new_username)
     return jsonify({"username": current_user.username}), 200
+
+
+@auth_bp.route("/me/password", methods=["PATCH"])
+@jwt_required()
+def update_me_password():
+    """ログイン中のユーザーのパスワードを変更する"""
+    try:
+        data = password_change_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    if not current_user.check_password(data["current_password"]):
+        return jsonify({"message": "現在のパスワードが正しくありません"}), 401
+
+    update_user_password(current_user, data["password"])
+    return jsonify({"message": "パスワードを変更しました"}), 200
 
 
 @auth_bp.route("/me/email", methods=["PATCH"])

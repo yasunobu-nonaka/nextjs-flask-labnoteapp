@@ -5,6 +5,7 @@ from .user_schema import (
     PasswordResetSchema,
     UsernameUpdateSchema,
     EmailUpdateSchema,
+    PasswordChangeSchema,
 )
 from .note_schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, NoteTransferOwnerSchema, PrivateNoteMemberSchema
 from .notification_schema import NotificationSchema

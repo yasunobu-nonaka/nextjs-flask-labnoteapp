@@ -35,7 +35,7 @@ export default function SettingHomePage() {
     });
   }, []);
 
-  async function handleEmailSave(e: React.FormEvent) {
+  async function handleEmailSave(e: React.SyntheticEvent) {
     e.preventDefault();
     const trimmed = editEmail.trim();
     if (!trimmed || trimmed === savedEmail) return;
@@ -60,7 +60,7 @@ export default function SettingHomePage() {
     }
   }
 
-  async function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.SyntheticEvent) {
     e.preventDefault();
     const trimmed = editName.trim();
     if (!trimmed || trimmed === savedUsername) return;
