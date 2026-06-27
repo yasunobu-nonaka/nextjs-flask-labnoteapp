@@ -330,6 +330,25 @@ def update_group_member_role(member: GroupMember, role: str) -> GroupMember:
     return member
 
 
+def get_owned_private_notes_in_group(user_id: int, group_id: int):
+    """指定グループ内でユーザーがオーナーであるプライベートノートの一覧を返す。
+
+    グループメンバー削除前の確認に使う。オーナーノートが残っている場合は削除をブロックする。
+    """
+    from app.model import Note, PrivateNoteMember
+
+    return db.session.execute(
+        db.select(Note)
+        .join(PrivateNoteMember, PrivateNoteMember.note_id == Note.id)
+        .filter(
+            Note.group_id == group_id,
+            Note.is_private == True,  # noqa: E712
+            PrivateNoteMember.user_id == user_id,
+            PrivateNoteMember.role == "owner",
+        )
+    ).scalars().all()
+
+
 def remove_group_member(member: GroupMember) -> None:
     """グループメンバーを削除する。"""
 

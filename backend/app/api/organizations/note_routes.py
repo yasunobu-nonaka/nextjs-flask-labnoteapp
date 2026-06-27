@@ -8,7 +8,7 @@ from flask import jsonify, request
 from flask_jwt_extended import jwt_required, current_user
 from marshmallow import ValidationError
 
-from app.schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, PrivateNoteMemberSchema
+from app.schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, NoteTransferOwnerSchema, PrivateNoteMemberSchema
 from app.api.notes.note_service import (
     get_notes_service,
     get_note_or_404_service,
@@ -19,6 +19,7 @@ from app.api.notes.note_service import (
     add_private_note_member_service,
     update_private_note_member_service,
     remove_private_note_member_service,
+    transfer_note_owner_service,
 )
 from app.api.notes.tag_service import get_group_tags
 from flask import abort
@@ -36,6 +37,7 @@ res_schema_note = NoteResponseSchema()
 res_schema_notes = NoteResponseSchema(many=True)
 share_schema = NoteShareSchema()
 role_update_schema = NoteRoleUpdateSchema()
+transfer_owner_schema = NoteTransferOwnerSchema()
 res_schema_members = PrivateNoteMemberSchema(many=True)
 
 
@@ -272,6 +274,27 @@ def update_note_member(org_id, group_id, note_id, target_user_id):
 
     from app.schema.note_schema import PrivateNoteMemberSchema as _MemberSchema
     return jsonify({"message": "ロールを変更しました", "member": _MemberSchema().dump(member)})
+
+
+@organizations_bp.route(
+    "/<int:org_id>/groups/<int:group_id>/notes/<int:note_id>/transfer-owner",
+    methods=["PATCH"],
+)
+@jwt_required()
+def transfer_note_owner(org_id, group_id, note_id):
+    """プライベートノートのオーナーを共有メンバーに移管する。現オーナーは editor に降格する。"""
+    err = _check_access(org_id, group_id, "note:read")
+    if err:
+        return err
+
+    try:
+        data = transfer_owner_schema.load(request.get_json())
+    except ValidationError as e:
+        return jsonify({"message": "validation error", "errors": e.messages}), 400
+
+    note = get_note_or_404_service(note_id, group_id, current_user_id=current_user.id)
+    note = transfer_note_owner_service(note, data["new_owner_user_id"], current_user.id)
+    return jsonify({"message": "オーナーを移管しました", "note": res_schema_note.dump(note)})
 
 
 @organizations_bp.route(

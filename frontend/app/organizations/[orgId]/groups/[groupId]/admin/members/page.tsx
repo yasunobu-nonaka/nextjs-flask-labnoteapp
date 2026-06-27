@@ -268,6 +268,14 @@ export default function GroupAdminMembersPage() {
         router.push("/login");
         return;
       }
+      if (res.status === 409) {
+        const json = await res.json();
+        const noteTitles = (json.owned_notes as { title: string }[])
+          .map((n) => `・${n.title}`)
+          .join("\n");
+        alert(`${json.message}\n\n${noteTitles}`);
+        return;
+      }
       if (!res.ok) {
         const json = await res.json();
         alert(json.message ?? "削除に失敗しました");

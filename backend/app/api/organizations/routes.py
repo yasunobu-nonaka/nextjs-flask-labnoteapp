@@ -48,6 +48,7 @@ from app.api.organizations.group_service import (
     cancel_join_request,
     update_group_member_role,
     remove_group_member,
+    get_owned_private_notes_in_group,
     update_group,
     update_group_policy,
     delete_group,
@@ -556,6 +557,14 @@ def remove_grp_member(org_id, group_id, member_user_id):
     member = check_group_membership(member_user_id, group_id)
     if not member:
         return jsonify({"message": "グループメンバーが見つかりません"}), 404
+
+    # オーナーであるプライベートノートが残っている場合は削除をブロックする
+    owned_notes = get_owned_private_notes_in_group(member_user_id, group_id)
+    if owned_notes:
+        return jsonify({
+            "message": "このメンバーがオーナーのプライベートノートが残っています。先にオーナーを移管してください。",
+            "owned_notes": [{"id": n.id, "title": n.title} for n in owned_notes],
+        }), 409
 
     remove_group_member(member)
     return "", 204

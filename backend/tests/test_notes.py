@@ -872,3 +872,130 @@ class TestPrivateNotes:
         )
         assert res.status_code == 200
         assert res.get_json()["note"]["is_private"] is False
+
+    def test_owner_can_transfer_ownership(self, client, auth_headers):
+        """オーナーは共有メンバーにオーナーを移管できる。移管後に自分は editor になる。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "移管テストノート"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 を editor として招待する
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        # user1 が user2 にオーナーを移管する
+        res = client.patch(
+            notes_url(org_id, group_id, note_id) + "/transfer-owner",
+            json={"new_owner_user_id": user2_id},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+
+        # user2 は is_owner=True になる
+        res2 = client.get(notes_url(org_id, group_id, note_id), headers=headers2)
+        assert res2.status_code == 200
+        assert res2.get_json()["is_owner"] is True
+
+        # user1 は is_owner=False になる（editor に降格）
+        res3 = client.get(notes_url(org_id, group_id, note_id), headers=auth_headers["headers"])
+        assert res3.status_code == 200
+        assert res3.get_json()["is_owner"] is False
+
+    def test_non_owner_cannot_transfer_ownership(self, client, auth_headers):
+        """オーナー以外はオーナー移管を実行できない。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "移管不可テスト"
+        ).get_json()["note"]["id"]
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 を editor として招待する
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": user2_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        # user2（editor）が自分宛てに移管しようとしても 403
+        res = client.patch(
+            notes_url(org_id, group_id, note_id) + "/transfer-owner",
+            json={"new_owner_user_id": auth_headers["user_id"]},
+            headers=headers2,
+        )
+        assert res.status_code == 403
+
+    def test_transfer_to_non_member_returns_404(self, client, auth_headers):
+        """共有されていないユーザーへの移管は 404 を返す。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "移管先未共有テスト"
+        ).get_json()["note"]["id"]
+
+        user2_id, _ = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 を共有メンバーにしないまま移管しようとする → 404
+        res = client.patch(
+            notes_url(org_id, group_id, note_id) + "/transfer-owner",
+            json={"new_owner_user_id": user2_id},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 404
+
+    def test_remove_group_member_blocked_if_owns_private_notes(self, client, auth_headers):
+        """プライベートノートのオーナーであるメンバーは 409 でグループ削除をブロックされる。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 がプライベートノートを作成する
+        note_title = "user2のプライベートノート"
+        create_private_note(client, headers2, org_id, group_id, note_title)
+
+        # user1（管理者）が user2 をグループから削除しようとする → 409
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{user2_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+        data = res.get_json()
+        assert "owned_notes" in data
+        assert any(n["title"] == note_title for n in data["owned_notes"])
+
+    def test_remove_group_member_succeeds_after_transfer(self, client, auth_headers):
+        """オーナー移管後はグループメンバーを削除できる。"""
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 がプライベートノートを作成する
+        note_id = create_private_note(
+            client, headers2, org_id, group_id, "移管後に削除テスト"
+        ).get_json()["note"]["id"]
+
+        # user2 が user1 を editor として共有する
+        client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": auth_headers["user_id"], "role": "editor"},
+            headers=headers2,
+        )
+
+        # user2 が user1 にオーナーを移管する
+        client.patch(
+            notes_url(org_id, group_id, note_id) + "/transfer-owner",
+            json={"new_owner_user_id": auth_headers["user_id"]},
+            headers=headers2,
+        )
+
+        # オーナー移管後は user2 をグループから削除できる
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{user2_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 204

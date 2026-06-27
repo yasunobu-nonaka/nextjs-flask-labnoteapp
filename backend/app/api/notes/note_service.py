@@ -364,3 +364,61 @@ def remove_private_note_member_service(note, target_user_id: int, current_user_i
 
     db.session.delete(target)
     db.session.commit()
+
+
+def transfer_note_owner_service(note, new_owner_user_id: int, current_user_id: int):
+    """プライベートノートのオーナーを別の共有メンバーに移管する。
+
+    現オーナーは editor に降格し、指定ユーザーが owner に昇格する。
+    移管先は既存の共有メンバー（editor / viewer）でなければならない。
+    """
+
+    if not note.is_private:
+        abort(400, description="このノートはプライベートノートではありません")
+
+    # 現在のオーナーであることを確認する
+    current_owner_member = next(
+        (m for m in note.private_members if m.user_id == current_user_id and m.role == "owner"),
+        None,
+    )
+    if current_owner_member is None:
+        abort(403, description="オーナー移管はオーナーのみ行えます")
+
+    # 移管先が現オーナー自身でないことを確認する
+    if new_owner_user_id == current_user_id:
+        abort(400, description="自分自身にはオーナーを移管できません")
+
+    # 移管先が既存の共有メンバーであることを確認する
+    new_owner_member = next(
+        (m for m in note.private_members if m.user_id == new_owner_user_id),
+        None,
+    )
+    if new_owner_member is None:
+        abort(404, description="指定したユーザーは共有メンバーではありません")
+
+    # 1トランザクションでロールを入れ替える
+    current_owner_member.role = "editor"
+    new_owner_member.role = "owner"
+    db.session.commit()
+    db.session.refresh(note)
+
+    _set_is_owner(note, current_user_id)
+    return note
+
+
+def get_notes_owned_by_user_in_group(user_id: int, group_id: int):
+    """指定グループ内でユーザーがオーナーであるプライベートノートの一覧を返す。
+
+    グループメンバー削除前に呼び出し、オーナーノートが残っている場合の確認に使う。
+    """
+
+    return db.session.execute(
+        db.select(Note)
+        .join(PrivateNoteMember, PrivateNoteMember.note_id == Note.id)
+        .filter(
+            Note.group_id == group_id,
+            Note.is_private == True,  # noqa: E712
+            PrivateNoteMember.user_id == user_id,
+            PrivateNoteMember.role == "owner",
+        )
+    ).scalars().all()

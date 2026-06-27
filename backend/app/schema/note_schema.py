@@ -69,3 +69,8 @@ class NoteRoleUpdateSchema(Schema):
         required=True,
         validate=validate.OneOf(["editor", "viewer"], error="role は editor または viewer のみ指定できます"),
     )
+
+
+class NoteTransferOwnerSchema(Schema):
+    """プライベートノートのオーナー移管スキーマ。"""
+    new_owner_user_id = fields.Int(required=True)

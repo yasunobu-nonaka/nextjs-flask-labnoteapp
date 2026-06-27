@@ -51,6 +51,8 @@ export default function NoteShareModal({
   const [isAdding, setIsAdding] = useState(false);
   // ロール変更中のユーザーID（複数同時操作防止）
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState<number | null>(null);
+  // オーナー移管処理中フラグ
+  const [isTransferring, setIsTransferring] = useState(false);
   // 現在のメンバー一覧（親から受け取り、操作のたびに更新）
   const [members, setMembers] = useState<PrivateMember[]>(privateMembers);
 
@@ -123,6 +125,29 @@ export default function NoteShareModal({
     setUpdatingRoleUserId(null);
   }
 
+  async function handleTransferOwner(targetUserId: number, targetUsername: string) {
+    if (!confirm(`「${targetUsername}」にオーナーを移管しますか？\nあなたは共同編集者に変わります。この操作は取り消せません。`)) return;
+    setIsTransferring(true);
+    setError(null);
+    const res = await authFetch(
+      `/api/organizations/${orgId}/groups/${groupId}/notes/${noteId}/transfer-owner`,
+      { method: "PATCH", body: JSON.stringify({ new_owner_user_id: targetUserId }) },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      // note.private_members がレスポンスに含まれるので更新して反映する
+      const updatedMembers: PrivateMember[] = data.note.private_members ?? [];
+      setMembers(updatedMembers);
+      onUpdated(updatedMembers);
+      // 移管後は自分がオーナーでなくなるためモーダルを閉じる
+      onClose();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      setError(json.message ?? "オーナー移管に失敗しました");
+    }
+    setIsTransferring(false);
+  }
+
   async function handleRemove(targetUserId: number) {
     const res = await authFetch(`${membersApiBase}/${targetUserId}`, {
       method: "DELETE",
@@ -163,7 +188,7 @@ export default function NoteShareModal({
                         {/* ロール変更セレクタ */}
                         <select
                           value={m.role}
-                          disabled={updatingRoleUserId === m.user_id}
+                          disabled={updatingRoleUserId === m.user_id || isTransferring}
                           onChange={(e) =>
                             handleRoleChange(m.user_id, e.target.value as "editor" | "viewer")
                           }
@@ -172,9 +197,18 @@ export default function NoteShareModal({
                           <option value="editor">{PRIVATE_NOTE_ROLE_LABELS.editor}</option>
                           <option value="viewer">{PRIVATE_NOTE_ROLE_LABELS.viewer}</option>
                         </select>
+                        {/* オーナー移管ボタン */}
+                        <button
+                          onClick={() => handleTransferOwner(m.user_id, m.username)}
+                          disabled={isTransferring}
+                          className="text-blue-500 hover:text-blue-700 text-base underline disabled:opacity-50"
+                        >
+                          移管
+                        </button>
                         <button
                           onClick={() => handleRemove(m.user_id)}
-                          className="text-red-500 hover:text-red-700 text-base underline"
+                          disabled={isTransferring}
+                          className="text-red-500 hover:text-red-700 text-base underline disabled:opacity-50"
                         >
                           削除
                         </button>
