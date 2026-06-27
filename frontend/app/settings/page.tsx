@@ -36,9 +36,9 @@ export default function SettingHomePage() {
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      const res = await authFetch(`/api/auth/rename/${user?.id}`, {
+      const res = await authFetch("/api/auth/me/username", {
         method: "PATCH",
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ username: trimmed }),
       });
       if (!res.ok) {
         const json = await res.json();

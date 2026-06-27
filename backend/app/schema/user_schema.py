@@ -97,6 +97,16 @@ class EmailSchema(Schema):
     )
 
 
+class UsernameUpdateSchema(Schema):
+    username = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=4, max=100, error="ユーザー名は4文字以上100字以下にしてください"
+        ),
+        error_messages={"required": "ユーザー名を入力してください"},
+    )
+
+
 class PasswordResetSchema(Schema):
     token = fields.Str(
         required=True,

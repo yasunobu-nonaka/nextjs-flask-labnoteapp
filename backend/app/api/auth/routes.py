@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_tok
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema
+from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema, UsernameUpdateSchema
 from app.extensions import db
 from app.services.mail_service import (
     send_verification_email,
@@ -16,9 +16,11 @@ from app.services.mail_service import (
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
     get_user_by_email,
+    get_user_by_username,
     register_user,
     verify_user,
     check_password_and_get_tokens,
+    update_username,
     update_user_password,
     delete_user,
 )
@@ -28,6 +30,7 @@ register_schema = RegistrationSchema()
 login_schema = LoginSchema()
 email_schema = EmailSchema()
 password_reset_schema = PasswordResetSchema()
+username_update_schema = UsernameUpdateSchema()
 
 #########################################################
 # ユーザー登録処理
@@ -177,6 +180,29 @@ def login():
 def get_me():
     """現在のログインユーザーの情報を返す"""
     return jsonify({"id": current_user.id, "username": current_user.username, "email": current_user.email})
+
+
+@auth_bp.route("/me/username", methods=["PATCH"])
+@jwt_required()
+def update_me_username():
+    """ログイン中のユーザーのユーザー名を変更する"""
+    try:
+        data = username_update_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    new_username = data["username"]
+
+    # 現在と同じ名前はそのまま返す
+    if new_username == current_user.username:
+        return jsonify({"username": current_user.username}), 200
+
+    # 重複チェック
+    if get_user_by_username(new_username):
+        return jsonify({"message": "このユーザー名はすでに使われています"}), 409
+
+    update_username(current_user, new_username)
+    return jsonify({"username": current_user.username}), 200
 
 
 @auth_bp.route("/refresh", methods=["POST"])

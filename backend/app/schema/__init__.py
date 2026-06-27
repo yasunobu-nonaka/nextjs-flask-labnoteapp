@@ -3,6 +3,7 @@ from .user_schema import (
     LoginSchema,
     EmailSchema,
     PasswordResetSchema,
+    UsernameUpdateSchema,
 )
 from .note_schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, NoteTransferOwnerSchema, PrivateNoteMemberSchema
 from .notification_schema import NotificationSchema

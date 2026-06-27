@@ -79,6 +79,13 @@ def check_password_and_get_tokens(user, password):
     return None, None
 
 
+def update_username(user, new_username):
+    """ユーザー名を変更する。呼び出し前に重複チェックを済ませること。"""
+    user.username = new_username
+    db.session.commit()
+    return user
+
+
 def update_user_password(user, new_password):
     user.set_password(new_password)
     db.session.commit()
