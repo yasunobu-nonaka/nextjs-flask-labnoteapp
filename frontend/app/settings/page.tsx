@@ -7,8 +7,7 @@ import { authFetch } from "@/lib/api";
 function ChangeUsernameForm({
   editName,
   handleSave,
-  setEditName,
-  setSaveSuccess,
+  onEditNameChange,
   onCancel,
   saveError,
   saveSuccess,
@@ -17,8 +16,7 @@ function ChangeUsernameForm({
 }: {
   editName: string;
   handleSave: (e: React.SyntheticEvent) => void;
-  setEditName: (value: string) => void;
-  setSaveSuccess: (value: boolean) => void;
+  onEditNameChange: (e: string) => void;
   onCancel: () => void;
   saveError: string | null;
   saveSuccess: boolean;
@@ -30,8 +28,7 @@ function ChangeUsernameForm({
       <input
         value={editName}
         onChange={(e) => {
-          setEditName(e.target.value);
-          setSaveSuccess(false);
+          onEditNameChange(e.target.value);
         }}
         placeholder="ユーザー名"
         className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
@@ -105,7 +102,9 @@ function ChangeEmailForm({
         <button
           type="submit"
           disabled={
-            isEmailSaving || !editEmail.trim() || editEmail.trim() === savedEmail
+            isEmailSaving ||
+            !editEmail.trim() ||
+            editEmail.trim() === savedEmail
           }
           className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
         >
@@ -219,8 +218,10 @@ export default function SettingHomePage() {
           <ChangeUsernameForm
             editName={editName}
             handleSave={handleSave}
-            setEditName={setEditName}
-            setSaveSuccess={setSaveSuccess}
+            onEditNameChange={(value) => {
+              setEditName(value);
+              setSaveSuccess(false);
+            }}
             onCancel={() => {
               setIsChangingUsername(false);
               setEditName(savedUsername);
