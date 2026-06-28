@@ -194,28 +194,57 @@ def get_me():
 @auth_bp.route("/me", methods=["DELETE"])
 @jwt_required()
 def delete_me():
-    """ログイン中のユーザーのアカウントを削除する"""
-    from app.model import OrganizationMember, RoleGlobal
+    """ログイン中のユーザーのアカウントを削除する。
 
-    # 自分だけがオーナーの組織がある場合は削除を拒否する
-    for membership in current_user.organization_memberships:
-        if membership.role.name != "owner":
-            continue
-        other_owner_count = (
-            db.session.query(OrganizationMember)
-            .join(RoleGlobal, OrganizationMember.role_id == RoleGlobal.id)
-            .filter(
-                OrganizationMember.organization_id == membership.organization_id,
-                OrganizationMember.user_id != current_user.id,
-                RoleGlobal.name == "owner",
-            )
-            .count()
-        )
-        if other_owner_count == 0:
+    以下の条件に該当する場合は 409 を返して削除を拒否する:
+    - 組織で通常メンバー以外のロール (owner / sys_admin / user_admin) を持つ
+    - グループの管理者 (admin) である
+    - プライベートノートのオーナーである
+    - 作成したノートまたはフォルダが残っている (FK 制約のため事前に削除が必要)
+    """
+    from app.model import OrganizationMember, GroupMember, Note, Folder, PrivateNoteMember
+
+    # 1. 組織ロールチェック: 通常メンバー以外はブロック
+    for m in current_user.organization_memberships:
+        if m.role.name != "member":
             return jsonify({
-                "message": f"組織「{membership.organization.name}」の唯一のオーナーです。先にオーナーを移譲するか組織を削除してください。"
+                "message": f"組織「{m.organization.name}」で「{m.role.name}」ロールを持っています。"
+                           "ロールを変更してからアカウントを削除してください。"
             }), 409
 
+    # 2. グループ管理者チェック: admin はブロック
+    for m in current_user.group_memberships:
+        if m.role.name == "admin":
+            return jsonify({
+                "message": f"グループ「{m.group.name}」の管理者です。"
+                           "管理者を変更してからアカウントを削除してください。"
+            }), 409
+
+    # 3. プライベートノートのオーナーチェック
+    if db.session.query(Note).filter(
+        Note.created_by_user_id == current_user.id,
+        Note.is_private.is_(True),
+    ).first():
+        return jsonify({
+            "message": "プライベートノートのオーナーです。"
+                       "プライベートノートを移譲または削除してからアカウントを削除してください。"
+        }), 409
+
+    # 4. 通常ノート・フォルダの FK 制約: 先に削除してもらう必要がある
+    if db.session.query(Note).filter(Note.created_by_user_id == current_user.id).first():
+        return jsonify({
+            "message": "作成したノートが残っています。先にノートを削除してからアカウントを削除してください。"
+        }), 409
+
+    if db.session.query(Folder).filter(Folder.created_by_user_id == current_user.id).first():
+        return jsonify({
+            "message": "作成したフォルダが残っています。先にフォルダを削除してからアカウントを削除してください。"
+        }), 409
+
+    # すべてのチェックを通過: メンバーシップと共有プライベートノートのメンバー記録を削除してからユーザーを削除する
+    db.session.query(PrivateNoteMember).filter(PrivateNoteMember.user_id == current_user.id).delete()
+    db.session.query(GroupMember).filter(GroupMember.user_id == current_user.id).delete()
+    db.session.query(OrganizationMember).filter(OrganizationMember.user_id == current_user.id).delete()
     delete_user(current_user)
     return "", 204
 
