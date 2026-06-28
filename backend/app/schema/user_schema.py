@@ -149,6 +149,19 @@ class UsernameUpdateSchema(Schema):
     )
 
 
+class PasswordVerifySchema(Schema):
+    """パスワード変更フロー step 1: 現在のパスワードのみ検証する"""
+
+    current_password = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "現在のパスワードを入力してください"},
+        load_only=True,
+    )
+
+
 class PasswordResetSchema(Schema):
     token = fields.Str(
         required=True,
