@@ -212,7 +212,6 @@ export default function SettingHomePage() {
       <h2 className="text-2xl font-bold">基本設定</h2>
       {/* ユーザー名編集セクション */}
       <section className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold">ユーザー名</h3>
         {isChangingUsername ? (
           /* 「名前変更」押下後: 変更フォームを表示する */
           <ChangeUsernameForm
@@ -235,7 +234,8 @@ export default function SettingHomePage() {
         ) : (
           /* デフォルト: 現在のユーザー名と変更ボタンを表示する */
           <div className="flex items-center gap-4">
-            <p>{savedUsername}</p>
+            <h3 className="text-lg font-semibold mr-4">ユーザー名</h3>
+            <p className="text-gray-500 dark:text-gray-400">{savedUsername}</p>
             <button
               onClick={() => setIsChangingUsername(true)}
               className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base hover:opacity-80 transition-opacity"
@@ -248,7 +248,6 @@ export default function SettingHomePage() {
 
       {/* メールアドレス変更セクション */}
       <section className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold">メールアドレス</h3>
         {isChangingEmail ? (
           /* 「メールアドレス変更」押下後: 変更フォームを表示する */
           <ChangeEmailForm
@@ -271,9 +270,8 @@ export default function SettingHomePage() {
           /* デフォルト: 現在のメールアドレスと変更ボタンを表示する */
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {savedEmail}
-              </p>
+              <h3 className="text-lg font-semibold mr-4">メールアドレス</h3>
+              <p className="text-gray-500 dark:text-gray-400">{savedEmail}</p>
               <button
                 onClick={() => {
                   setIsChangingEmail(true);

@@ -4,25 +4,26 @@ import { useState } from "react";
 import { authFetch } from "@/lib/api";
 
 // パスワード変更フローのステップ
+// "idle":   デフォルト表示（マスクされたパスワードと変更ボタン）
 // "verify": 現在のパスワードを確認する
 // "change": 新しいパスワードを入力する
-type PasswordStep = "verify" | "change";
+type PasswordStep = "idle" | "verify" | "change";
 
 // ステップ1: 現在のパスワードを入力して認証するフォーム
 function VerifyPasswordForm({
   currentPassword,
   onCurrentPasswordChange,
   onSubmit,
+  onCancel,
   isSubmitting,
   error,
-  saveSuccess,
 }: {
   currentPassword: string;
   onCurrentPasswordChange: (value: string) => void;
   onSubmit: (e: React.SyntheticEvent) => void;
+  onCancel: () => void;
   isSubmitting: boolean;
   error: string | null;
-  saveSuccess: boolean;
 }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3">
@@ -34,12 +35,14 @@ function VerifyPasswordForm({
         className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {saveSuccess && (
-        <p className="text-sm text-green-600 dark:text-green-400">
-          パスワードを変更しました
-        </p>
-      )}
-      <div>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base hover:opacity-80 transition-opacity"
+        >
+          キャンセル
+        </button>
         <button
           type="submit"
           disabled={isSubmitting || !currentPassword}
@@ -102,7 +105,9 @@ function ChangePasswordForm({
         </button>
         <button
           type="submit"
-          disabled={isSubmitting || !newPassword || !confirmPassword || !!clientError}
+          disabled={
+            isSubmitting || !newPassword || !confirmPassword || !!clientError
+          }
           className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
         >
           {isSubmitting ? "変更中..." : "パスワードを変更"}
@@ -113,9 +118,12 @@ function ChangePasswordForm({
 }
 
 // セキュリティ設定ページ
-// パスワード変更を2ステップで行う: ステップ1で現在のパスワードを認証し、ステップ2で新パスワードを設定する
+// パスワード変更を3ステップで行う:
+//   idle   → 「パスワードを変更」ボタンを押してフローを開始
+//   verify → 現在のパスワードを認証
+//   change → 新パスワードを設定
 export default function SecurityPage() {
-  const [step, setStep] = useState<PasswordStep>("verify");
+  const [step, setStep] = useState<PasswordStep>("idle");
 
   // 現在のパスワード（ステップ1で入力し、ステップ2の最終送信にも使う）
   const [currentPassword, setCurrentPassword] = useState("");
@@ -131,6 +139,20 @@ export default function SecurityPage() {
     newPassword && confirmPassword && newPassword !== confirmPassword
       ? "新しいパスワードが一致しません"
       : null;
+
+  /** フローを開始する */
+  function handleStartChange() {
+    setStep("verify");
+    setSaveSuccess(false);
+    setError(null);
+  }
+
+  /** キャンセル: すべてリセットして idle に戻る */
+  function handleCancel() {
+    setStep("idle");
+    setCurrentPassword("");
+    setError(null);
+  }
 
   /** ステップ1: 現在のパスワードをサーバーに検証してもらう */
   async function handleVerify(e: React.SyntheticEvent) {
@@ -175,11 +197,11 @@ export default function SecurityPage() {
         setError(json.message ?? "変更に失敗しました");
         return;
       }
-      /* 成功時はフォームをリセットしてステップ1に戻す */
+      /* 成功時はすべてリセットして idle に戻り、成功メッセージを表示する */
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setStep("verify");
+      setStep("idle");
       setSaveSuccess(true);
     } catch {
       setError("サーバーへの接続に失敗しました");
@@ -199,23 +221,44 @@ export default function SecurityPage() {
   return (
     <div className="max-w-xl flex flex-col gap-8">
       <h2 className="text-2xl font-bold">セキュリティ</h2>
-      {/* パスワード変更フォーム（2ステップ） */}
+      {/* パスワード変更セクション */}
       <section className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold">パスワード変更</h3>
-        {step === "verify" ? (
+        {step === "idle" && (
+          /* デフォルト: マスクされたパスワードと変更ボタンを表示する */
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg font-semibold mr-4">パスワード</h3>
+              <p className="text-gray-500 dark:text-gray-400 tracking-widest">
+                ••••••••
+              </p>
+              <button
+                onClick={handleStartChange}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base hover:opacity-80 transition-opacity"
+              >
+                パスワードを変更
+              </button>
+            </div>
+            {saveSuccess && (
+              <p className="text-sm text-green-600 dark:text-green-400">
+                パスワードを変更しました
+              </p>
+            )}
+          </div>
+        )}
+        {step === "verify" && (
           <VerifyPasswordForm
             currentPassword={currentPassword}
             onCurrentPasswordChange={(value) => {
               setCurrentPassword(value);
-              setSaveSuccess(false);
               setError(null);
             }}
             onSubmit={handleVerify}
+            onCancel={handleCancel}
             isSubmitting={isSubmitting}
             error={error}
-            saveSuccess={saveSuccess}
           />
-        ) : (
+        )}
+        {step === "change" && (
           <ChangePasswordForm
             newPassword={newPassword}
             confirmPassword={confirmPassword}
