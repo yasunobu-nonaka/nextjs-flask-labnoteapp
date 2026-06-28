@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import ConfirmModal from "@/components/ConfirmModal";
 
 // パスワード変更フローのステップ
 // "idle":   デフォルト表示（マスクされたパスワードと変更ボタン）
@@ -123,6 +125,8 @@ function ChangePasswordForm({
 //   verify → 現在のパスワードを認証
 //   change → 新パスワードを設定
 export default function SecurityPage() {
+  const router = useRouter();
+
   const [step, setStep] = useState<PasswordStep>("idle");
 
   // 現在のパスワード（ステップ1で入力し、ステップ2の最終送信にも使う）
@@ -133,6 +137,11 @@ export default function SecurityPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // アカウント削除の確認モーダルと削除処理の状態
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   /* クライアントサイドの入力チェック */
   const clientError =
@@ -218,6 +227,30 @@ export default function SecurityPage() {
     setError(null);
   }
 
+  /** アカウントを削除してログイン画面へ遷移する */
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await authFetch("/api/auth/me", { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json();
+        setDeleteError(json.message ?? "削除に失敗しました");
+        setShowDeleteConfirm(false);
+        return;
+      }
+      /* 削除成功: トークンを削除してログイン画面へ */
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      router.push("/login");
+    } catch {
+      setDeleteError("サーバーへの接続に失敗しました");
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="max-w-xl flex flex-col gap-8">
       <h2 className="text-2xl font-bold">セキュリティ</h2>
@@ -278,6 +311,37 @@ export default function SecurityPage() {
           />
         )}
       </section>
+
+      {/* アカウント削除セクション */}
+      <section className="flex flex-col gap-4 border-t border-gray-200 dark:border-gray-700 pt-8">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-semibold mr-4">アカウント削除</h3>
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setShowDeleteConfirm(true);
+            }}
+            disabled={isDeleting}
+            className="px-4 py-2 rounded-lg border border-red-400 text-red-500 text-base hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50"
+          >
+            アカウントを削除
+          </button>
+        </div>
+        {deleteError && (
+          <p className="text-sm text-red-500">{deleteError}</p>
+        )}
+      </section>
+
+      {/* アカウント削除確認モーダル */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title="アカウントを削除しますか？"
+        message={"この操作は取り消せません。\nノート・フォルダ・タグなどすべてのデータが削除されます。"}
+        confirmLabel={isDeleting ? "削除中..." : "削除する"}
+        variant="danger"
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

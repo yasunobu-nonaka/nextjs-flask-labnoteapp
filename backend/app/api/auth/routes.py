@@ -191,6 +191,35 @@ def get_me():
     return jsonify({"id": current_user.id, "username": current_user.username, "email": current_user.email})
 
 
+@auth_bp.route("/me", methods=["DELETE"])
+@jwt_required()
+def delete_me():
+    """ログイン中のユーザーのアカウントを削除する"""
+    from app.model import OrganizationMember, RoleGlobal
+
+    # 自分だけがオーナーの組織がある場合は削除を拒否する
+    for membership in current_user.organization_memberships:
+        if membership.role.name != "owner":
+            continue
+        other_owner_count = (
+            db.session.query(OrganizationMember)
+            .join(RoleGlobal, OrganizationMember.role_id == RoleGlobal.id)
+            .filter(
+                OrganizationMember.organization_id == membership.organization_id,
+                OrganizationMember.user_id != current_user.id,
+                RoleGlobal.name == "owner",
+            )
+            .count()
+        )
+        if other_owner_count == 0:
+            return jsonify({
+                "message": f"組織「{membership.organization.name}」の唯一のオーナーです。先にオーナーを移譲するか組織を削除してください。"
+            }), 409
+
+    delete_user(current_user)
+    return "", 204
+
+
 @auth_bp.route("/me/username", methods=["PATCH"])
 @jwt_required()
 def update_me_username():
