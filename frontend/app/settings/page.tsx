@@ -3,11 +3,73 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 
+// ユーザー名変更フォーム
+function ChangeUsernameForm({
+  editName,
+  handleSave,
+  setEditName,
+  setSaveSuccess,
+  onCancel,
+  saveError,
+  saveSuccess,
+  isSaving,
+  savedUsername,
+}: {
+  editName: string;
+  handleSave: (e: React.SyntheticEvent) => void;
+  setEditName: (value: string) => void;
+  setSaveSuccess: (value: boolean) => void;
+  onCancel: () => void;
+  saveError: string | null;
+  saveSuccess: boolean;
+  isSaving: boolean;
+  savedUsername: string;
+}) {
+  return (
+    <form onSubmit={handleSave} className="flex flex-col gap-3">
+      <input
+        value={editName}
+        onChange={(e) => {
+          setEditName(e.target.value);
+          setSaveSuccess(false);
+        }}
+        placeholder="ユーザー名"
+        className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+      />
+      {saveError && <p className="text-sm text-red-500">{saveError}</p>}
+      {saveSuccess && (
+        <p className="text-sm text-green-600 dark:text-green-400">
+          保存しました
+        </p>
+      )}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base hover:opacity-80 transition-opacity"
+        >
+          キャンセル
+        </button>
+        <button
+          type="submit"
+          disabled={
+            isSaving || !editName.trim() || editName.trim() === savedUsername
+          }
+          className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+        >
+          {isSaving ? "保存中..." : "保存"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function SettingHomePage() {
   // 保存済みのユーザー名: 変更前との比較に使う
   const [savedUsername, setSavedUsername] = useState("");
 
-  // ユーザー名編集フォームの入力値と保存状態
+  // ユーザー名編集フォームの表示状態と入力値・保存状態
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -82,6 +144,8 @@ export default function SettingHomePage() {
       setSavedUsername(json.username);
       setEditName(json.username);
       setSaveSuccess(true);
+      /* 保存成功後はフォームを閉じる */
+      setIsChangingUsername(false);
     } catch {
       setSaveError("サーバーへの接続に失敗しました");
     } finally {
@@ -92,37 +156,38 @@ export default function SettingHomePage() {
   return (
     <div className="max-w-xl flex flex-col gap-8">
       <h2 className="text-2xl font-bold">基本設定</h2>
-      {/* ユーザー名編集フォーム */}
+      {/* ユーザー名編集セクション */}
       <section className="flex flex-col gap-4">
         <h3 className="text-lg font-semibold">ユーザー名</h3>
-        <form onSubmit={handleSave} className="flex flex-col gap-3">
-          <input
-            value={editName}
-            onChange={(e) => {
-              setEditName(e.target.value);
-              setSaveSuccess(false);
+        {isChangingUsername ? (
+          /* 「名前変更」押下後: 変更フォームを表示する */
+          <ChangeUsernameForm
+            editName={editName}
+            handleSave={handleSave}
+            setEditName={setEditName}
+            setSaveSuccess={setSaveSuccess}
+            onCancel={() => {
+              setIsChangingUsername(false);
+              setEditName(savedUsername);
+              setSaveError(null);
             }}
-            placeholder="ユーザー名"
-            className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground"
+            saveError={saveError}
+            saveSuccess={saveSuccess}
+            isSaving={isSaving}
+            savedUsername={savedUsername}
           />
-          {saveError && <p className="text-sm text-red-500">{saveError}</p>}
-          {saveSuccess && (
-            <p className="text-sm text-green-600 dark:text-green-400">
-              保存しました
-            </p>
-          )}
-          <div>
+        ) : (
+          /* デフォルト: 現在のユーザー名と変更ボタンを表示する */
+          <div className="flex items-center gap-4">
+            <p>{savedUsername}</p>
             <button
-              type="submit"
-              disabled={
-                isSaving || !editName.trim() || editName.trim() === savedUsername
-              }
-              className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              onClick={() => setIsChangingUsername(true)}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base hover:opacity-80 transition-opacity"
             >
-              {isSaving ? "保存中..." : "保存"}
+              名前変更
             </button>
           </div>
-        </form>
+        )}
       </section>
 
       {/* メールアドレス変更セクション */}
