@@ -6,11 +6,22 @@ from app.services.mail_service import (
     generate_reset_password_token,
     verify_email_verification_token,
     verify_reset_password_token,
+    generate_email_change_token,
     hash_token,
 )
 from app.api.auth.auth_service import get_user_by_email
 from app.extensions import db
-from app.model import User
+from app.model import (
+    User,
+    Organization,
+    OrganizationMember,
+    Group,
+    GroupMember,
+    Note,
+    Folder,
+    RoleGlobal,
+    RoleLocal,
+)
 
 #############################################
 # tests for register
@@ -736,3 +747,459 @@ class TestPasswordResetIntegration:
             },
         )
         assert response2.status_code == 400
+
+
+#############################################
+# tests for GET /api/auth/me
+#############################################
+
+
+class TestGetMe:
+    def test_get_me_returns_user_info(self, client, auth_headers):
+        """認証済みユーザーの情報を返す。"""
+        res = client.get("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["username"] == "testuser"
+        assert data["email"] == "testuser@example.com"
+        assert "id" in data
+
+    def test_get_me_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.get("/api/auth/me")
+
+        assert res.status_code == 401
+
+
+#############################################
+# tests for PATCH /api/auth/me/username
+#############################################
+
+
+class TestUpdateUsername:
+    def test_update_username_success(self, client, auth_headers):
+        """ユーザー名を正常に変更できる。"""
+        res = client.patch(
+            "/api/auth/me/username",
+            headers=auth_headers["headers"],
+            json={"username": "newusername"},
+        )
+
+        assert res.status_code == 200
+        assert res.get_json()["username"] == "newusername"
+
+    def test_update_username_same_name_returns_200(self, client, auth_headers):
+        """現在と同じユーザー名は変更なしで 200 を返す。"""
+        res = client.patch(
+            "/api/auth/me/username",
+            headers=auth_headers["headers"],
+            json={"username": "testuser"},
+        )
+
+        assert res.status_code == 200
+        assert res.get_json()["username"] == "testuser"
+
+    def test_update_username_duplicate_returns_409(self, client, auth_headers):
+        """他ユーザーが使用中のユーザー名には 409 を返す。"""
+        register_user(client, username="otherusr", email="other@example.com")
+
+        res = client.patch(
+            "/api/auth/me/username",
+            headers=auth_headers["headers"],
+            json={"username": "otherusr"},
+        )
+
+        assert res.status_code == 409
+
+    def test_update_username_too_short_returns_400(self, client, auth_headers):
+        """4文字未満のユーザー名はバリデーションエラーになる。"""
+        res = client.patch(
+            "/api/auth/me/username",
+            headers=auth_headers["headers"],
+            json={"username": "abc"},
+        )
+
+        assert res.status_code == 400
+        assert "errors" in res.get_json()
+
+    def test_update_username_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.patch("/api/auth/me/username", json={"username": "newname1234"})
+
+        assert res.status_code == 401
+
+
+#############################################
+# tests for PATCH /api/auth/me/email
+#############################################
+
+
+class TestUpdateEmail:
+    def test_initiate_email_change_success(self, client, auth_headers):
+        """新しいメールアドレスへの確認メールを送信できる。"""
+        with patch("app.api.auth.routes.send_email_change_confirmation") as mock_send:
+            mock_send.return_value = True
+            res = client.patch(
+                "/api/auth/me/email",
+                headers=auth_headers["headers"],
+                json={"email": "newemail@example.com"},
+            )
+
+        assert res.status_code == 200
+        assert mock_send.called
+        # pending_email が保存されていることを確認
+        user = db.session.get(User, auth_headers["user_id"])
+        db.session.refresh(user)
+        assert user.pending_email == "newemail@example.com"
+
+    def test_initiate_email_change_same_email_returns_400(self, client, auth_headers):
+        """現在と同じメールアドレスは 400 になる。"""
+        res = client.patch(
+            "/api/auth/me/email",
+            headers=auth_headers["headers"],
+            json={"email": "testuser@example.com"},
+        )
+
+        assert res.status_code == 400
+
+    def test_initiate_email_change_duplicate_returns_409(self, client, auth_headers):
+        """他ユーザーが使用中のメールアドレスは 409 になる。"""
+        register_user(client, username="otherusr", email="other@example.com")
+
+        res = client.patch(
+            "/api/auth/me/email",
+            headers=auth_headers["headers"],
+            json={"email": "other@example.com"},
+        )
+
+        assert res.status_code == 409
+
+    def test_initiate_email_change_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.patch("/api/auth/me/email", json={"email": "new@example.com"})
+
+        assert res.status_code == 401
+
+
+#############################################
+# tests for GET /api/auth/verify-email-change/<token>
+#############################################
+
+
+class TestVerifyEmailChange:
+    def test_verify_email_change_success(self, client, auth_headers):
+        """有効なトークンでメールアドレスが確定される。"""
+        user = db.session.get(User, auth_headers["user_id"])
+        user.pending_email = "confirmed@example.com"
+        db.session.commit()
+
+        token = generate_email_change_token("confirmed@example.com")
+        res = client.get(f"/api/auth/verify-email-change/{token}")
+
+        assert res.status_code == 200
+        db.session.refresh(user)
+        assert user.email == "confirmed@example.com"
+        assert user.pending_email is None
+
+    def test_verify_email_change_invalid_token_returns_400(self, client):
+        """無効なトークンは 400 になる。"""
+        res = client.get("/api/auth/verify-email-change/invalid-token")
+
+        assert res.status_code == 400
+
+    def test_verify_email_change_no_pending_returns_404(self, client):
+        """pending_email が存在しないトークンは 404 になる。"""
+        token = generate_email_change_token("nobody@example.com")
+        res = client.get(f"/api/auth/verify-email-change/{token}")
+
+        assert res.status_code == 404
+
+    def test_verify_email_change_already_taken_returns_409(self, client, auth_headers):
+        """確認リンクを踏む前に同じアドレスが別アカウントで登録された場合は 409 になる。"""
+        user = db.session.get(User, auth_headers["user_id"])
+        user.pending_email = "taken@example.com"
+        db.session.commit()
+
+        # 別ユーザーが同じアドレスを登録する
+        register_user(client, username="otherusr", email="taken@example.com")
+
+        token = generate_email_change_token("taken@example.com")
+        res = client.get(f"/api/auth/verify-email-change/{token}")
+
+        assert res.status_code == 409
+
+
+#############################################
+# tests for POST /api/auth/me/password/verify
+#############################################
+
+
+class TestVerifyPassword:
+    def test_verify_password_correct_returns_200(self, client, auth_headers):
+        """正しい現在のパスワードで 200 を返す。"""
+        res = client.post(
+            "/api/auth/me/password/verify",
+            headers=auth_headers["headers"],
+            json={"current_password": "testuser1234"},
+        )
+
+        assert res.status_code == 200
+
+    def test_verify_password_wrong_returns_401(self, client, auth_headers):
+        """誤ったパスワードは 401 になる。"""
+        res = client.post(
+            "/api/auth/me/password/verify",
+            headers=auth_headers["headers"],
+            json={"current_password": "wrongpassword1234"},
+        )
+
+        assert res.status_code == 401
+
+    def test_verify_password_too_short_returns_400(self, client, auth_headers):
+        """12文字未満のパスワードはバリデーションエラーになる。"""
+        res = client.post(
+            "/api/auth/me/password/verify",
+            headers=auth_headers["headers"],
+            json={"current_password": "short"},
+        )
+
+        assert res.status_code == 400
+
+    def test_verify_password_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.post(
+            "/api/auth/me/password/verify",
+            json={"current_password": "testuser1234"},
+        )
+
+        assert res.status_code == 401
+
+
+#############################################
+# tests for PATCH /api/auth/me/password
+#############################################
+
+
+class TestUpdatePassword:
+    def test_update_password_success(self, client, auth_headers):
+        """正しい現在のパスワードで新パスワードに変更できる。"""
+        res = client.patch(
+            "/api/auth/me/password",
+            headers=auth_headers["headers"],
+            json={
+                "current_password": "testuser1234",
+                "password": "newpassword1234",
+                "confirm": "newpassword1234",
+            },
+        )
+
+        assert res.status_code == 200
+
+        # 新しいパスワードでログインできることを確認
+        login_res = client.post(
+            "/api/auth/login",
+            json={"identifier": "testuser@example.com", "password": "newpassword1234"},
+        )
+        assert login_res.status_code == 200
+
+    def test_update_password_wrong_current_returns_401(self, client, auth_headers):
+        """誤った現在のパスワードは 401 になる。"""
+        res = client.patch(
+            "/api/auth/me/password",
+            headers=auth_headers["headers"],
+            json={
+                "current_password": "wrongpassword1234",
+                "password": "newpassword1234",
+                "confirm": "newpassword1234",
+            },
+        )
+
+        assert res.status_code == 401
+
+    def test_update_password_mismatch_returns_400(self, client, auth_headers):
+        """新パスワードと確認用が不一致は 400 になる。"""
+        res = client.patch(
+            "/api/auth/me/password",
+            headers=auth_headers["headers"],
+            json={
+                "current_password": "testuser1234",
+                "password": "newpassword1234",
+                "confirm": "differentpassword1234",
+            },
+        )
+
+        assert res.status_code == 400
+
+    def test_update_password_too_short_returns_400(self, client, auth_headers):
+        """12文字未満の新パスワードはバリデーションエラーになる。"""
+        res = client.patch(
+            "/api/auth/me/password",
+            headers=auth_headers["headers"],
+            json={
+                "current_password": "testuser1234",
+                "password": "short",
+                "confirm": "short",
+            },
+        )
+
+        assert res.status_code == 400
+
+    def test_update_password_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.patch(
+            "/api/auth/me/password",
+            json={
+                "current_password": "testuser1234",
+                "password": "newpassword1234",
+                "confirm": "newpassword1234",
+            },
+        )
+
+        assert res.status_code == 401
+
+
+#############################################
+# tests for DELETE /api/auth/me
+#############################################
+
+
+class TestDeleteMe:
+    """アカウント削除のテスト。"""
+
+    # ---- ヘルパー: 削除テスト用の組織・グループをセットアップする ----
+
+    def _setup_org_with_role(self, user_id, role_name):
+        """指定ロールで組織メンバーシップを作成する。"""
+        org = Organization(name="Test Org", created_by_user_id=user_id)
+        db.session.add(org)
+        db.session.flush()
+
+        role = db.session.query(RoleGlobal).filter_by(name=role_name).first()
+        db.session.add(OrganizationMember(user_id=user_id, organization_id=org.id, role_id=role.id))
+        db.session.flush()
+        return org
+
+    def _setup_group_with_role(self, user_id, org_id, role_name):
+        """指定ロールでグループメンバーシップを作成する。"""
+        group = Group(organization_id=org_id, name="Test Group", created_by_user_id=user_id)
+        db.session.add(group)
+        db.session.flush()
+
+        role = db.session.query(RoleLocal).filter_by(name=role_name).first()
+        db.session.add(GroupMember(user_id=user_id, group_id=group.id, role_id=role.id))
+        db.session.flush()
+        return group
+
+    # ---- テスト ----
+
+    def test_delete_account_success(self, client, auth_headers):
+        """メンバーシップもノートもないユーザーは削除できる。"""
+        user_id = auth_headers["user_id"]
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 204
+        db.session.expire_all()
+        assert db.session.get(User, user_id) is None
+
+    def test_delete_account_without_token_returns_401(self, client):
+        """トークンなしは 401 になる。"""
+        res = client.delete("/api/auth/me")
+
+        assert res.status_code == 401
+
+    def test_delete_blocked_by_non_member_org_role(self, client, auth_headers):
+        """通常メンバー以外の組織ロール（owner 等）を持つと 409 になる。"""
+        user_id = auth_headers["user_id"]
+        self._setup_org_with_role(user_id, "owner")
+        db.session.commit()
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 409
+        assert "ロール" in res.get_json()["message"]
+
+    def test_delete_blocked_by_group_admin(self, client, auth_headers):
+        """グループ管理者（admin）は 409 になる。"""
+        user_id = auth_headers["user_id"]
+        org = self._setup_org_with_role(user_id, "member")
+        self._setup_group_with_role(user_id, org.id, "admin")
+        db.session.commit()
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 409
+        assert "管理者" in res.get_json()["message"]
+
+    def test_delete_blocked_by_private_note_ownership(self, client, auth_headers):
+        """プライベートノートのオーナーは 409 になる。"""
+        user_id = auth_headers["user_id"]
+        org = self._setup_org_with_role(user_id, "member")
+        group = self._setup_group_with_role(user_id, org.id, "editor")
+
+        db.session.add(Note(
+            group_id=group.id,
+            created_by_user_id=user_id,
+            title="Secret",
+            content_md="secret content",
+            is_private=True,
+        ))
+        db.session.commit()
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 409
+        assert "プライベートノート" in res.get_json()["message"]
+
+    def test_delete_blocked_by_existing_notes(self, client, auth_headers):
+        """作成したノートが残っていると 409 になる。"""
+        user_id = auth_headers["user_id"]
+        org = self._setup_org_with_role(user_id, "member")
+        group = self._setup_group_with_role(user_id, org.id, "editor")
+
+        db.session.add(Note(
+            group_id=group.id,
+            created_by_user_id=user_id,
+            title="My Note",
+            content_md="content",
+            is_private=False,
+        ))
+        db.session.commit()
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 409
+        assert "ノート" in res.get_json()["message"]
+
+    def test_delete_blocked_by_existing_folders(self, client, auth_headers):
+        """作成したフォルダが残っていると 409 になる。"""
+        user_id = auth_headers["user_id"]
+        org = self._setup_org_with_role(user_id, "member")
+        group = self._setup_group_with_role(user_id, org.id, "editor")
+
+        db.session.add(Folder(
+            group_id=group.id,
+            created_by_user_id=user_id,
+            name="My Folder",
+        ))
+        db.session.commit()
+
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 409
+        assert "フォルダ" in res.get_json()["message"]
+
+    def test_delete_removes_memberships_automatically(self, client, auth_headers):
+        """通常メンバー・editor ロールのメンバーシップは自動削除されてユーザーが削除される。"""
+        user_id = auth_headers["user_id"]
+        org = self._setup_org_with_role(user_id, "member")
+        self._setup_group_with_role(user_id, org.id, "editor")
+        db.session.commit()
+
+        # ノートなし → 削除できる
+        res = client.delete("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 204
+        db.session.expire_all()
+        assert db.session.get(User, user_id) is None

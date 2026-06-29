@@ -245,6 +245,9 @@ def delete_me():
     db.session.query(PrivateNoteMember).filter(PrivateNoteMember.user_id == current_user.id).delete()
     db.session.query(GroupMember).filter(GroupMember.user_id == current_user.id).delete()
     db.session.query(OrganizationMember).filter(OrganizationMember.user_id == current_user.id).delete()
+    # バルク削除後にセッションをリセットして、残留した関連オブジェクトが
+    # delete_user() 内の db.session.delete(user) に干渉しないようにする
+    db.session.expire_all()
     delete_user(current_user)
     return "", 204
 
