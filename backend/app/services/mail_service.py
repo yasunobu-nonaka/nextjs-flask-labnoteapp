@@ -13,16 +13,6 @@ logging.basicConfig(
 )
 
 
-def send_welcome_email(user_email: str, username: str):
-    msg = Message(
-        subject=f"ノートアプリ登録完了",
-        sender="noreply@example.com",
-        recipients=[user_email],
-    )
-    msg.body = f"ようこそ{username}さん！ラボノートアプリへの登録が完了しました。"
-    mail.send(msg)
-
-
 def generate_email_verification_token(email):
     """メール認証用のトークンを生成"""
     serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
@@ -87,6 +77,50 @@ def send_verification_email(user_email):
 
     except Exception as e:
         logging.error(f"Failed to send email to {user_email}: {str(e)}")
+        return False
+
+
+def generate_email_change_token(email):
+    """メールアドレス変更確認用のトークンを生成する。payload は新メールアドレス。"""
+    serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+    return serializer.dumps(email, salt="email-change")
+
+
+def verify_email_change_token(token, expiration=1800):
+    """メールアドレス変更確認トークンを検証し、有効な場合は新メールアドレスを返す。"""
+    serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+    try:
+        email = serializer.loads(token, salt="email-change", max_age=expiration)
+        return email
+    except SignatureExpired:
+        logging.warning("Email change token expired")
+        return None
+    except BadSignature:
+        logging.warning("Invalid email change token")
+        return None
+
+
+def send_email_change_confirmation(pending_email, token):
+    """メールアドレス変更の確認メールを新メールアドレス宛に送信する。"""
+    try:
+        verify_url = f"{current_app.config['FRONTEND_URL']}/verify-email-change/{token}"
+        html_body = render_template(
+            "email/email_change_confirmation.html", verify_url=verify_url
+        )
+        msg = Message(
+            subject="メールアドレス変更の確認",
+            sender="noreply@example.com",
+            recipients=[pending_email],
+            html=html_body,
+            body=f"以下のリンクをクリックしてメールアドレスの変更を確定してください：\n\n{verify_url}\n\nこのリンクの有効期限は30分です。",
+        )
+        mail.send(msg)
+        logging.info(f"Email change confirmation sent to {pending_email}")
+        return True
+    except Exception as e:
+        logging.error(
+            f"Failed to send email change confirmation to {pending_email}: {str(e)}"
+        )
         return False
 
 

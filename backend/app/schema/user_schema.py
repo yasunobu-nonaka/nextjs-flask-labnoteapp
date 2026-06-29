@@ -97,6 +97,71 @@ class EmailSchema(Schema):
     )
 
 
+class PasswordChangeSchema(Schema):
+    current_password = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "現在のパスワードを入力してください"},
+        load_only=True,
+    )
+    password = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "新しいパスワードを入力してください"},
+        load_only=True,
+    )
+    confirm = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "パスワード確認を入力してください"},
+        load_only=True,
+    )
+
+    @validates_schema
+    def validate_password_match(self, data, **kwargs):
+        if data.get("password") != data.get("confirm"):
+            raise ValidationError("パスワードが合致しません", "confirm")
+
+
+class EmailUpdateSchema(Schema):
+    email = fields.Email(
+        required=True,
+        validate=validate.Length(
+            min=4, max=120, error="メールアドレスは4文字以上120字以下にしてください"
+        ),
+        error_messages={"required": "メールアドレスを入力してください"},
+    )
+
+
+class UsernameUpdateSchema(Schema):
+    username = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=4, max=100, error="ユーザー名は4文字以上100字以下にしてください"
+        ),
+        error_messages={"required": "ユーザー名を入力してください"},
+    )
+
+
+class PasswordVerifySchema(Schema):
+    """パスワード変更フロー step 1: 現在のパスワードのみ検証する"""
+
+    current_password = fields.Str(
+        required=True,
+        validate=validate.Length(
+            min=12, max=64, error="パスワードは12文字以上64字以下にしてください"
+        ),
+        error_messages={"required": "現在のパスワードを入力してください"},
+        load_only=True,
+    )
+
+
 class PasswordResetSchema(Schema):
     token = fields.Str(
         required=True,

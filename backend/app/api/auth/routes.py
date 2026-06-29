@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_tok
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema
+from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordChangeSchema, PasswordVerifySchema
 from app.extensions import db
 from app.services.mail_service import (
     send_verification_email,
@@ -12,13 +12,21 @@ from app.services.mail_service import (
     verify_email_verification_token,
     verify_reset_password_token,
     hash_token,
+    generate_email_change_token,
+    verify_email_change_token,
+    send_email_change_confirmation,
 )
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
     get_user_by_email,
+    get_user_by_username,
+    get_user_by_pending_email,
     register_user,
     verify_user,
     check_password_and_get_tokens,
+    update_username,
+    initiate_email_change,
+    confirm_email_change,
     update_user_password,
     delete_user,
 )
@@ -28,6 +36,10 @@ register_schema = RegistrationSchema()
 login_schema = LoginSchema()
 email_schema = EmailSchema()
 password_reset_schema = PasswordResetSchema()
+username_update_schema = UsernameUpdateSchema()
+email_update_schema = EmailUpdateSchema()
+password_change_schema = PasswordChangeSchema()
+password_verify_schema = PasswordVerifySchema()
 
 #########################################################
 # ユーザー登録処理
@@ -177,6 +189,169 @@ def login():
 def get_me():
     """現在のログインユーザーの情報を返す"""
     return jsonify({"id": current_user.id, "username": current_user.username, "email": current_user.email})
+
+
+@auth_bp.route("/me", methods=["DELETE"])
+@jwt_required()
+def delete_me():
+    """ログイン中のユーザーのアカウントを削除する。
+
+    以下の条件に該当する場合は 409 を返して削除を拒否する:
+    - 組織で通常メンバー以外のロール (owner / sys_admin / user_admin) を持つ
+    - グループの管理者 (admin) である
+    - プライベートノートのオーナーである
+    - 作成したノートまたはフォルダが残っている (FK 制約のため事前に削除が必要)
+    """
+    from app.model import OrganizationMember, GroupMember, Note, Folder, PrivateNoteMember
+
+    # 1. 組織ロールチェック: 通常メンバー以外はブロック
+    for m in current_user.organization_memberships:
+        if m.role.name != "member":
+            return jsonify({
+                "message": f"組織「{m.organization.name}」で「{m.role.name}」ロールを持っています。"
+                           "ロールを変更してからアカウントを削除してください。"
+            }), 409
+
+    # 2. グループ管理者チェック: admin はブロック
+    for m in current_user.group_memberships:
+        if m.role.name == "admin":
+            return jsonify({
+                "message": f"グループ「{m.group.name}」の管理者です。"
+                           "管理者を変更してからアカウントを削除してください。"
+            }), 409
+
+    # 3. プライベートノートのオーナーチェック
+    if db.session.query(Note).filter(
+        Note.created_by_user_id == current_user.id,
+        Note.is_private.is_(True),
+    ).first():
+        return jsonify({
+            "message": "プライベートノートのオーナーです。"
+                       "プライベートノートを移譲または削除してからアカウントを削除してください。"
+        }), 409
+
+    # 4. 通常ノート・フォルダの FK 制約: 先に削除してもらう必要がある
+    if db.session.query(Note).filter(Note.created_by_user_id == current_user.id).first():
+        return jsonify({
+            "message": "作成したノートが残っています。先にノートを削除してからアカウントを削除してください。"
+        }), 409
+
+    if db.session.query(Folder).filter(Folder.created_by_user_id == current_user.id).first():
+        return jsonify({
+            "message": "作成したフォルダが残っています。先にフォルダを削除してからアカウントを削除してください。"
+        }), 409
+
+    # すべてのチェックを通過: メンバーシップと共有プライベートノートのメンバー記録を削除してからユーザーを削除する
+    db.session.query(PrivateNoteMember).filter(PrivateNoteMember.user_id == current_user.id).delete()
+    db.session.query(GroupMember).filter(GroupMember.user_id == current_user.id).delete()
+    db.session.query(OrganizationMember).filter(OrganizationMember.user_id == current_user.id).delete()
+    # バルク削除後にセッションをリセットして、残留した関連オブジェクトが
+    # delete_user() 内の db.session.delete(user) に干渉しないようにする
+    db.session.expire_all()
+    delete_user(current_user)
+    return "", 204
+
+
+@auth_bp.route("/me/username", methods=["PATCH"])
+@jwt_required()
+def update_me_username():
+    """ログイン中のユーザーのユーザー名を変更する"""
+    try:
+        data = username_update_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    new_username = data["username"]
+
+    # 現在と同じ名前はそのまま返す
+    if new_username == current_user.username:
+        return jsonify({"username": current_user.username}), 200
+
+    # 重複チェック
+    if get_user_by_username(new_username):
+        return jsonify({"message": "このユーザー名はすでに使われています"}), 409
+
+    update_username(current_user, new_username)
+    return jsonify({"username": current_user.username}), 200
+
+
+@auth_bp.route("/me/password/verify", methods=["POST"])
+@jwt_required()
+def verify_me_password():
+    """パスワード変更フロー step 1: 現在のパスワードが正しいか検証する"""
+    try:
+        data = password_verify_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    if not current_user.check_password(data["current_password"]):
+        return jsonify({"message": "現在のパスワードが正しくありません"}), 401
+
+    return jsonify({"message": "ok"}), 200
+
+
+@auth_bp.route("/me/password", methods=["PATCH"])
+@jwt_required()
+def update_me_password():
+    """ログイン中のユーザーのパスワードを変更する"""
+    try:
+        data = password_change_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    if not current_user.check_password(data["current_password"]):
+        return jsonify({"message": "現在のパスワードが正しくありません"}), 401
+
+    update_user_password(current_user, data["password"])
+    return jsonify({"message": "パスワードを変更しました"}), 200
+
+
+@auth_bp.route("/me/email", methods=["PATCH"])
+@jwt_required()
+def update_me_email():
+    """ログイン中のユーザーのメールアドレス変更を開始する（確認メール送信）"""
+    try:
+        data = email_update_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"message": "validation error", "errors": err.messages}), 400
+
+    new_email = data["email"]
+
+    if new_email == current_user.email:
+        return jsonify({"message": "現在と同じメールアドレスです"}), 400
+
+    if get_user_by_email(new_email):
+        return jsonify({"message": "このメールアドレスはすでに使われています"}), 409
+
+    initiate_email_change(current_user, new_email)
+
+    token = generate_email_change_token(new_email)
+    if send_email_change_confirmation(new_email, token):
+        return jsonify({"message": "確認メールを送信しました。メールのリンクをクリックして変更を確定してください。"}), 200
+
+    # メール送信失敗時は pending_email をクリアして元に戻す
+    current_user.pending_email = None
+    db.session.commit()
+    return jsonify({"error": "確認メールの送信に失敗しました"}), 500
+
+
+@auth_bp.route("/verify-email-change/<token>", methods=["GET"])
+def verify_email_change(token):
+    """メールアドレス変更の確認トークンを検証し、変更を確定する"""
+    new_email = verify_email_change_token(token)
+    if not new_email:
+        return jsonify({"error": "リンクの有効期限が切れているか、無効です"}), 400
+
+    user = get_user_by_pending_email(new_email)
+    if not user:
+        return jsonify({"error": "変更申請が見つかりません。再度変更をお試しください。"}), 404
+
+    # 確認リンクを踏む間に別ユーザーが同じアドレスを登録していないか最終チェック
+    if get_user_by_email(new_email):
+        return jsonify({"error": "このメールアドレスはすでに別のアカウントで使われています"}), 409
+
+    confirm_email_change(user)
+    return jsonify({"message": "メールアドレスを変更しました"}), 200
 
 
 @auth_bp.route("/refresh", methods=["POST"])
