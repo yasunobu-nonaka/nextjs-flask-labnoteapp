@@ -3,35 +3,33 @@
 import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import GroupCreateModal from "@/components/GroupCreateModal";
 import { type Group } from "@/components/GroupListModal";
+import { GROUP_ROLE_LABELS } from "@/lib/constants";
 
 /** 未所属グループごとの参加処理状態 */
 type JoinStatus = "idle" | "requesting" | "requested" | "canceling";
 
 /**
- * グループ一覧 / onboarding ページ。
+ * グループ一覧ページ。
  *
- * - 所属グループが 1 件以上ある場合: 最初のグループのノート一覧へリダイレクト
- * - 所属グループが 0 件の場合: 公開グループへの参加 UI とグループ作成ボタンを表示する
- *   - join_method=open  → 即時参加 → ノート一覧へリダイレクト
- *   - join_method=request → 申請送信 → 「申請済み」表示 + キャンセルボタン
- *   - join_method=invite_only → 「招待制」バッジのみ（操作不可）
- *   - 「グループを作成」→ GroupCreateModal を開く → 作成後にノート一覧へリダイレクト
+ * 所属グループと参加可能な公開グループを並べて表示する。
+ * - 所属グループ: クリックでそのグループのノート一覧へ遷移する
+ * - 未所属公開グループ: join_method に応じて参加ボタンを表示する
+ *   - open         → 即時参加 → ノート一覧へ遷移
+ *   - request      → 申請送信 → 「申請済み」+ キャンセルボタン
+ *   - invite_only  → 「招待制」バッジのみ（操作不可）
+ * - 「グループを作成」ボタン → GroupCreateModal → 作成後にノート一覧へ遷移
  */
-export default function GroupsRedirectPage() {
+export default function GroupsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
-  /* フェッチ済みのグループ一覧 */
   const [groups, setGroups] = useState<Group[]>([]);
-  /* ローディングが終わり所属グループなしと確定したら true */
-  const [showNoGroupPage, setShowNoGroupPage] = useState(false);
-  /* 非メンバーで API が 404 を返したとき true にする */
+  const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
-
-  /* グループ作成モーダルの表示制御 */
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   /* 未所属グループごとの参加申請状態 */
@@ -42,13 +40,14 @@ export default function GroupsRedirectPage() {
     new Map(),
   );
 
-  /* 公開かつ未所属のグループのみ参加候補として表示する */
+  /* 所属グループ / 公開未所属グループ */
+  const joinedGroups = groups.filter((g) => g.role !== null);
   const unjoinedPublicGroups = groups.filter(
     (g) => !g.is_private && g.role === null,
   );
 
   useEffect(() => {
-    async function redirect() {
+    async function fetchGroups() {
       try {
         const res = await authFetch(`/api/organizations/${orgId}/groups`);
         if (res.status === 401) {
@@ -64,30 +63,22 @@ export default function GroupsRedirectPage() {
           return;
         }
         const data: Group[] = await res.json();
-        /* role が null でないものが所属グループ */
-        const firstJoined = data.find((g) => g.role !== null);
-        if (firstJoined) {
-          router.replace(
-            `/organizations/${orgId}/groups/${firstJoined.id}/notes`,
-          );
-        } else {
-          /* 所属グループなし: グループ一覧を保持して onboarding 画面を表示する */
-          setGroups(data);
-          /* API の join_status=pending をローカル状態に反映する */
-          const initialJoinMap = new Map<number, JoinStatus>();
-          data.forEach((g) => {
-            if (g.join_status === "pending") {
-              initialJoinMap.set(g.id, "requested");
-            }
-          });
-          setJoinStatusMap(initialJoinMap);
-          setShowNoGroupPage(true);
-        }
+        setGroups(data);
+        /* API の join_status=pending をローカル状態に反映する（リロード後の復元） */
+        const initialJoinMap = new Map<number, JoinStatus>();
+        data.forEach((g) => {
+          if (g.join_status === "pending") {
+            initialJoinMap.set(g.id, "requested");
+          }
+        });
+        setJoinStatusMap(initialJoinMap);
       } catch {
         router.replace("/organizations");
+      } finally {
+        setIsLoading(false);
       }
     }
-    redirect();
+    fetchGroups();
   }, [orgId, router]);
 
   /** グループへの参加申請または即時参加を行う */
@@ -150,7 +141,6 @@ export default function GroupsRedirectPage() {
         );
         return;
       }
-      /* キャンセル成功: 申請前の状態に戻す */
       setJoinStatusMap((prev) => new Map(prev).set(groupId, "idle"));
     } catch {
       setJoinStatusMap((prev) => new Map(prev).set(groupId, "requested"));
@@ -164,8 +154,7 @@ export default function GroupsRedirectPage() {
     notFound();
   }
 
-  /* グループなし確定前はローディング表示 */
-  if (!showNoGroupPage) {
+  if (isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-gray-500">読み込み中...</p>
@@ -177,15 +166,8 @@ export default function GroupsRedirectPage() {
     <main className="min-h-screen bg-background text-foreground">
       <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
         {/* ヘッダー */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold mb-1">
-              グループがありません
-            </h1>
-            <p className="text-sm text-gray-500">
-              参加できるグループを選ぶか、新しいグループを作成しましょう。
-            </p>
-          </div>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-lg font-semibold">グループ一覧</h1>
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
@@ -195,7 +177,38 @@ export default function GroupsRedirectPage() {
           </button>
         </div>
 
-        {/* 参加可能なグループ一覧 */}
+        {/* 所属グループ */}
+        {joinedGroups.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              所属グループ
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {joinedGroups.map((group) => (
+                <li key={group.id}>
+                  <Link
+                    href={`/organizations/${orgId}/groups/${group.id}/notes`}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-medium">{group.name}</span>
+                      {group.is_private && (
+                        <span className="text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                          非公開
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-400">
+                      {GROUP_ROLE_LABELS[group.role!] ?? group.role}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 参加可能なグループ */}
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             参加可能なグループ
@@ -254,7 +267,6 @@ export default function GroupsRedirectPage() {
                           </button>
                         )}
                       </div>
-                      {/* エラーメッセージ */}
                       {error && (
                         <p className="text-xs text-red-500">{error}</p>
                       )}
