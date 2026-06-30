@@ -42,6 +42,8 @@ export default function InviteMembersPage() {
   // ルーターキャッシュが古いDOM状態を保持している場合でも、マウント前は常に
   // disabled=true を返すことでハイドレーション不一致を防ぐ。
   const [mounted, setMounted] = useState(false);
+  // SSR/CSR ハイドレーション不一致防止のためのマウントフラグ（意図的な同期 setState）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   /** 指定 id のエントリを部分更新する */

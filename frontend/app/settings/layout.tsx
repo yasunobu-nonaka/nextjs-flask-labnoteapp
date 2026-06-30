@@ -21,10 +21,14 @@ export default function SettingsLayout({
   );
   useEffect(() => {
     if (!backHref) {
+      // localStorage は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBackHref(
         localStorage.getItem("last_notes_url") ?? "/organizations",
       );
     }
+    // マウント時のみ実行したいため依存配列は空にする（意図的）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const navItems = [

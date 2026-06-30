@@ -36,6 +36,8 @@ export default function NoteForm({
   });
 
   // content_md は MDEditor の onChange で直接 setValue するため watch で現在値を取得する
+  // React Hook Form の watch() は React Compiler と相性が悪いが、このコンポーネントでは問題ない
+  // eslint-disable-next-line react-hooks/incompatible-library
   const contentMd = watch("content_md");
 
   // tags フィールドを監視し、useTagInput に現在値を渡す
