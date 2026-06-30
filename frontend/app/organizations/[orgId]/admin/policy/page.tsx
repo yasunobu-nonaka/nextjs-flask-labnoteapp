@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
-import RadioGroup from "@/components/RadioGroup";
+import RadioGroup from "@/components/common/RadioGroup";
 import { type OrgPolicy } from "@/lib/types";
 
 /**

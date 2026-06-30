@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import GroupCreateModal from "@/components/GroupCreateModal";
-import { GroupList, type Group } from "@/components/GroupListModal";
-import AppHeader from "@/components/AppHeader";
+import GroupCreateModal from "@/components/group/GroupCreateModal";
+import { GroupList, type Group } from "@/components/group/GroupListModal";
+import AppHeader from "@/components/layout/AppHeader";
 
 /**
  * グループ一覧ページ。

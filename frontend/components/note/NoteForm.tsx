@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { noteSchema, type NoteFormValues } from "@/lib/schemas/noteSchema";
 import { useTagInput } from "@/lib/hooks/useTagInput";
-import MarkdownEditor from "@/components/MarkdownEditor";
+import MarkdownEditor from "@/components/note/MarkdownEditor";
 
 type Props = {
   // マウント時のフォーム初期値。編集ページでは取得したノートのデータを渡す。

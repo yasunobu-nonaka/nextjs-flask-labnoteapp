@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import AppHeader from "@/components/AppHeader";
+import AppHeader from "@/components/layout/AppHeader";
 
 export default function SettingsLayout({
   children,

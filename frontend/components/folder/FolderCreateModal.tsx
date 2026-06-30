@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { authFetch } from "@/lib/api";
-import Modal from "@/components/Modal";
+import Modal from "@/components/common/Modal";
 
 /**
  * FolderCreateModal コンポーネント

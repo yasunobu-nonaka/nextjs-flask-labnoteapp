@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import { OrgList, type Organization } from "@/components/OrgSwitchModal";
-import AppHeader from "@/components/AppHeader";
+import { OrgList, type Organization } from "@/components/org/OrgSwitchModal";
+import AppHeader from "@/components/layout/AppHeader";
 
 /**
  * 組織一覧ページ。

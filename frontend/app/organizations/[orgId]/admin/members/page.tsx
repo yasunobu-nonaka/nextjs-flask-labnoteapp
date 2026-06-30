@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { ORG_ROLE_LABELS } from "@/lib/constants";
-import ConfirmModal from "@/components/ConfirmModal";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 type Member = {
   user_id: number;

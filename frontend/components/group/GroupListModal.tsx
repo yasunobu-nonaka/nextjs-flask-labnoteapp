@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { authFetch } from "@/lib/api";
-import Modal from "@/components/Modal";
+import Modal from "@/components/common/Modal";
 import { GROUP_ROLE_LABELS } from "@/lib/constants";
 
 export type Group = {

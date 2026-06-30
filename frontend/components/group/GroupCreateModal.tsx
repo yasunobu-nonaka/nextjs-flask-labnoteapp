@@ -1,7 +1,7 @@
 "use client";
 
-import Modal from "@/components/Modal";
-import CreateGroupWizard from "@/components/CreateGroupWizard";
+import Modal from "@/components/common/Modal";
+import CreateGroupWizard from "@/components/group/CreateGroupWizard";
 
 /**
  * GroupCreateModal コンポーネント

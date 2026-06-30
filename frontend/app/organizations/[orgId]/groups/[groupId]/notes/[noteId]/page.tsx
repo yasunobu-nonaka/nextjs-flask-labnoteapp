@@ -7,10 +7,10 @@ import Link from "next/link";
 import Markdown from "react-markdown";
 import { authFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
-import AppHeader from "@/components/AppHeader";
-import ConfirmModal from "@/components/ConfirmModal";
-import NoteShareModal from "@/components/NoteShareModal";
-import { type PrivateMember } from "@/components/NoteCard";
+import AppHeader from "@/components/layout/AppHeader";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import NoteShareModal from "@/components/note/NoteShareModal";
+import { type PrivateMember } from "@/components/note/NoteCard";
 
 type Note = {
   id: number;

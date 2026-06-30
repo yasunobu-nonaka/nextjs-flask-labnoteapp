@@ -6,7 +6,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { authFetch } from "@/lib/api";
-import AppHeader from "@/components/AppHeader";
+import AppHeader from "@/components/layout/AppHeader";
 
 /** 組織管理画面にアクセスできるロール */
 const ADMIN_ROLES = ["owner", "sys_admin", "user_admin"];

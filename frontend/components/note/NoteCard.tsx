@@ -5,9 +5,9 @@ import Link from "next/link";
 import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import { type Folder, buildFolderOptions } from "@/lib/folders";
-import Modal from "@/components/Modal";
-import ConfirmModal from "@/components/ConfirmModal";
-import NoteShareModal from "@/components/NoteShareModal";
+import Modal from "@/components/common/Modal";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import NoteShareModal from "@/components/note/NoteShareModal";
 import { formatDate } from "@/lib/utils";
 
 export type PrivateMember = {

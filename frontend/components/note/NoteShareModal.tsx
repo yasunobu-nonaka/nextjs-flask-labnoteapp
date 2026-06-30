@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
-import Modal from "@/components/Modal";
-import ConfirmModal from "@/components/ConfirmModal";
-import { type PrivateMember } from "@/components/NoteCard";
+import Modal from "@/components/common/Modal";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import { type PrivateMember } from "@/components/note/NoteCard";
 import { GROUP_ROLE_LABELS, PRIVATE_NOTE_ROLE_LABELS } from "@/lib/constants";
 
 /** グループメンバー（招待先候補として取得するもの） */
