@@ -159,17 +159,19 @@ lib/
 
 ## Organization & Group Redesign
 
-The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 4 (frontend) is complete. Phase 5 is partially done.**
+The app is being extended from a personal note tool to an organization/group-based shared note platform. **Phases 1–6 are complete. Phase 7 is pending.**
 
 ### Phase Plan
 
-| Phase | Status | Content |
-|-------|--------|---------|
-| 1 | ✅ Done | Organization & Group models, membership, basic API |
-| 2 | ✅ Done | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
-| 3 | ✅ Done | Migrate Note / Tag / Folder ownership from User → Group |
-| 4 | ✅ Done | Frontend — org creation UI, group management, member management |
-| 5 | 🔄 Partial | Email invitations ✅ done; audit log and advanced policies pending |
+| Phase | Status | PR(s) | Content |
+|-------|--------|-------|---------|
+| 1 | ✅ Done | #19 | Organization & Group models, membership, basic API |
+| 2 | ✅ Done | #19 | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
+| 3 | ✅ Done | #19 | Migrate Note / Tag / Folder ownership from User → Group |
+| 4 | ✅ Done | #19 #20 #26 | Frontend — org/group navigation, group-scoped note pages, group creation wizard, org/group list pages |
+| 5 | ✅ Done | #19 #21 #22 #24 | Access control & sharing — email invitations, group join requests & approval, 404 hardening for non-members, private notes |
+| 6 | ✅ Done | #8 #25 #27 | User account management — password reset, user settings (username/email change, account deletion) |
+| 7 | Pending | — | Audit log, advanced org/group policies |
 
 ### Domain Concepts
 
