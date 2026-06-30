@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { authFetch } from "@/lib/api";
-import Modal from "@/components/Modal";
-import RadioGroup from "@/components/RadioGroup";
+import Modal from "@/components/common/Modal";
+import RadioGroup from "@/components/common/RadioGroup";
 import { JOIN_METHOD_OPTIONS, WHO_CAN_CREATE_OPTIONS } from "@/lib/constants";
 import { type OrgPolicy } from "@/lib/types";
 

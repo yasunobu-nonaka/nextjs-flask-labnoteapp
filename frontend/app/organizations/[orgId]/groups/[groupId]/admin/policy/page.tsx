@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { JOIN_METHOD_OPTIONS } from "@/lib/constants";
-import RadioGroup from "@/components/RadioGroup";
+import RadioGroup from "@/components/common/RadioGroup";
 
 type GroupPolicy = {
   allow_private_notes: boolean;

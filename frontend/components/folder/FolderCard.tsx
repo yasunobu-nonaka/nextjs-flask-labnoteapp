@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { authFetch } from "@/lib/api";
 import { type Folder } from "@/lib/folders";
-import Modal from "@/components/Modal";
+import Modal from "@/components/common/Modal";
 
 type Props = {
   folder: Folder;

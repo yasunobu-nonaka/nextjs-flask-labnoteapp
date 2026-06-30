@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import ConfirmModal from "@/components/ConfirmModal";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 // パスワード変更フローのステップ
 // "idle":   デフォルト表示（マスクされたパスワードと変更ボタン）

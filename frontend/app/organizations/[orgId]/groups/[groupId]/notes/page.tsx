@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import AppHeader from "@/components/AppHeader";
-import FolderSidebar from "@/components/FolderSidebar";
-import FolderCard from "@/components/FolderCard";
-import NoteCard, { type Note } from "@/components/NoteCard";
-import FolderCreateModal from "@/components/FolderCreateModal";
-import NewItemButton from "@/components/NewItemButton";
-import FolderBreadcrumb from "@/components/FolderBreadcrumb";
+import AppHeader from "@/components/layout/AppHeader";
+import FolderSidebar from "@/components/folder/FolderSidebar";
+import FolderCard from "@/components/folder/FolderCard";
+import NoteCard, { type Note } from "@/components/note/NoteCard";
+import FolderCreateModal from "@/components/folder/FolderCreateModal";
+import NewItemButton from "@/components/note/NewItemButton";
+import FolderBreadcrumb from "@/components/folder/FolderBreadcrumb";
 import { type Folder } from "@/lib/folders";
 
 type NotesResponse = {

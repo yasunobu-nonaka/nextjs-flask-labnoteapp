@@ -6,7 +6,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 import { authFetch } from "@/lib/api";
-import AppHeader from "@/components/AppHeader";
+import AppHeader from "@/components/layout/AppHeader";
 import { PendingCountContext } from "./pending-count-context";
 
 /** グループ管理画面にアクセスできる組織ロール */

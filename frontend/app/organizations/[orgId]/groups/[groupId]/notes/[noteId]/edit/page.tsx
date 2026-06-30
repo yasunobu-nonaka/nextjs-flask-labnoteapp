@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/schemas/noteSchema";
-import NoteForm from "@/components/NoteForm";
-import AppHeader from "@/components/AppHeader";
+import NoteForm from "@/components/note/NoteForm";
+import AppHeader from "@/components/layout/AppHeader";
 
 type LoadStatus = "loading" | "ready" | "error";
 

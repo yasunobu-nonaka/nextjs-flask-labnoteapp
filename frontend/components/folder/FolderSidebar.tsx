@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import OrgCreateModal from "@/components/OrgCreateModal";
-import OrgSwitchModal from "@/components/OrgSwitchModal";
-import GroupCreateModal from "@/components/GroupCreateModal";
-import GroupListModal, { type Group } from "@/components/GroupListModal";
+import OrgCreateModal from "@/components/org/OrgCreateModal";
+import OrgSwitchModal from "@/components/org/OrgSwitchModal";
+import GroupCreateModal from "@/components/group/GroupCreateModal";
+import GroupListModal, { type Group } from "@/components/group/GroupListModal";
 import { type OrgPolicy } from "@/lib/types";
 
 type Props = {

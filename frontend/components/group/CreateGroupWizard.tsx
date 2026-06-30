@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/api";
 import { ASSIGNABLE_GROUP_ROLES, GROUP_ROLE_LABELS, JOIN_METHOD_OPTIONS } from "@/lib/constants";
-import RadioGroup from "@/components/RadioGroup";
+import RadioGroup from "@/components/common/RadioGroup";
 import { type OrgMember, type PendingMember } from "@/lib/types";
 
 
