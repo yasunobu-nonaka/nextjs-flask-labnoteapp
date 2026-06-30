@@ -1,0 +1,60 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: backend
+
+      - name: Create .env.development for CI
+        # TestingConfig (SQLite) を使うが、config.py のクラス定義時に
+        # DevelopmentConfig が POSTGRES_PASSWORD を quote_plus() するため
+        # ダミー値が必要。メール送信は TestingConfig で抑制される。
+        run: |
+          cat > .env.development << 'EOF'
+          FLASK_CONFIG=testing
+          SECRET_KEY=ci-secret-key-for-testing-only
+          JWT_SECRET_KEY=ci-jwt-secret-key-for-testing-only
+          POSTGRES_USER=dummy
+          POSTGRES_PASSWORD=dummy
+          POSTGRES_DB=dummy
+          FRONTEND_URL=http://localhost:3000
+          DEV_MAIL_DEFAULT_SENDER=noreply@example.com
+          DEV_MAIL_SERVER=localhost
+          DEV_MAIL_PORT=25
+          DEV_MAIL_USERNAME=dummy
+          DEV_MAIL_PASSWORD=dummy
+          EOF
+        working-directory: backend
+
+      - name: Run pytest
+        run: pytest
+        working-directory: backend
