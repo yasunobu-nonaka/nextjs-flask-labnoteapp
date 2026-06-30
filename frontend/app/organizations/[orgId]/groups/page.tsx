@@ -4,25 +4,34 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import CreateGroupWizard from "@/components/CreateGroupWizard";
+import GroupCreateModal from "@/components/GroupCreateModal";
+import { GroupList, type Group } from "@/components/GroupListModal";
 
 /**
- * グループ一覧リダイレクトページ。
- * 組織切り替えモーダルなどから組織 ID のみ指定されて遷移した場合に、
- * 最初の所属グループのノート一覧へ自動的に転送する。
- * 所属グループが見つからない場合はグループ作成ウィザードを表示する。
+ * グループ一覧ページ。
+ *
+ * 所属グループと参加可能な公開グループを GroupList コンポーネントで表示する。
+ * - 所属グループのリンクをクリック → そのグループのノート一覧へ遷移
+ * - 即時参加（open）→ ノート一覧へ遷移
+ * - 参加申請（request）→ 「申請済み」表示 + キャンセルボタン
+ * - 「グループを作成」→ GroupCreateModal → 作成後にノート一覧へ遷移
  */
-export default function GroupsRedirectPage() {
+export default function GroupsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
-  /* ローディングが終わりグループなしと確定したら true */
-  const [showWizard, setShowWizard] = useState(false);
-  /* 非メンバーで API が 404 を返したとき true にする */
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const joinedGroups = groups.filter((g) => g.role !== null);
+  const unjoinedPublicGroups = groups.filter(
+    (g) => !g.is_private && g.role === null,
+  );
 
   useEffect(() => {
-    async function redirect() {
+    async function fetchGroups() {
       try {
         const res = await authFetch(`/api/organizations/${orgId}/groups`);
         if (res.status === 401) {
@@ -37,32 +46,21 @@ export default function GroupsRedirectPage() {
           router.replace("/organizations");
           return;
         }
-        const groups = await res.json();
-        /* role が null でないものが所属グループ */
-        const firstJoined = groups.find(
-          (g: { role: string | null }) => g.role !== null,
-        );
-        if (firstJoined) {
-          router.replace(
-            `/organizations/${orgId}/groups/${firstJoined.id}/notes`,
-          );
-        } else {
-          /* 所属グループがない場合はグループ作成ウィザードを表示する */
-          setShowWizard(true);
-        }
+        setGroups(await res.json());
       } catch {
         router.replace("/organizations");
+      } finally {
+        setIsLoading(false);
       }
     }
-    redirect();
+    fetchGroups();
   }, [orgId, router]);
 
   if (isNotFound) {
     notFound();
   }
 
-  /* グループなし確定前はローディング表示 */
-  if (!showWizard) {
+  if (isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-gray-500">読み込み中...</p>
@@ -71,23 +69,46 @@ export default function GroupsRedirectPage() {
   }
 
   return (
-    /* グループがない組織に遷移したときの初期グループ作成画面 */
-    <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      <div className="w-full max-w-3xl px-6">
-        <div className="text-center mb-8">
-          <h1 className="text-lg font-semibold mb-1">グループがありません</h1>
-          <p className="text-sm text-gray-500">
-            最初のグループを作成してノートを始めましょう。
-          </p>
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-lg font-semibold">グループ一覧</h1>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="shrink-0 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+          >
+            グループを作成
+          </button>
         </div>
-        {/* 共通ウィザードコンポーネントをページ内に直接埋め込む */}
-        <CreateGroupWizard
+
+        <GroupList
           orgId={orgId}
-          onCreated={(group) =>
-            router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
+          joinedGroups={joinedGroups}
+          unjoinedGroups={unjoinedPublicGroups}
+          onImmediateJoin={(groupId) =>
+            router.push(`/organizations/${orgId}/groups/${groupId}/notes`)
           }
+          onCancelledRequest={(groupId) =>
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === groupId ? { ...g, join_status: null } : g,
+              ),
+            )
+          }
+          unjoinedEmptyText="参加可能なグループがありません。"
         />
       </div>
+
+      <GroupCreateModal
+        orgId={orgId}
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={(group) =>
+          router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
+        }
+      />
     </main>
   );
 }
