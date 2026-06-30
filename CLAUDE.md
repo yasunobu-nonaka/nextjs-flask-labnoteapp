@@ -199,7 +199,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 | 4 | ✅ Done | #19 #20 #26 | Frontend — org/group navigation, group-scoped note pages, group creation wizard, org/group list pages |
 | 5 | ✅ Done | #19 #21 #22 #24 | Access control & sharing — email invitations, group join requests & approval, 404 hardening for non-members, private notes |
 | 6 | ✅ Done | #8 #25 #27 | User account management — password reset, user settings (username/email change, account deletion) |
-| 7 | Pending | — | Audit log, advanced org/group policies |
+| 7 | Pending | — | Onboarding setup wizard, audit log, advanced org/group policies |
 
 ### Domain Concepts
 
@@ -351,3 +351,33 @@ All routes require `org:read` org-level permission plus the group-level permissi
 | DELETE | `.../folders/<fid>` | `note:delete` | Delete folder |
 
 Route implementations live in `note_routes.py` and `folder_routes.py` inside `app/api/organizations/`.
+
+## Phase 7: Onboarding Setup Wizard
+
+### Overview
+
+When a user registers an account themselves (i.e. not via an email invitation), show a multi-step setup wizard on first login to guide them through creating their first organization. Users who accepted an invitation and joined an existing org skip the wizard entirely.
+
+### Trigger Condition
+
+- **Show wizard**: user registered via `POST /api/auth/register` and has no organization membership yet
+- **Skip wizard**: user registered via invitation acceptance (`POST /api/invitations/<token>/accept`) — they already belong to an org
+
+Detection approach: on the `GET /api/auth/me` response, add a flag (e.g. `needs_onboarding: bool`) that the frontend checks after login. The flag is `true` when the user has zero org memberships.
+
+### Wizard Steps
+
+| Step | Content |
+|------|---------|
+| 1 | **組織名** — text input for the organization name |
+| 2 | **ポリシー設定** — who can create groups (`owner_only` / `all_members`), default join method (`open` / `request` / `invite_only`) |
+| 3 | **メンバーの招待** — add members by email and assign each an org role (`sys_admin` / `user_admin` / `member`); can skip |
+| 4 | **完了** — summary screen; "ノートを始める" button navigates to the new org's group list |
+
+### Implementation Notes
+
+- The wizard reuses `OrgCreateModal` logic (Step 1) and `CreateGroupWizard` design patterns (multi-step state machine) — extract shared UI primitives as needed rather than duplicating.
+- Step 3 sends invitations via `POST /api/organizations/<id>/invitations` after the org is created in Step 1.
+- The wizard lives at `/onboarding` (a new page) and is shown via a redirect from `/organizations` when `needs_onboarding` is `true`.
+- Once the user creates an org (or explicitly skips), `needs_onboarding` becomes `false` and the redirect no longer triggers.
+- Do not show the wizard to users who land on `/organizations` via a direct URL after already completing setup.
