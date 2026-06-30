@@ -3,7 +3,7 @@ from flask_mail import Message
 import hashlib
 import logging
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from flask import current_app, url_for
+from flask import current_app
 
 from app.extensions import mail
 
@@ -126,7 +126,7 @@ def send_email_change_confirmation(pending_email, token):
 
 def send_password_reset_email(user_email, token):
     try:
-        verify_url = url_for("api.auth.reset_password", token=token, _external=True)
+        verify_url = f"{current_app.config['FRONTEND_URL']}/reset-password/{token}"
         html_body = render_template("email/reset_password.html", verify_url=verify_url)
 
         msg = Message(
