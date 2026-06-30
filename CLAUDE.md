@@ -88,22 +88,61 @@ Next.js 16 App Router. All pages under `frontend/app/` are Server Components by 
 
 ```
 app/
-  notes/
-    page.tsx           # file-browser style note list; folder+note grid, breadcrumb, search, tag filter, pagination
-    new/page.tsx       # create note
-    [id]/page.tsx      # note detail (read-only)
-    [id]/edit/page.tsx # edit note
+  organizations/
+    page.tsx                              # org list; shows orgs the user belongs to + OrgCreateModal
+    [orgId]/
+      admin/
+        layout.tsx                        # org admin sidebar layout
+        page.tsx                          # org admin dashboard (name, policy overview)
+        policy/page.tsx                   # edit org-level policy (who_can_create_groups, etc.)
+        groups/page.tsx                   # group list for org admins; create/delete groups
+        members/
+          page.tsx                        # org member list; role change, remove, add by email
+          invite/page.tsx                 # send email invitation to join org (Phase 5)
+      groups/
+        page.tsx                          # group list for org members; join / enter group
+        [groupId]/
+          admin/
+            layout.tsx                    # group admin sidebar layout
+            page.tsx                      # group admin dashboard
+            policy/page.tsx               # edit group-level policy (join_method, visibility)
+            members/page.tsx              # group member list; role change, remove, add
+          notes/
+            page.tsx                      # file-browser style note list; folder+note grid, breadcrumb, search, tag filter, pagination
+            new/page.tsx                  # create note
+            [noteId]/page.tsx             # note detail (read-only)
+            [noteId]/edit/page.tsx        # edit note
+  invitations/
+    [token]/page.tsx                      # accept email invitation link (Phase 5)
 components/
-  FolderSidebar.tsx    # left sidebar: keyword search form + tag filter checkboxes
-  FolderCard.tsx       # folder card (tab design); owns ··· menu popover, rename/delete modals
-  NoteCard.tsx         # note card; owns ··· menu popover + move-to-folder modal
-  NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput
-  Modal.tsx            # generic modal shell (backdrop + dialog box); content passed as children
+  AppHeader.tsx          # top navigation bar; org switcher, user menu
+  OrgCreateModal.tsx     # create organization form (name input)
+  OrgSwitchModal.tsx     # switch between orgs the user belongs to
+  CreateGroupWizard.tsx  # multi-step group creation wizard (name, visibility, policy)
+  GroupCreateModal.tsx   # simple group create modal (used from admin/groups)
+  GroupListModal.tsx     # group list picker modal
+  FolderSidebar.tsx      # left sidebar: keyword search form + tag filter checkboxes
+  FolderCard.tsx         # folder card (tab design); owns ··· menu popover, rename/delete modals
+  FolderBreadcrumb.tsx   # breadcrumb navigation for folder hierarchy
+  FolderCreateModal.tsx  # create folder modal
+  NoteCard.tsx           # note card; owns ··· menu popover + move-to-folder modal
+  NoteShareModal.tsx     # note share settings modal
+  NoteForm.tsx           # shared create/edit form; owns useForm + useTagInput
+  NewItemButton.tsx      # "新規作成" button that opens popover (note / folder)
+  Modal.tsx              # generic modal shell (backdrop + dialog box); content passed as children
+  ConfirmModal.tsx       # generic confirmation dialog (yes/no)
+  RadioGroup.tsx         # reusable radio button group component
+  MarkdownEditor.tsx     # Markdown editor wrapper
 lib/
-  api.ts               # authFetch — wraps fetch with JWT Bearer header and base URL
-  folders.ts           # Folder type, buildFolderOptions (flat list → <select> options)
-  noteSchema.ts        # Zod schema + NoteFormValues type (shared by new and edit pages)
-  useTagInput.ts       # custom hook managing tag input state
+  api.ts                 # authFetch — wraps fetch with JWT Bearer header and base URL
+  folders.ts             # Folder type, buildFolderOptions (flat list → <select> options)
+  types.ts               # shared TypeScript types (OrgPolicy, GroupPolicy, Member, etc.)
+  constants.ts           # display label maps (ORG_ROLE_LABELS, etc.)
+  utils.ts               # formatDate and other shared utilities
+  schemas/
+    noteSchema.ts        # Zod schema + NoteFormValues type (shared by new and edit pages)
+  hooks/
+    useTagInput.ts       # custom hook managing tag input state
 ```
 
 **API calls**: always use `authFetch(path, init?)` from `lib/api.ts`. It prepends `NEXT_PUBLIC_API_URL` and attaches the JWT token from `localStorage`.
@@ -112,15 +151,15 @@ lib/
 
 **Folder navigation**: `NotesPage` tracks position with `currentFolderId` (null = root). All folders are fetched once on mount into `allFolders`; `currentLevelFolders` is derived client-side by filtering `parent_id === currentFolderId`. Breadcrumb is built by traversing `parent_id` upward from `currentFolderId`. Root view shows top-level folders + notes with no folder (sends `folder_id=null` string sentinel to API).
 
-**New item creation**: The "新規作成" button opens a popover menu. "ノート" navigates to `/notes/new` (appending `?folder_id=X` when inside a folder); `new/page.tsx` reads this from `window.location.search` on mount. "フォルダー" opens a `Modal` for folder name input.
+**New item creation**: The "新規作成" button (`NewItemButton`) opens a popover menu. "ノート" navigates to `notes/new`; "フォルダー" opens a `Modal` for folder name input.
 
 **Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
 
-**Layout**: `notes/page.tsx` uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
+**Layout**: Notes page uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
 
 ## Organization & Group Redesign
 
-The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 3 (backend migration) is complete**.
+The app is being extended from a personal note tool to an organization/group-based shared note platform. Implementation is phased; **Phase 4 (frontend) is complete. Phase 5 is partially done.**
 
 ### Phase Plan
 
@@ -129,8 +168,8 @@ The app is being extended from a personal note tool to an organization/group-bas
 | 1 | ✅ Done | Organization & Group models, membership, basic API |
 | 2 | ✅ Done | Full RBAC (Permission / RoleGlobal / RoleLocal models) |
 | 3 | ✅ Done | Migrate Note / Tag / Folder ownership from User → Group |
-| 4 | Pending | Frontend — org creation UI, group management, member management |
-| 5 | Pending | Email invitations (member invite flow), member management UI, audit log, advanced policies |
+| 4 | ✅ Done | Frontend — org creation UI, group management, member management |
+| 5 | 🔄 Partial | Email invitations ✅ done; audit log and advanced policies pending |
 
 ### Domain Concepts
 
