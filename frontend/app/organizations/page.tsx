@@ -1,46 +1,52 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import { OrgList, type Organization } from "@/components/OrgSwitchModal";
 
 /**
- * 組織一覧リダイレクトページ。
- * ログイン後の初期遷移先として機能し、最初の所属グループのノート一覧へ自動的に転送する。
- * 所属グループが見つからない場合は /login へ戻す。
+ * 組織一覧ページ。
+ * ログイン後の初期遷移先として機能し、所属組織をリンク一覧で表示する。
+ * 組織リンクをクリックするとそのグループ一覧ページへ遷移する。
  */
-export default function OrganizationsRedirectPage() {
+export default function OrganizationsPage() {
   const router = useRouter();
 
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    async function redirect() {
+    async function fetchOrgs() {
       try {
-        const orgsRes = await authFetch("/api/organizations");
-        if (orgsRes.status === 401) {
+        const res = await authFetch("/api/organizations");
+        if (res.status === 401) {
           router.replace("/login");
           return;
         }
-        if (!orgsRes.ok) {
-          router.replace("/login");
+        if (!res.ok) {
+          setError("組織一覧の取得に失敗しました");
           return;
         }
-        const orgs = await orgsRes.json();
-        if (orgs.length === 0) {
-          router.replace("/login");
-          return;
-        }
-        // 最初の組織のグループ一覧へ転送する（groups/page.tsx がさらに所属グループへ転送する）
-        router.replace(`/organizations/${orgs[0].id}/groups`);
+        setOrgs(await res.json());
       } catch {
-        router.replace("/login");
+        setError("サーバーへの接続に失敗しました");
+      } finally {
+        setIsLoading(false);
       }
     }
-    redirect();
+    fetchOrgs();
   }, [router]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      <p className="text-gray-500">読み込み中...</p>
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
+        <h1 className="text-lg font-semibold">組織一覧</h1>
+        <section className="flex flex-col gap-3">
+          <OrgList orgs={orgs} isLoading={isLoading} error={error} />
+        </section>
+      </div>
     </main>
   );
 }
