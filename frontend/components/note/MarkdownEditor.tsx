@@ -32,6 +32,8 @@ export default function MarkdownEditor({ value, onChange }: Props) {
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    // window.matchMedia は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setColorMode(mq.matches ? "dark" : "light");
 
     const handler = (e: MediaQueryListEvent) =>

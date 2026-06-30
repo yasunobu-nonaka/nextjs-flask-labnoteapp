@@ -145,6 +145,8 @@ export default function NotesPage() {
       }
     }
     fetchTags();
+    // fetchAllFolders は useCallback で安定化済みの非同期関数（内部の setState は非同期）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAllFolders();
   }, [orgIdNum, groupIdNum, fetchAllFolders]);
 

@@ -159,6 +159,8 @@ export default function AppHeader({
 
   // マウント時に初回フェッチ、その後 30 秒ごとにポーリングする
   useEffect(() => {
+    // fetchNotifications は非同期関数（内部の setState は await 後に呼ばれる）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications();
     pollTimerRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
     return () => {

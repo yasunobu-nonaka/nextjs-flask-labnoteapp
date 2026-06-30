@@ -41,6 +41,8 @@ export default function InvitationAcceptPage() {
 
   // マウント時にログイン状態を確認し、招待詳細を取得する
   useEffect(() => {
+    // localStorage は SSR で参照できないため useEffect 内で読む（同期 setState だが意図的）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoggedIn(!!localStorage.getItem("access_token"));
 
     async function fetchInvitation() {

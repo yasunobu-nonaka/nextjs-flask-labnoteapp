@@ -64,9 +64,12 @@ export default function NoteShareModal({
   // モーダルを開いたときにグループメンバー一覧を取得する
   useEffect(() => {
     if (!isOpen) return;
+    // モーダルオープン時に props の最新値で内部状態をリセットする（意図的な同期 setState）
+    /* eslint-disable react-hooks/set-state-in-effect */
     setMembers(privateMembers);
     setSelectedUserId("");
     setError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     async function fetchGroupMembers() {
       const res = await authFetch(

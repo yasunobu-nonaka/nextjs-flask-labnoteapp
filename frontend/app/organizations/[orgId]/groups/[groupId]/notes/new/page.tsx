@@ -21,9 +21,11 @@ export default function NewNotePage() {
   const router = useRouter();
 
   // URLクエリパラメータ folder_id を読み取り、指定フォルダーにノートを作成するかどうかを決める
+  // window は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const id = searchParams.get("folder_id");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (id) setFolderId(Number(id));
   }, []);
 
