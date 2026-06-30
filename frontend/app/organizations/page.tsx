@@ -21,6 +21,20 @@ export default function OrganizationsPage() {
   useEffect(() => {
     async function fetchOrgs() {
       try {
+        // オンボーディング状態を先に確認し、未完了ユーザーをウィザードへ誘導する
+        const meRes = await authFetch("/api/auth/me");
+        if (meRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (me.needs_onboarding) {
+            router.replace("/onboarding");
+            return;
+          }
+        }
+
         const res = await authFetch("/api/organizations");
         if (res.status === 401) {
           router.replace("/login");

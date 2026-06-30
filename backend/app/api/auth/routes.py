@@ -228,12 +228,17 @@ def refresh():
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():
-    """現在のログインユーザーの情報を返す"""
+    """現在のログインユーザーの情報を返す。
+
+    needs_onboarding は organization_memberships が 0 件のとき true。
+    招待経由で参加済みのユーザーは既に 1 件以上あるため false になる。
+    """
     return jsonify(
         {
             "id": current_user.id,
             "username": current_user.username,
             "email": current_user.email,
+            "needs_onboarding": len(current_user.organization_memberships) == 0,
         }
     )
 
