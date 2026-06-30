@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import GroupCreateModal from "@/components/GroupCreateModal";
 import { GroupList, type Group } from "@/components/GroupListModal";
+import AppHeader from "@/components/AppHeader";
 
 /**
  * グループ一覧ページ。
@@ -62,15 +63,20 @@ export default function GroupsPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-gray-500">読み込み中...</p>
-      </main>
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <AppHeader />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500">読み込み中...</p>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <AppHeader />
+      <main className="flex-1">
+        <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
         {/* ヘッダー */}
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-lg font-semibold">グループ一覧</h1>
@@ -109,6 +115,7 @@ export default function GroupsPage() {
           router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
         }
       />
-    </main>
+      </main>
+    </div>
   );
 }

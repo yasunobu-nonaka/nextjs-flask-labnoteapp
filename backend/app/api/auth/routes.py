@@ -1,9 +1,23 @@
 from flask import jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, current_user
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_identity,
+    create_access_token,
+    current_user,
+)
 from marshmallow import ValidationError
 
 from . import auth_bp
-from app.schema import RegistrationSchema, LoginSchema, EmailSchema, PasswordResetSchema, UsernameUpdateSchema, EmailUpdateSchema, PasswordChangeSchema, PasswordVerifySchema
+from app.schema import (
+    RegistrationSchema,
+    LoginSchema,
+    EmailSchema,
+    PasswordResetSchema,
+    UsernameUpdateSchema,
+    EmailUpdateSchema,
+    PasswordChangeSchema,
+    PasswordVerifySchema,
+)
 from app.extensions import db
 from app.services.mail_service import (
     send_verification_email,
@@ -82,6 +96,11 @@ def register():
         return jsonify({"error": "確認メールの送信に失敗しました"}), 500
 
 
+#########################################################
+# メール認証処理
+#########################################################
+
+
 @auth_bp.route("/verify/<token>", methods=["GET"])
 def verify_email(token):
     """メール認証エンドポイント"""
@@ -155,7 +174,7 @@ def resend_verification():
 
 
 #########################################################
-# ログイン処理
+# ログイン / トークン管理
 #########################################################
 
 
@@ -184,11 +203,39 @@ def login():
     return jsonify(access_token=access_token, refresh_token=refresh_token)
 
 
+@auth_bp.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    """リフレッシュトークンを使って新しいアクセストークンを発行する"""
+    from app.extensions import db
+    from app.model import User
+
+    # get_jwt_identity() は user_identity_loader が返した文字列（str(user.id)）を返す
+    # create_access_token には User オブジェクトを渡す必要があるため、DBから引き直す
+    identity = get_jwt_identity()
+    user = db.session.get(User, int(identity))
+    if not user:
+        return jsonify({"message": "ユーザーが見つかりません"}), 404
+    new_access_token = create_access_token(identity=user)
+    return jsonify(access_token=new_access_token)
+
+
+#########################################################
+# アカウント管理
+#########################################################
+
+
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():
     """現在のログインユーザーの情報を返す"""
-    return jsonify({"id": current_user.id, "username": current_user.username, "email": current_user.email})
+    return jsonify(
+        {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+        }
+    )
 
 
 @auth_bp.route("/me", methods=["DELETE"])
@@ -202,49 +249,98 @@ def delete_me():
     - プライベートノートのオーナーである
     - 作成したノートまたはフォルダが残っている (FK 制約のため事前に削除が必要)
     """
-    from app.model import OrganizationMember, GroupMember, Note, Folder, PrivateNoteMember
+    from app.model import (
+        OrganizationMember,
+        GroupMember,
+        Note,
+        Folder,
+        PrivateNoteMember,
+    )
 
     # 1. 組織ロールチェック: 通常メンバー以外はブロック
     for m in current_user.organization_memberships:
         if m.role.name != "member":
-            return jsonify({
-                "message": f"組織「{m.organization.name}」で「{m.role.name}」ロールを持っています。"
-                           "ロールを変更してからアカウントを削除してください。"
-            }), 409
+            return (
+                jsonify(
+                    {
+                        "message": f"組織「{m.organization.name}」で「{m.role.name}」ロールを持っています。"
+                        "ロールを変更してからアカウントを削除してください。"
+                    }
+                ),
+                409,
+            )
 
     # 2. グループ管理者チェック: admin はブロック
     for m in current_user.group_memberships:
         if m.role.name == "admin":
-            return jsonify({
-                "message": f"グループ「{m.group.name}」の管理者です。"
-                           "管理者を変更してからアカウントを削除してください。"
-            }), 409
+            return (
+                jsonify(
+                    {
+                        "message": f"グループ「{m.group.name}」の管理者です。"
+                        "管理者を変更してからアカウントを削除してください。"
+                    }
+                ),
+                409,
+            )
 
     # 3. プライベートノートのオーナーチェック
-    if db.session.query(Note).filter(
-        Note.created_by_user_id == current_user.id,
-        Note.is_private.is_(True),
-    ).first():
-        return jsonify({
-            "message": "プライベートノートのオーナーです。"
-                       "プライベートノートを移譲または削除してからアカウントを削除してください。"
-        }), 409
+    if (
+        db.session.query(Note)
+        .filter(
+            Note.created_by_user_id == current_user.id,
+            Note.is_private.is_(True),
+        )
+        .first()
+    ):
+        return (
+            jsonify(
+                {
+                    "message": "プライベートノートのオーナーです。"
+                    "プライベートノートを移譲または削除してからアカウントを削除してください。"
+                }
+            ),
+            409,
+        )
 
     # 4. 通常ノート・フォルダの FK 制約: 先に削除してもらう必要がある
-    if db.session.query(Note).filter(Note.created_by_user_id == current_user.id).first():
-        return jsonify({
-            "message": "作成したノートが残っています。先にノートを削除してからアカウントを削除してください。"
-        }), 409
+    if (
+        db.session.query(Note)
+        .filter(Note.created_by_user_id == current_user.id)
+        .first()
+    ):
+        return (
+            jsonify(
+                {
+                    "message": "作成したノートが残っています。先にノートを削除してからアカウントを削除してください。"
+                }
+            ),
+            409,
+        )
 
-    if db.session.query(Folder).filter(Folder.created_by_user_id == current_user.id).first():
-        return jsonify({
-            "message": "作成したフォルダが残っています。先にフォルダを削除してからアカウントを削除してください。"
-        }), 409
+    if (
+        db.session.query(Folder)
+        .filter(Folder.created_by_user_id == current_user.id)
+        .first()
+    ):
+        return (
+            jsonify(
+                {
+                    "message": "作成したフォルダが残っています。先にフォルダを削除してからアカウントを削除してください。"
+                }
+            ),
+            409,
+        )
 
     # すべてのチェックを通過: メンバーシップと共有プライベートノートのメンバー記録を削除してからユーザーを削除する
-    db.session.query(PrivateNoteMember).filter(PrivateNoteMember.user_id == current_user.id).delete()
-    db.session.query(GroupMember).filter(GroupMember.user_id == current_user.id).delete()
-    db.session.query(OrganizationMember).filter(OrganizationMember.user_id == current_user.id).delete()
+    db.session.query(PrivateNoteMember).filter(
+        PrivateNoteMember.user_id == current_user.id
+    ).delete()
+    db.session.query(GroupMember).filter(
+        GroupMember.user_id == current_user.id
+    ).delete()
+    db.session.query(OrganizationMember).filter(
+        OrganizationMember.user_id == current_user.id
+    ).delete()
     # バルク削除後にセッションをリセットして、残留した関連オブジェクトが
     # delete_user() 内の db.session.delete(user) に干渉しないようにする
     db.session.expire_all()
@@ -327,7 +423,14 @@ def update_me_email():
 
     token = generate_email_change_token(new_email)
     if send_email_change_confirmation(new_email, token):
-        return jsonify({"message": "確認メールを送信しました。メールのリンクをクリックして変更を確定してください。"}), 200
+        return (
+            jsonify(
+                {
+                    "message": "確認メールを送信しました。メールのリンクをクリックして変更を確定してください。"
+                }
+            ),
+            200,
+        )
 
     # メール送信失敗時は pending_email をクリアして元に戻す
     current_user.pending_email = None
@@ -344,31 +447,27 @@ def verify_email_change(token):
 
     user = get_user_by_pending_email(new_email)
     if not user:
-        return jsonify({"error": "変更申請が見つかりません。再度変更をお試しください。"}), 404
+        return (
+            jsonify({"error": "変更申請が見つかりません。再度変更をお試しください。"}),
+            404,
+        )
 
     # 確認リンクを踏む間に別ユーザーが同じアドレスを登録していないか最終チェック
     if get_user_by_email(new_email):
-        return jsonify({"error": "このメールアドレスはすでに別のアカウントで使われています"}), 409
+        return (
+            jsonify(
+                {"error": "このメールアドレスはすでに別のアカウントで使われています"}
+            ),
+            409,
+        )
 
     confirm_email_change(user)
     return jsonify({"message": "メールアドレスを変更しました"}), 200
 
 
-@auth_bp.route("/refresh", methods=["POST"])
-@jwt_required(refresh=True)
-def refresh():
-    """リフレッシュトークンを使って新しいアクセストークンを発行する"""
-    from app.extensions import db
-    from app.model import User
-
-    # get_jwt_identity() は user_identity_loader が返した文字列（str(user.id)）を返す
-    # create_access_token には User オブジェクトを渡す必要があるため、DBから引き直す
-    identity = get_jwt_identity()
-    user = db.session.get(User, int(identity))
-    if not user:
-        return jsonify({"message": "ユーザーが見つかりません"}), 404
-    new_access_token = create_access_token(identity=user)
-    return jsonify(access_token=new_access_token)
+#########################################################
+# パスワードリセット処理
+#########################################################
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { OrgList, type Organization } from "@/components/OrgSwitchModal";
+import AppHeader from "@/components/AppHeader";
 
 /**
  * 組織一覧ページ。
@@ -40,13 +41,16 @@ export default function OrganizationsPage() {
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
-        <h1 className="text-lg font-semibold">組織一覧</h1>
-        <section className="flex flex-col gap-3">
-          <OrgList orgs={orgs} isLoading={isLoading} error={error} />
-        </section>
-      </div>
-    </main>
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <AppHeader />
+      <main className="flex-1">
+        <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
+          <h1 className="text-lg font-semibold">組織一覧</h1>
+          <section className="flex flex-col gap-3">
+            <OrgList orgs={orgs} isLoading={isLoading} error={error} />
+          </section>
+        </div>
+      </main>
+    </div>
   );
 }
