@@ -137,24 +137,30 @@ app/
             [noteId]/page.tsx             # note detail (read-only); private badge, share management
             [noteId]/edit/page.tsx        # edit note
 components/
-  AppHeader.tsx          # top navigation bar; org switcher, user menu
-  OrgCreateModal.tsx     # create organization form (name input)
-  OrgSwitchModal.tsx     # switch between orgs the user belongs to
-  CreateGroupWizard.tsx  # multi-step group creation wizard (name, visibility, policy)
-  GroupCreateModal.tsx   # simple group create modal (used from admin/groups)
-  GroupListModal.tsx     # group list picker modal
-  FolderSidebar.tsx      # left sidebar: keyword search form + tag filter checkboxes
-  FolderCard.tsx         # folder card (tab design); owns ··· menu popover, rename/delete modals
-  FolderBreadcrumb.tsx   # breadcrumb navigation for folder hierarchy
-  FolderCreateModal.tsx  # create folder modal
-  NoteCard.tsx           # note card; owns ··· menu popover + move-to-folder modal
-  NoteShareModal.tsx     # note share settings modal
-  NoteForm.tsx           # shared create/edit form; owns useForm + useTagInput
-  NewItemButton.tsx      # "新規作成" button that opens popover (note / folder)
-  Modal.tsx              # generic modal shell (backdrop + dialog box); content passed as children
-  ConfirmModal.tsx       # generic confirmation dialog (yes/no)
-  RadioGroup.tsx         # reusable radio button group component
-  MarkdownEditor.tsx     # Markdown editor wrapper
+  common/
+    Modal.tsx            # generic modal shell (backdrop + dialog box); content passed as children
+    ConfirmModal.tsx     # generic confirmation dialog (yes/no)
+    RadioGroup.tsx       # reusable radio button group component
+  layout/
+    AppHeader.tsx        # top navigation bar; org switcher, user menu
+  org/
+    OrgCreateModal.tsx   # create organization form (name input)
+    OrgSwitchModal.tsx   # switch between orgs the user belongs to; exports OrgList
+  group/
+    CreateGroupWizard.tsx  # multi-step group creation wizard (name, visibility, policy)
+    GroupCreateModal.tsx   # simple group create modal (used from admin/groups)
+    GroupListModal.tsx     # group list picker modal; exports GroupList
+  folder/
+    FolderSidebar.tsx    # left sidebar: keyword search form + tag filter checkboxes
+    FolderCard.tsx       # folder card (tab design); owns ··· menu popover, rename/delete modals
+    FolderBreadcrumb.tsx # breadcrumb navigation for folder hierarchy
+    FolderCreateModal.tsx# create folder modal
+  note/
+    NoteCard.tsx         # note card; owns ··· menu popover + move-to-folder modal; exports PrivateMember type
+    NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput
+    NoteShareModal.tsx   # note share settings modal (private note member management)
+    MarkdownEditor.tsx   # Markdown editor wrapper
+    NewItemButton.tsx    # "新規作成" button that opens popover (note / folder)
 lib/
   api.ts                 # authFetch — wraps fetch with JWT Bearer header and base URL
   folders.ts             # Folder type, buildFolderOptions (flat list → <select> options)
