@@ -27,6 +27,7 @@ from app.api.organizations.organization_service import (
     remove_org_member,
     update_organization,
     update_org_policy,
+    delete_organization,
     build_member_response,
     build_org_response,
 )
@@ -154,6 +155,20 @@ def update_org(org_id):
 
     member = check_org_membership(current_user.id, org_id)
     return jsonify(build_org_response(org, member.role.name if member else None))
+
+
+@organizations_bp.route("/<int:org_id>", methods=["DELETE"])
+@jwt_required()
+def delete_org(org_id):
+    """組織を削除する。ownerのみ可能。グループ・メンバー・ノートを含むすべてのデータが削除される。"""
+
+    require_org_member(current_user.id, org_id)
+    if not check_org_role(current_user.id, org_id, ["owner"]):
+        return jsonify({"message": "この操作を行う権限がありません"}), 403
+
+    org = get_organization_or_404(org_id)
+    delete_organization(org)
+    return "", 204
 
 
 # ============================================================
