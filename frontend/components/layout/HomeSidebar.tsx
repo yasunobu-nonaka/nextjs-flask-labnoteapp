@@ -72,15 +72,33 @@ export default function HomeSidebar() {
         {orgs.length > 0 ? (
           /* 所属組織のリスト: 各組織のグループ一覧ページへリンクする */
           <div className="flex flex-col gap-1.5 px-2">
-            {orgs.map((org) => (
-              <Link
-                key={org.id}
-                href={`/organizations/${org.id}/groups`}
-                className="flex items-center px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                <span className="truncate text-base">{org.name}</span>
-              </Link>
-            ))}
+            {orgs.map((org) => {
+              const canManageOrg = ["owner", "sys_admin", "user_admin"].includes(org.role);
+              return (
+                <div
+                  key={org.id}
+                  className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  {/* 組織名: グループ一覧ページへのリンク */}
+                  <Link
+                    href={`/organizations/${org.id}/groups`}
+                    className="flex-1 flex items-center px-2 py-1.5 min-w-0"
+                  >
+                    <span className="truncate text-base">{org.name}</span>
+                  </Link>
+                  {/* ⚙ アイコン: owner / sys_admin / user_admin のみ表示する */}
+                  {canManageOrg && (
+                    <Link
+                      href={`/organizations/${org.id}/admin`}
+                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
+                      title={`${org.name} の管理`}
+                    >
+                      ⚙
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           /* 組織がない場合の空状態メッセージ */
