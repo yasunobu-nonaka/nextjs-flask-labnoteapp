@@ -123,7 +123,7 @@ export default function FolderSidebar({
       {/* アプリロゴ: クリックするとホームへ戻る */}
       <div className="h-12 flex items-center px-2 pt-2 shrink-0">
         <Link
-          href="/home"
+          href="/organizations"
           className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
         >
           LabNoteApp

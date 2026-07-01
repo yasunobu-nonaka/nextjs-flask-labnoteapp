@@ -4,25 +4,24 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import Link from "next/link";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
 import { GroupList, type Group } from "@/components/group/GroupListModal";
 import AppHeader from "@/components/layout/AppHeader";
+import HomeSidebar from "@/components/layout/HomeSidebar";
 
 /**
  * グループ一覧ページ。
- *
- * 所属グループと参加可能な公開グループを GroupList コンポーネントで表示する。
- * - 所属グループのリンクをクリック → そのグループのノート一覧へ遷移
- * - 即時参加（open）→ ノート一覧へ遷移
- * - 参加申請（request）→ 「申請済み」表示 + キャンセルボタン
- * - 「グループを作成」→ GroupCreateModal → 作成後にノート一覧へ遷移
+ * HomeSidebar を左に表示し、現在の組織をハイライトする。
+ * 右エリアでグループ一覧を表示する:
+ *   - グループがない場合: 作成を促す空状態
+ *   - グループがある場合: 所属グループと参加可能な公開グループを一覧表示
  */
 export default function GroupsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
 
   const [groups, setGroups] = useState<Group[]>([]);
+  const [orgName, setOrgName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -31,90 +30,116 @@ export default function GroupsPage() {
   const unjoinedPublicGroups = groups.filter(
     (g) => !g.is_private && g.role === null,
   );
+  const hasNoGroups = !isLoading && joinedGroups.length === 0 && unjoinedPublicGroups.length === 0;
 
   useEffect(() => {
-    async function fetchGroups() {
+    async function fetchData() {
       try {
-        const res = await authFetch(`/api/organizations/${orgId}/groups`);
-        if (res.status === 401) {
+        // 組織名の取得
+        const orgRes = await authFetch(`/api/organizations/${orgId}`);
+        if (orgRes.status === 401) {
           router.replace("/login");
           return;
         }
-        if (res.status === 404) {
+        if (orgRes.ok) {
+          const orgData = await orgRes.json();
+          setOrgName(orgData.name ?? "");
+        }
+
+        // グループ一覧の取得
+        const groupsRes = await authFetch(`/api/organizations/${orgId}/groups`);
+        if (groupsRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (groupsRes.status === 404) {
           setIsNotFound(true);
           return;
         }
-        if (!res.ok) {
+        if (!groupsRes.ok) {
           router.replace("/organizations");
           return;
         }
-        setGroups(await res.json());
+        setGroups(await groupsRes.json());
       } catch {
         router.replace("/organizations");
       } finally {
         setIsLoading(false);
       }
     }
-    fetchGroups();
+    fetchData();
   }, [orgId, router]);
 
   if (isNotFound) {
     notFound();
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background text-foreground">
-        <AppHeader />
-        <main className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500">読み込み中...</p>
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <AppHeader />
-      <main className="flex-1">
-        <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
-        {/* ヘッダー */}
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-lg font-semibold">グループ一覧</h1>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="shrink-0 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
-          >
-            グループを作成
-          </button>
-        </div>
+    <main className="h-screen overflow-hidden bg-background text-foreground flex">
+      {/* 左カラム: 現在の組織をハイライトした組織ナビゲーションサイドバー */}
+      <HomeSidebar selectedOrgId={orgId} />
 
-        <GroupList
-          orgId={orgId}
-          joinedGroups={joinedGroups}
-          unjoinedGroups={unjoinedPublicGroups}
-          onImmediateJoin={(groupId) =>
-            router.push(`/organizations/${orgId}/groups/${groupId}/notes`)
-          }
-          onCancelledRequest={(groupId) =>
-            setGroups((prev) =>
-              prev.map((g) =>
-                g.id === groupId ? { ...g, join_status: null } : g,
-              ),
-            )
-          }
-          unjoinedEmptyText="参加可能なグループがありません。"
-        />
-        {/* グループが一件もない場合のみホームへのリンクを表示する */}
-        {joinedGroups.length === 0 && unjoinedPublicGroups.length === 0 && (
-          <Link
-            href="/home"
-            className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
-          >
-            ホームへ
-          </Link>
-        )}
+      {/* 右カラム: ヘッダー + グループ一覧コンテンツ */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <AppHeader showLogo={false} />
+
+        <div className="flex-1 overflow-y-auto px-6 py-10">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500 text-base">読み込み中...</p>
+            </div>
+          ) : hasNoGroups ? (
+            /* グループがない場合: 作成を促す空状態 */
+            <div className="flex flex-col items-center gap-6 py-20 text-center">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-2xl font-bold">グループを作成しましょう</h1>
+                <p className="text-gray-500 text-base">
+                  {orgName} にはまだグループがありません。
+                  グループを作成してメンバーを招待し、ノートを共有しましょう。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-3 rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+              >
+                グループを作成する
+              </button>
+            </div>
+          ) : (
+            /* グループがある場合: 一覧表示 */
+            <div className="max-w-2xl mx-auto flex flex-col gap-6">
+              <div className="flex items-center justify-between gap-4">
+                <h1 className="text-lg font-semibold">
+                  {orgName ? `${orgName} のグループ` : "グループ一覧"}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="shrink-0 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+                >
+                  グループを作成
+                </button>
+              </div>
+
+              <GroupList
+                orgId={orgId}
+                joinedGroups={joinedGroups}
+                unjoinedGroups={unjoinedPublicGroups}
+                onImmediateJoin={(groupId) =>
+                  router.push(`/organizations/${orgId}/groups/${groupId}/notes`)
+                }
+                onCancelledRequest={(groupId) =>
+                  setGroups((prev) =>
+                    prev.map((g) =>
+                      g.id === groupId ? { ...g, join_status: null } : g,
+                    ),
+                  )
+                }
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <GroupCreateModal
@@ -125,7 +150,6 @@ export default function GroupsPage() {
           router.push(`/organizations/${orgId}/groups/${group.id}/notes`)
         }
       />
-      </main>
-    </div>
+    </main>
   );
 }

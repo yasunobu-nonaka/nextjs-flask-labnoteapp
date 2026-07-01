@@ -219,7 +219,7 @@ export default function AppHeader({
         {showLogo && (
           /* アプリロゴ: クリックするとホームへ戻る */
           <Link
-            href="/home"
+            href="/organizations"
             className="text-lg font-bold tracking-tight hover:opacity-75 transition-opacity"
           >
             LabNoteApp

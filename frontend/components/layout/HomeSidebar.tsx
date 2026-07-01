@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
 
@@ -12,13 +13,19 @@ type Org = {
   role: string;
 };
 
+type Props = {
+  /** 現在選択中の組織 ID。一致する組織をハイライト表示する。 */
+  selectedOrgId?: string;
+};
+
 /**
  * HomeSidebar コンポーネント
- * ホームページ用の左サイドバー。
+ * ホーム・組織・グループページ共通の左サイドバー。
  * アプリロゴと所属組織の一覧を表示し、各組織のグループページへのナビゲーションを提供する。
  * 「作成」ボタンから新規組織を作成できる。
+ * selectedOrgId と一致する組織をハイライト表示する。
  */
-export default function HomeSidebar() {
+export default function HomeSidebar({ selectedOrgId }: Props = {}) {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
   const router = useRouter();
@@ -46,7 +53,7 @@ export default function HomeSidebar() {
       {/* アプリロゴ: クリックするとホームへ戻る */}
       <div className="h-12 flex items-center px-2 pt-2 shrink-0">
         <Link
-          href="/home"
+          href="/organizations"
           className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
         >
           LabNoteApp
@@ -70,19 +77,28 @@ export default function HomeSidebar() {
         </div>
 
         {orgs.length > 0 ? (
-          /* 所属組織のリスト: 各組織のグループ一覧ページへリンクする */
+          /* 所属組織のリスト */
           <div className="flex flex-col gap-1.5 px-2">
             {orgs.map((org) => {
+              const isSelected = String(org.id) === selectedOrgId;
               const canManageOrg = ["owner", "sys_admin", "user_admin"].includes(org.role);
               return (
                 <div
                   key={org.id}
-                  className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  className={clsx(
+                    "flex items-center gap-0.5 rounded-lg transition-colors",
+                    isSelected
+                      ? "bg-gray-300 dark:bg-gray-600"
+                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                  )}
                 >
                   {/* 組織名: グループ一覧ページへのリンク */}
                   <Link
                     href={`/organizations/${org.id}/groups`}
-                    className="flex-1 flex items-center px-2 py-1.5 min-w-0"
+                    className={clsx(
+                      "flex-1 flex items-center px-2 py-1.5 min-w-0",
+                      isSelected && "font-semibold",
+                    )}
                   >
                     <span className="truncate text-base">{org.name}</span>
                   </Link>

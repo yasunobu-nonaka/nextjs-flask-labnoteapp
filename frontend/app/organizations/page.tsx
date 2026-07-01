@@ -3,22 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
-import { OrgList, type Organization } from "@/components/org/OrgSwitchModal";
 import AppHeader from "@/components/layout/AppHeader";
+import HomeSidebar from "@/components/layout/HomeSidebar";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
-import Link from "next/link";
 
 /**
  * 組織一覧ページ。
- * 所属組織をリンク一覧で表示し、新規組織の作成ボタンを提供する。
- * 組織リンクをクリックするとそのグループ一覧ページへ遷移する。
+ * 組織がない場合は作成を促す空状態を表示する。
+ * 組織がある場合は HomeSidebar から選択するよう案内する。
  */
 export default function OrganizationsPage() {
   const router = useRouter();
-
-  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [hasOrgs, setHasOrgs] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
 
   useEffect(() => {
@@ -29,13 +26,12 @@ export default function OrganizationsPage() {
           router.replace("/login");
           return;
         }
-        if (!res.ok) {
-          setError("組織一覧の取得に失敗しました");
-          return;
+        if (res.ok) {
+          const orgs = await res.json();
+          setHasOrgs(orgs.length > 0);
         }
-        setOrgs(await res.json());
       } catch {
-        setError("サーバーへの接続に失敗しました");
+        // エラーは空状態として扱う
       } finally {
         setIsLoading(false);
       }
@@ -44,41 +40,47 @@ export default function OrganizationsPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <AppHeader />
-      <main className="flex-1">
-        <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
-          {/* ページヘッダー: タイトルと組織作成ボタン */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold">組織一覧</h1>
-            <button
-              onClick={() => setIsOrgCreateModalOpen(true)}
-              className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
-            >
-              組織を作成
-            </button>
-          </div>
-          <section className="flex flex-col gap-3">
-            <OrgList orgs={orgs} isLoading={isLoading} error={error} />
-            {/* 組織がない場合のみホームへのリンクを表示する */}
-            {!isLoading && !error && orgs.length === 0 && (
-              <Link
-                href="/home"
-                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
-              >
-                ホームへ
-              </Link>
-            )}
-          </section>
-        </div>
-      </main>
+    <main className="h-screen overflow-hidden bg-background text-foreground flex">
+      {/* 左カラム: 組織ナビゲーションサイドバー */}
+      <HomeSidebar />
 
-      {/* 組織作成モーダル: 作成後は新しい組織のグループページへ遷移する */}
+      {/* 右カラム: ヘッダー + メインコンテンツ */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <AppHeader showLogo={false} />
+        <div className="flex-1 flex items-center justify-center">
+          {isLoading ? (
+            <p className="text-gray-500 text-base">読み込み中...</p>
+          ) : !hasOrgs ? (
+            /* 組織がない場合: 作成を促す空状態 */
+            <div className="flex flex-col items-center gap-6 text-center">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-2xl font-bold">はじめましょう</h1>
+                <p className="text-gray-500 text-base">
+                  まず組織を作成して、チームメンバーとノートを共有しましょう。
+                </p>
+              </div>
+              <button
+                onClick={() => setIsOrgCreateModalOpen(true)}
+                className="px-6 py-3 rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
+              >
+                組織を作成する
+              </button>
+            </div>
+          ) : (
+            /* 組織がある場合: サイドバーから選択するよう案内する */
+            <p className="text-gray-400 dark:text-gray-500 text-base">
+              組織が選択されていません。左のサイドバーから選択してください。
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 組織作成モーダル */}
       <OrgCreateModal
         isOpen={isOrgCreateModalOpen}
         onClose={() => setIsOrgCreateModalOpen(false)}
         onCreated={(org) => router.push(`/organizations/${org.id}/groups`)}
       />
-    </div>
+    </main>
   );
 }
