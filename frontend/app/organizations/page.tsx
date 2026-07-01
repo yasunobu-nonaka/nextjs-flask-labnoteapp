@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { OrgList, type Organization } from "@/components/org/OrgSwitchModal";
 import AppHeader from "@/components/layout/AppHeader";
+import OrgCreateModal from "@/components/org/OrgCreateModal";
 
 /**
  * 組織一覧ページ。
- * ログイン後の初期遷移先として機能し、所属組織をリンク一覧で表示する。
+ * 所属組織をリンク一覧で表示し、新規組織の作成ボタンを提供する。
  * 組織リンクをクリックするとそのグループ一覧ページへ遷移する。
  */
 export default function OrganizationsPage() {
@@ -17,6 +18,7 @@ export default function OrganizationsPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchOrgs() {
@@ -45,12 +47,28 @@ export default function OrganizationsPage() {
       <AppHeader />
       <main className="flex-1">
         <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col gap-8">
-          <h1 className="text-lg font-semibold">組織一覧</h1>
+          {/* ページヘッダー: タイトルと組織作成ボタン */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold">組織一覧</h1>
+            <button
+              onClick={() => setIsOrgCreateModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+            >
+              組織を作成
+            </button>
+          </div>
           <section className="flex flex-col gap-3">
             <OrgList orgs={orgs} isLoading={isLoading} error={error} />
           </section>
         </div>
       </main>
+
+      {/* 組織作成モーダル: 作成後は新しい組織のグループページへ遷移する */}
+      <OrgCreateModal
+        isOpen={isOrgCreateModalOpen}
+        onClose={() => setIsOrgCreateModalOpen(false)}
+        onCreated={(org) => router.push(`/organizations/${org.id}/groups`)}
+      />
     </div>
   );
 }
