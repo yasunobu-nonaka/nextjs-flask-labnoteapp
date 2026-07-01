@@ -1118,7 +1118,7 @@ class TestDeleteMe:
         res = client.delete("/api/auth/me", headers=auth_headers["headers"])
 
         assert res.status_code == 409
-        assert "ロール" in res.get_json()["message"]
+        assert "オーナー" in res.get_json()["message"]
 
     def test_delete_blocked_by_group_admin(self, client, auth_headers):
         """グループ管理者（admin）は 409 になる。"""

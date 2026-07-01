@@ -259,7 +259,18 @@ def delete_me():
 
     # 1. 組織ロールチェック: 通常メンバー以外はブロック
     for m in current_user.organization_memberships:
-        if m.role.name != "member":
+        if m.role.name == "owner":
+            # オーナーは移譲または組織削除が必要（ロール変更では解決できない）
+            return (
+                jsonify(
+                    {
+                        "message": f"組織「{m.organization.name}」のオーナーです。"
+                        "先に別のメンバーにオーナーを移譲するか、組織を削除してからアカウントを削除してください。"
+                    }
+                ),
+                409,
+            )
+        elif m.role.name != "member":
             return (
                 jsonify(
                     {

@@ -28,6 +28,7 @@ from app.api.organizations.organization_service import (
     update_organization,
     update_org_policy,
     delete_organization,
+    transfer_org_ownership,
     build_member_response,
     build_org_response,
 )
@@ -155,6 +156,34 @@ def update_org(org_id):
 
     member = check_org_membership(current_user.id, org_id)
     return jsonify(build_org_response(org, member.role.name if member else None))
+
+
+@organizations_bp.route("/<int:org_id>/transfer-ownership", methods=["POST"])
+@jwt_required()
+def transfer_ownership(org_id):
+    """組織のオーナー権限を別のメンバーに移譲する。現在のオーナーのみ実行可能。"""
+
+    require_org_member(current_user.id, org_id)
+    if not check_org_role(current_user.id, org_id, ["owner"]):
+        return jsonify({"message": "この操作はオーナーのみ行えます"}), 403
+
+    data = request.get_json() or {}
+    new_owner_id = data.get("user_id")
+    if not new_owner_id:
+        return jsonify({"message": "user_id は必須です"}), 400
+
+    try:
+        transfer_org_ownership(org_id, new_owner_id, current_user.id)
+    except ValueError as err:
+        return jsonify({"message": str(err)}), 400
+
+    # 移譲後の呼び出し元のロールは member に変わっているため、更新後の状態を返す
+    org = get_organization_or_404(org_id)
+    member = check_org_membership(current_user.id, org_id)
+    return jsonify({
+        "message": "オーナーを移譲しました",
+        "organization": build_org_response(org, member.role.name if member else None),
+    })
 
 
 @organizations_bp.route("/<int:org_id>", methods=["DELETE"])
