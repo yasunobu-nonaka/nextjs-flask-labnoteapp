@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
+import Link from "next/link";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
 import { GroupList, type Group } from "@/components/group/GroupListModal";
 import AppHeader from "@/components/layout/AppHeader";
@@ -105,6 +106,15 @@ export default function GroupsPage() {
           }
           unjoinedEmptyText="参加可能なグループがありません。"
         />
+        {/* グループが一件もない場合のみホームへのリンクを表示する */}
+        {joinedGroups.length === 0 && unjoinedPublicGroups.length === 0 && (
+          <Link
+            href="/home"
+            className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+          >
+            ホームへ
+          </Link>
+        )}
       </div>
 
       <GroupCreateModal

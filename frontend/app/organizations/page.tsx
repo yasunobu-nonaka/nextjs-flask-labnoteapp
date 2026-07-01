@@ -6,6 +6,7 @@ import { authFetch } from "@/lib/api";
 import { OrgList, type Organization } from "@/components/org/OrgSwitchModal";
 import AppHeader from "@/components/layout/AppHeader";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
+import Link from "next/link";
 
 /**
  * 組織一覧ページ。
@@ -59,6 +60,15 @@ export default function OrganizationsPage() {
           </div>
           <section className="flex flex-col gap-3">
             <OrgList orgs={orgs} isLoading={isLoading} error={error} />
+            {/* 組織がない場合のみホームへのリンクを表示する */}
+            {!isLoading && !error && orgs.length === 0 && (
+              <Link
+                href="/home"
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline"
+              >
+                ホームへ
+              </Link>
+            )}
           </section>
         </div>
       </main>
