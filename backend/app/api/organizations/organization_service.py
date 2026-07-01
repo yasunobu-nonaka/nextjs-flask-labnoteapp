@@ -155,10 +155,14 @@ def remove_org_member(member: OrganizationMember) -> None:
 
 
 def delete_organization(org: Organization) -> None:
-    """組織を削除する（グループ・メンバー・ポリシー・招待はcascadeで削除）。
+    """組織を削除する（メンバー・ポリシー・招待はcascadeで削除）。
 
+    グループが残っている場合は ValueError を送出する。
     ownerのみが実行できる。呼び出し元で権限確認済みであることを前提とする。
     """
+
+    if org.groups:
+        raise ValueError("グループが残っています。先にすべてのグループを削除してください。")
 
     db.session.delete(org)
     db.session.commit()

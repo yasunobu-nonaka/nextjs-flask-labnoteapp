@@ -167,7 +167,10 @@ def delete_org(org_id):
         return jsonify({"message": "この操作を行う権限がありません"}), 403
 
     org = get_organization_or_404(org_id)
-    delete_organization(org)
+    try:
+        delete_organization(org)
+    except ValueError as err:
+        return jsonify({"message": str(err)}), 409
     return "", 204
 
 
