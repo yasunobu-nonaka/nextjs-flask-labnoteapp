@@ -66,7 +66,7 @@ export default function LoginPage() {
           localStorage.removeItem("redirect_after_login");
           router.push(redirect);
         } else {
-          router.push("/organizations");
+          router.push("/home");
         }
       }
     } catch {

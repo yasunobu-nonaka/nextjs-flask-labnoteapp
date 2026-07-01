@@ -120,9 +120,14 @@ export default function FolderSidebar({
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-4 pb-6 px-3 flex flex-col gap-4">
-      {/* アプリロゴ */}
+      {/* アプリロゴ: クリックするとホームへ戻る */}
       <div className="h-12 flex items-center px-2 pt-2 shrink-0">
-        <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+        <Link
+          href="/home"
+          className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
+        >
+          LabNoteApp
+        </Link>
       </div>
 
       {/* 現在の組織名と操作ボタン */}
