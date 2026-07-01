@@ -6,6 +6,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
+import OrgSwitchModal from "@/components/org/OrgSwitchModal";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
 import GroupListModal, { type Group } from "@/components/group/GroupListModal";
 
@@ -30,6 +31,7 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
+  const [isOrgSwitchModalOpen, setIsOrgSwitchModalOpen] = useState(false);
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
   const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
   const router = useRouter();
@@ -93,13 +95,22 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
           <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             組織
           </span>
-          {/* 組織作成ボタン */}
-          <button
-            onClick={() => setIsOrgCreateModalOpen(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-          >
-            作成
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 組織作成ボタン */}
+            <button
+              onClick={() => setIsOrgCreateModalOpen(true)}
+              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            >
+              作成
+            </button>
+            {/* 組織切り替えボタン */}
+            <button
+              onClick={() => setIsOrgSwitchModalOpen(true)}
+              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            >
+              切り替え
+            </button>
+          </div>
         </div>
 
         {orgs.length > 0 ? (
@@ -207,6 +218,12 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
           setIsOrgCreateModalOpen(false);
           router.push(`/organizations/${org.id}/groups`);
         }}
+      />
+
+      {/* 組織切り替えモーダル */}
+      <OrgSwitchModal
+        isOpen={isOrgSwitchModalOpen}
+        onClose={() => setIsOrgSwitchModalOpen(false)}
       />
 
       {/* グループ作成モーダル */}
