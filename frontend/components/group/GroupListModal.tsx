@@ -239,7 +239,7 @@ export function GroupList({
             })}
           </ul>
         </section>
-      ) : unjoinedEmptyText ? (
+      ) : (unjoinedEmptyText && joinedGroups.length === 0) ? (
         <p className="text-sm text-gray-400">{unjoinedEmptyText}</p>
       ) : null}
 
