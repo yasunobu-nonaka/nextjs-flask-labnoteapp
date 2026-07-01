@@ -37,6 +37,8 @@ export default function ConsoleMembersPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [page, setPage] = useState(1);
+  // 現在のユーザーの組織ロール（オーナー移譲ボタンの表示制御に使う）
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   // user_id → 変更後のロール。変更があったメンバーのみ保持する
   const [pendingRoles, setPendingRoles] = useState<Record<number, string>>({});
@@ -45,35 +47,44 @@ export default function ConsoleMembersPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   // 削除確認モーダルの対象（null = 非表示）
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null);
+  // オーナー移譲確認モーダルの対象（null = 非表示）
+  const [memberToTransfer, setMemberToTransfer] = useState<Member | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
-  // マウント時にメンバー一覧を取得する
+  // マウント時にメンバー一覧と現在ユーザーのロールを並行取得する
   useEffect(() => {
-    async function fetchMembers() {
+    async function fetchData() {
       try {
-        const res = await authFetch(`/api/organizations/${orgId}/members`);
-        if (res.status === 401) {
+        const [membersRes, orgRes] = await Promise.all([
+          authFetch(`/api/organizations/${orgId}/members`),
+          authFetch(`/api/organizations/${orgId}`),
+        ]);
+        if (membersRes.status === 401 || orgRes.status === 401) {
           router.push("/login");
           return;
         }
-        if (res.status === 404) {
+        if (membersRes.status === 404 || orgRes.status === 404) {
           setIsNotFound(true);
           setLoading(false);
           return;
         }
-        if (!res.ok) {
-          setFetchError("メンバー一覧の取得に失敗しました");
+        if (!membersRes.ok || !orgRes.ok) {
+          setFetchError("データの取得に失敗しました");
           setLoading(false);
           return;
         }
-        const data: Member[] = await res.json();
-        setMembers(data);
+        const [membersData, orgData]: [Member[], { role: string }] =
+          await Promise.all([membersRes.json(), orgRes.json()]);
+        setMembers(membersData);
+        setCurrentUserRole(orgData.role);
       } catch {
         setFetchError("サーバーへの接続に失敗しました");
       } finally {
         setLoading(false);
       }
     }
-    fetchMembers();
+    fetchData();
   }, [orgId, router]);
 
   /**
@@ -158,6 +169,38 @@ export default function ConsoleMembersPage() {
     }
 
     setIsSaving(false);
+  }
+
+  /**
+   * オーナー権限を指定メンバーに移譲する。
+   * 移譲後、呼び出し元は member ロールになり管理画面へのアクセス権を失うため
+   * グループ一覧ページへリダイレクトする。
+   */
+  async function handleTransferOwnership(member: Member) {
+    setIsTransferring(true);
+    setTransferError(null);
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/transfer-ownership`,
+        {
+          method: "POST",
+          body: JSON.stringify({ user_id: member.user_id }),
+        },
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setTransferError(json.message ?? "移譲に失敗しました");
+        setMemberToTransfer(null);
+        return;
+      }
+      // 移譲後は管理者権限を失うためグループ一覧へ戻る
+      router.push(`/organizations/${orgId}/groups`);
+    } catch {
+      setTransferError("サーバーへの接続に失敗しました");
+      setMemberToTransfer(null);
+    } finally {
+      setIsTransferring(false);
+    }
   }
 
   /** メンバーを組織から削除する（確認モーダル経由で呼ばれる） */
@@ -278,17 +321,31 @@ export default function ConsoleMembersPage() {
                       )}
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">
-                      {/* owner は削除不可 */}
-                      {m.role !== "owner" && (
-                        <button
-                          type="button"
-                          onClick={() => setMemberToRemove(m)}
-                          className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
-                          aria-label={`${m.username} を削除`}
-                        >
-                          削除
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {/* 現在のユーザーがオーナーで、かつ対象が非オーナーのときのみ移譲ボタンを表示する */}
+                        {currentUserRole === "owner" && m.role !== "owner" && (
+                          <button
+                            type="button"
+                            onClick={() => setMemberToTransfer(m)}
+                            disabled={isTransferring}
+                            className="text-blue-500 hover:text-blue-600 transition-colors text-sm px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50"
+                            aria-label={`${m.username} にオーナーを移譲`}
+                          >
+                            オーナー移譲
+                          </button>
+                        )}
+                        {/* owner は削除不可 */}
+                        {m.role !== "owner" && (
+                          <button
+                            type="button"
+                            onClick={() => setMemberToRemove(m)}
+                            className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
+                            aria-label={`${m.username} を削除`}
+                          >
+                            削除
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -347,6 +404,9 @@ export default function ConsoleMembersPage() {
           )}
         </>
       )}
+      {/* 移譲エラー表示 */}
+      {transferError && <p className="text-sm text-red-500">{transferError}</p>}
+
       {/* メンバー削除確認モーダル */}
       <ConfirmModal
         isOpen={memberToRemove !== null}
@@ -362,6 +422,23 @@ export default function ConsoleMembersPage() {
           }
         }}
         onCancel={() => setMemberToRemove(null)}
+      />
+
+      {/* オーナー移譲確認モーダル */}
+      <ConfirmModal
+        isOpen={memberToTransfer !== null}
+        title="オーナーを移譲しますか？"
+        message={`「${memberToTransfer?.username}」にオーナー権限を移譲します。\nあなたは member ロールに変更され、この画面にアクセスできなくなります。\nこの操作は取り消せません。`}
+        confirmLabel="移譲する"
+        variant="danger"
+        onConfirm={() => {
+          if (memberToTransfer) {
+            const target = memberToTransfer;
+            setMemberToTransfer(null);
+            handleTransferOwnership(target);
+          }
+        }}
+        onCancel={() => setMemberToTransfer(null)}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { ORG_ROLE_LABELS } from "@/lib/constants";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 type OrgData = {
   id: number;
@@ -31,6 +32,11 @@ export default function ConsoleBasicPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // 組織削除
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchOrg() {
@@ -61,6 +67,29 @@ export default function ConsoleBasicPage() {
     }
     fetchOrg();
   }, [orgId, router]);
+
+  /** 組織を削除し、組織一覧へリダイレクトする */
+  async function handleDeleteOrg() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await authFetch(`/api/organizations/${orgId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setDeleteError(json.message ?? "削除に失敗しました");
+        setShowDeleteConfirm(false);
+        return;
+      }
+      router.push("/organizations");
+    } catch {
+      setDeleteError("サーバーへの接続に失敗しました");
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -146,6 +175,42 @@ export default function ConsoleBasicPage() {
           {ORG_ROLE_LABELS[org?.role ?? ""] ?? org?.role}
         </p>
       </section>
+
+      {/* 危険ゾーン: 組織削除（ownerのみ表示） */}
+      {org?.role === "owner" && (
+        <section className="flex flex-col gap-4 border border-red-200 dark:border-red-800 rounded-xl p-5">
+          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">
+            危険ゾーン
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            組織を削除すると、組織内のすべてのグループ・ノート・フォルダー・メンバーが完全に削除されます。この操作は取り消せません。
+          </p>
+          {deleteError && (
+            <p className="text-sm text-red-500">{deleteError}</p>
+          )}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="px-4 py-2 text-base rounded-lg border border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? "削除中..." : "組織を削除"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* 組織削除確認モーダル */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title="組織を削除しますか？"
+        message={`「${org?.name}」を削除します。\n組織内のすべてのグループ・ノート・フォルダー・メンバーが完全に削除されます。\nこの操作は取り消せません。`}
+        confirmLabel="削除する"
+        variant="danger"
+        onConfirm={handleDeleteOrg}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

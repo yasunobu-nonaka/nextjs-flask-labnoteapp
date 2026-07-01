@@ -154,6 +154,48 @@ def remove_org_member(member: OrganizationMember) -> None:
     db.session.commit()
 
 
+def transfer_org_ownership(org_id: int, new_owner_user_id: int, current_owner_user_id: int) -> OrganizationMember:
+    """組織のオーナー権限を別のメンバーに移譲する。
+
+    現在のオーナーを member に降格し、新しいオーナーを owner に昇格させる。
+    両方の変更を同一トランザクションで確定する。
+    """
+
+    current_owner = check_org_membership(current_owner_user_id, org_id)
+    if not current_owner or current_owner.role.name != "owner":
+        raise ValueError("現在のユーザーはオーナーではありません")
+
+    if new_owner_user_id == current_owner_user_id:
+        raise ValueError("自分自身にオーナーを移譲することはできません")
+
+    new_owner = check_org_membership(new_owner_user_id, org_id)
+    if not new_owner:
+        raise ValueError("指定されたユーザーはこの組織のメンバーではありません")
+
+    owner_role = get_role_global("owner")
+    member_role = get_role_global("member")
+
+    current_owner.role_id = member_role.id
+    new_owner.role_id = owner_role.id
+
+    db.session.commit()
+    return new_owner
+
+
+def delete_organization(org: Organization) -> None:
+    """組織を削除する（メンバー・ポリシー・招待はcascadeで削除）。
+
+    グループが残っている場合は ValueError を送出する。
+    ownerのみが実行できる。呼び出し元で権限確認済みであることを前提とする。
+    """
+
+    if org.groups:
+        raise ValueError("グループが残っています。先にすべてのグループを削除してください。")
+
+    db.session.delete(org)
+    db.session.commit()
+
+
 def update_organization(org: Organization, data: dict) -> Organization:
     """組織名を更新する。"""
 

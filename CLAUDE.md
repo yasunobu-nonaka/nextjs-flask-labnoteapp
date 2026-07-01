@@ -117,18 +117,18 @@ app/
     [orgId]/
       admin/
         layout.tsx                        # org admin sidebar layout
-        page.tsx                          # org admin dashboard (name, policy overview)
+        page.tsx                          # org admin dashboard (name, policy overview); org deletion (owner only)
         policy/page.tsx                   # edit org-level policy (who_can_create_groups, etc.)
         groups/page.tsx                   # group list for org admins; create/delete groups
         members/
-          page.tsx                        # org member list; role change, remove, add by email
+          page.tsx                        # org member list; role change, remove, add by email; ownership transfer (owner only)
           invite/page.tsx                 # send email invitation to join org (Phase 5)
       groups/
         page.tsx                          # group list for org members; join / enter group
         [groupId]/
           admin/
             layout.tsx                    # group admin sidebar layout
-            page.tsx                      # group admin dashboard; join request count badge
+            page.tsx                      # group admin dashboard; join request count badge; group deletion (group admin only)
             policy/page.tsx               # edit group-level policy (join_method, visibility)
             members/page.tsx              # group member list; role change, remove, add; join request approval
           notes/
@@ -307,6 +307,8 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | POST | `/api/organizations` | JWT | Create org (caller becomes `owner`) |
 | GET | `/api/organizations/<id>` | member | Org detail + policy |
 | PATCH | `/api/organizations/<id>` | owner/sys_admin | Update org name or policy |
+| DELETE | `/api/organizations/<id>` | owner | Delete org (blocked if any groups exist) |
+| POST | `/api/organizations/<id>/transfer-ownership` | owner | Transfer owner role to another member (caller demoted to member) |
 | GET | `/api/organizations/<id>/members` | member | List members |
 | POST | `/api/organizations/<id>/members` | owner/sys_admin/user_admin | Add member |
 | PATCH | `/api/organizations/<id>/members/<uid>` | owner/sys_admin | Change member role |

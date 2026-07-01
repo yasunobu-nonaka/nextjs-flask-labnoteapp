@@ -381,3 +381,187 @@ class TestNonMemberAccessReturns404:
             headers=outside_headers,
         )
         assert res.status_code == 404
+
+
+###############################################
+#  組織削除テスト
+###############################################
+class TestOrganizationDeletion:
+    def test_delete_organization_success(self, client, auth_headers):
+        """ownerはグループがない組織を削除できる。削除後は 404 を返す。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+
+        res = client.delete(
+            f"/api/organizations/{org_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 204
+
+        # 削除後は取得できない
+        res2 = client.get(
+            f"/api/organizations/{org_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res2.status_code == 404
+
+    def test_delete_organization_blocked_when_groups_exist(self, client, auth_headers):
+        """グループが残っている場合は 409 を返す。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        client.post(
+            f"/api/organizations/{org_id}/groups",
+            json={"name": "残っているグループ", "is_private": False},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.delete(
+            f"/api/organizations/{org_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+        assert "グループ" in res.get_json()["message"]
+
+    def test_delete_organization_forbidden_for_non_owner(self, client, auth_headers):
+        """owner 以外のロール（sys_admin など）は組織を削除できない。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+
+        # sys_admin を追加
+        other_headers = register_and_get_headers(client, "sysadm", "sysadm@example.com")
+        from app.extensions import db
+        from app.model import User
+        with client.application.app_context():
+            other_user = db.session.execute(
+                db.select(User).filter_by(email="sysadm@example.com")
+            ).scalar_one()
+            other_id = other_user.id
+
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id, "role": "sys_admin"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.delete(
+            f"/api/organizations/{org_id}",
+            headers=other_headers,
+        )
+        assert res.status_code == 403
+
+    def test_delete_organization_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーが削除しようとすると 404 を返す（存在を漏洩させない）。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        outside_headers = register_and_get_headers(client, "outside2", "outside2@example.com")
+
+        res = client.delete(
+            f"/api/organizations/{org_id}",
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
+
+
+###############################################
+#  オーナー移譲テスト
+###############################################
+class TestOrganizationOwnershipTransfer:
+    def _add_member(self, client, auth_headers, org_id, username, email, role="member"):
+        """ヘルパー: ユーザーを登録して組織に追加し、そのユーザーの ID と認証ヘッダーを返す。"""
+        other_headers = register_and_get_headers(client, username, email)
+        from app.extensions import db
+        from app.model import User
+        with client.application.app_context():
+            other_user = db.session.execute(
+                db.select(User).filter_by(email=email)
+            ).scalar_one()
+            other_id = other_user.id
+
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id, "role": role},
+            headers=auth_headers["headers"],
+        )
+        return other_id, other_headers
+
+    def test_transfer_ownership_success(self, client, auth_headers):
+        """ownerが別のメンバーにオーナーを移譲できる。移譲後、元ownerはmemberになる。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        other_id, other_headers = self._add_member(
+            client, auth_headers, org_id, "newowner", "newowner@example.com"
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/transfer-ownership",
+            json={"user_id": other_id},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+        # 移譲後、元ownerのロールが member になっていることを確認
+        assert res.get_json()["organization"]["role"] == "member"
+
+        # 新オーナーがownerロールを持つことを確認
+        res2 = client.get(
+            f"/api/organizations/{org_id}",
+            headers=other_headers,
+        )
+        assert res2.get_json()["role"] == "owner"
+
+    def test_transfer_ownership_to_self_fails(self, client, auth_headers):
+        """自分自身にオーナーを移譲しようとすると 400 を返す。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        owner_id = auth_headers["user_id"]
+
+        res = client.post(
+            f"/api/organizations/{org_id}/transfer-ownership",
+            json={"user_id": owner_id},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 400
+
+    def test_transfer_ownership_to_non_member_fails(self, client, auth_headers):
+        """組織外のユーザーへの移譲は 400 を返す。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+
+        # 組織に追加しないユーザー
+        register_and_get_headers(client, "outsider", "outsider@example.com")
+        from app.extensions import db
+        from app.model import User
+        with client.application.app_context():
+            outsider = db.session.execute(
+                db.select(User).filter_by(email="outsider@example.com")
+            ).scalar_one()
+            outsider_id = outsider.id
+
+        res = client.post(
+            f"/api/organizations/{org_id}/transfer-ownership",
+            json={"user_id": outsider_id},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 400
+
+    def test_transfer_ownership_forbidden_for_non_owner(self, client, auth_headers):
+        """owner 以外のロールは移譲エンドポイントを呼べない。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        other_id, other_headers = self._add_member(
+            client, auth_headers, org_id, "sysadm2", "sysadm2@example.com", role="sys_admin"
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/transfer-ownership",
+            json={"user_id": other_id},
+            headers=other_headers,
+        )
+        assert res.status_code == 403
+
+    def test_transfer_ownership_returns_404_for_non_member(self, client, auth_headers):
+        """非メンバーが移譲エンドポイントを呼ぶと 404 を返す。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        outside_headers = register_and_get_headers(client, "outside3", "outside3@example.com")
+
+        other_id, _ = self._add_member(
+            client, auth_headers, org_id, "target3", "target3@example.com"
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/transfer-ownership",
+            json={"user_id": other_id},
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
