@@ -18,7 +18,7 @@ import { type OrgPolicy } from "@/lib/types";
 type PendingInvitation = { id: number; email: string; role: string };
 
 /**
- * 招待送信後の結果を1件ずつ保持する。Step 4 の結果サマリーで使う。
+ * 招待送信後の結果を1件ずつ保持する。Step 5 の結果サマリーで使う。
  */
 type InviteResult = {
   id: number;
@@ -32,12 +32,13 @@ const INVITE_ROLES = ["sys_admin", "user_admin", "member"] as const;
 
 /**
  * オンボーディングセットアップウィザード。
- * 4ステップで初めての組織作成・ポリシー設定・メンバー招待を行う。
+ * 5ステップで初めての組織作成・ポリシー設定・グループ作成・メンバー招待を行う。
  *
  * Step 1: 組織名の入力
  * Step 2: ポリシー設定 → ここで POST /api/organizations を実行
- * Step 3: メンバーの招待（スキップ可）→ POST /api/organizations/{id}/invitations を順次実行
- * Step 4: 完了サマリー → 組織グループ一覧へ遷移
+ * Step 3: グループ作成（スキップ可）→ POST /api/organizations/{id}/groups を実行
+ * Step 4: メンバーの招待（スキップ可）→ POST /api/organizations/{id}/invitations を順次実行
+ * Step 5: 完了サマリー → グループノート一覧 or 組織グループ一覧へ遷移
  *
  * Step 3 以降は組織作成済みのため「戻る」ボタンを非表示にする。
  */
@@ -46,7 +47,7 @@ export default function OnboardingWizard() {
   /** 招待エントリのクライアント側キー生成用カウンタ */
   const nextId = useRef(0);
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   // ---- Step 1: 組織名 ----
   const [orgName, setOrgName] = useState("");
@@ -67,7 +68,16 @@ export default function OnboardingWizard() {
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [orgCreateError, setOrgCreateError] = useState<string | null>(null);
 
-  // ---- Step 3: メンバーの招待 ----
+  // ---- Step 3: グループ作成 ----
+  const [groupName, setGroupName] = useState("");
+  const [createdGroup, setCreatedGroup] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupCreateError, setGroupCreateError] = useState<string | null>(null);
+
+  // ---- Step 4: メンバーの招待 ----
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
   >([]);
@@ -115,6 +125,37 @@ export default function OnboardingWizard() {
     }
   }
 
+  /**
+   * Step 3 → Step 4 遷移: グループを作成してから次のステップへ進む。
+   * 二重送信防止のため先頭で isCreatingGroup を確認する。
+   */
+  async function handleCreateGroup() {
+    if (isCreatingGroup || !createdOrg) return;
+    setIsCreatingGroup(true);
+    setGroupCreateError(null);
+    try {
+      const res = await authFetch(
+        `/api/organizations/${createdOrg.id}/groups`,
+        {
+          method: "POST",
+          body: JSON.stringify({ name: groupName.trim() }),
+        },
+      );
+      if (!res.ok) {
+        const json = await res.json();
+        setGroupCreateError(json.message ?? "グループの作成に失敗しました");
+        return;
+      }
+      const data = await res.json();
+      setCreatedGroup({ id: data.group.id, name: data.group.name });
+      setStep(4);
+    } catch {
+      setGroupCreateError("サーバーへの接続に失敗しました");
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  }
+
   /** 入力中のメールアドレスを招待予定リストに追加する。重複は無視する。 */
   function handleAddInvite() {
     const email = inviteEmail.trim();
@@ -131,13 +172,13 @@ export default function OnboardingWizard() {
   }
 
   /**
-   * Step 3 → Step 4 遷移: 招待予定リストを順次送信してから完了ステップへ進む。
-   * 個別の送信エラーは記録するが全件試行後に Step 4 へ進む（ブロッキングしない）。
+   * Step 4 → Step 5 遷移: 招待予定リストを順次送信してから完了ステップへ進む。
+   * 個別の送信エラーは記録するが全件試行後に Step 5 へ進む（ブロッキングしない）。
    */
   async function handleSendInvitesAndAdvance() {
     if (isSendingInvites || !createdOrg) return;
     if (pendingInvitations.length === 0) {
-      setStep(4);
+      setStep(5);
       return;
     }
 
@@ -171,7 +212,7 @@ export default function OnboardingWizard() {
 
     setInviteResults(results);
     setIsSendingInvites(false);
-    setStep(4);
+    setStep(5);
   }
 
   return (
@@ -191,8 +232,9 @@ export default function OnboardingWizard() {
             [
               "1. 組織名",
               "2. ポリシー",
-              "3. 招待",
-              "4. 完了",
+              "3. グループ",
+              "4. 招待",
+              "5. 完了",
             ] as const
           ).map((label, i) => (
             <span key={label} className="flex items-center gap-2">
@@ -217,12 +259,12 @@ export default function OnboardingWizard() {
           <div
             className="flex transition-transform duration-300 ease-in-out"
             style={{
-              width: "400%",
-              transform: `translateX(-${(step - 1) * 25}%)`,
+              width: "500%",
+              transform: `translateX(-${(step - 1) * 20}%)`,
             }}
           >
             {/* ---- Step 1: 組織名 ---- */}
-            <div className="w-1/4 flex flex-col gap-5 pr-6">
+            <div className="w-1/5 flex flex-col gap-5 pr-6">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-semibold">組織名</label>
                 <input
@@ -257,7 +299,7 @@ export default function OnboardingWizard() {
             </div>
 
             {/* ---- Step 2: ポリシー設定 ---- */}
-            <div className="w-1/4 flex flex-col gap-5 px-6">
+            <div className="w-1/5 flex flex-col gap-5 px-6">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -316,8 +358,52 @@ export default function OnboardingWizard() {
               </button>
             </div>
 
-            {/* ---- Step 3: メンバーの招待 ---- */}
-            <div className="w-1/4 flex flex-col gap-5 px-6">
+            {/* ---- Step 3: グループ作成 ---- */}
+            <div className="w-1/5 flex flex-col gap-5 px-6">
+              {/* 戻るボタンは表示しない: Step 2 で組織を作成済みのため */}
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold">グループ名</label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && groupName.trim())
+                      handleCreateGroup();
+                  }}
+                  placeholder="例: 論文執筆チーム"
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                />
+              </div>
+
+              {groupCreateError && (
+                <p className="text-sm text-red-500">{groupCreateError}</p>
+              )}
+
+              {/* グループ名が空のときは次へボタンを無効化する */}
+              <button
+                type="button"
+                onClick={handleCreateGroup}
+                disabled={isCreatingGroup || !groupName.trim()}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              >
+                {isCreatingGroup ? "作成中..." : "次へ"}
+              </button>
+
+              {/* 招待ステップへスキップ（グループ作成を後回しにする）*/}
+              <button
+                type="button"
+                onClick={() => setStep(4)}
+                disabled={isCreatingGroup}
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center disabled:opacity-40"
+              >
+                スキップ（あとで作成する）
+              </button>
+            </div>
+
+            {/* ---- Step 4: メンバーの招待 ---- */}
+            <div className="w-1/5 flex flex-col gap-5 px-6">
               {/* 戻るボタンは表示しない: Step 2 で組織を作成済みのため */}
 
               {/* メールアドレスとロールの入力行 */}
@@ -393,11 +479,11 @@ export default function OnboardingWizard() {
                 </div>
               )}
 
-              {/* スキップ（招待リストを無視してStep 4へ進む）と招待送信ボタン */}
+              {/* スキップ（招待リストを無視してStep 5へ進む）と招待送信ボタン */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(5)}
                   disabled={isSendingInvites}
                   className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-40"
                 >
@@ -416,11 +502,28 @@ export default function OnboardingWizard() {
               </div>
             </div>
 
-            {/* ---- Step 4: 完了 ---- */}
-            <div className="w-1/4 flex flex-col gap-5 pl-6">
-              <div className="flex flex-col gap-1">
-                <p className="text-base font-semibold">{createdOrg?.name ?? ""}</p>
-                <p className="text-sm text-gray-500">組織が作成されました。</p>
+            {/* ---- Step 5: 完了 ---- */}
+            <div className="w-1/5 flex flex-col gap-5 pl-6">
+              {/* 組織・グループ作成結果サマリー */}
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-base font-semibold">
+                    {createdOrg?.name ?? ""}
+                  </p>
+                  <p className="text-sm text-gray-500">組織が作成されました。</p>
+                </div>
+                {createdGroup ? (
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-base font-semibold">{createdGroup.name}</p>
+                    <p className="text-sm text-gray-500">
+                      グループが作成されました。
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    グループはスキップしました。
+                  </p>
+                )}
               </div>
 
               {/* 招待送信結果のサマリー */}
@@ -453,13 +556,22 @@ export default function OnboardingWizard() {
                 <p className="text-sm text-gray-500">招待はスキップしました。</p>
               )}
 
-              {/* 組織のグループ一覧へ遷移する */}
+              {/*
+               * グループを作成した場合はそのノート一覧へ、
+               * スキップした場合は組織のグループ一覧へ遷移する。
+               */}
               <button
                 type="button"
-                onClick={() =>
-                  createdOrg &&
-                  router.push(`/organizations/${createdOrg.id}/groups`)
-                }
+                onClick={() => {
+                  if (!createdOrg) return;
+                  if (createdGroup) {
+                    router.push(
+                      `/organizations/${createdOrg.id}/groups/${createdGroup.id}/notes`,
+                    );
+                  } else {
+                    router.push(`/organizations/${createdOrg.id}/groups`);
+                  }
+                }}
                 className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
               >
                 ノートを始める
