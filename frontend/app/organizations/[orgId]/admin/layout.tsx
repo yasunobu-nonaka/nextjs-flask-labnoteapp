@@ -88,9 +88,14 @@ export default function ConsoleLayout({
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる（画面上端まで広がる） */}
       <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col pt-4 px-4 gap-6">
-        {/* アプリロゴ */}
+        {/* アプリロゴ: クリックするとホームへ戻る */}
         <div className="h-12 flex items-center px-2 pt-2 shrink-0">
-          <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+          <Link
+            href="/organizations"
+            className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
+          >
+            LabNoteApp
+          </Link>
         </div>
         <div className="flex flex-col gap-2">
           <div className="px-2 mt-1 flex flex-col gap-0.5">
