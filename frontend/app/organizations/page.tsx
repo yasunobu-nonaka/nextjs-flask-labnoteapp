@@ -81,6 +81,16 @@ export default function OrganizationsPage() {
               >
                 組織を作成する
               </button>
+              {/* スキップ済みユーザーがウィザードに戻れるリンク */}
+              <button
+                onClick={() => {
+                  localStorage.removeItem("onboarding_skipped");
+                  router.push("/onboarding");
+                }}
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                セットアップウィザードに戻る
+              </button>
             </div>
           ) : (
             /* 組織がある場合: サイドバーから選択するよう案内する */
