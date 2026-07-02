@@ -77,6 +77,15 @@ export default function OnboardingWizard() {
   const [inviteResults, setInviteResults] = useState<InviteResult[]>([]);
 
   /**
+   * ウィザード全体をスキップする。
+   * localStorage にフラグを立てて /organizations のリダイレクトガードを通過させる。
+   */
+  function handleSkipWizard() {
+    localStorage.setItem("onboarding_skipped", "1");
+    router.push("/organizations");
+  }
+
+  /**
    * Step 2 → Step 3 遷移: 組織を作成してから次のステップへ進む。
    * 二重送信防止のため先頭で isCreatingOrg を確認する。
    */
@@ -96,6 +105,8 @@ export default function OnboardingWizard() {
       }
       const data = await res.json();
       setCreatedOrg({ id: data.organization.id, name: data.organization.name });
+      // 組織が作成されたのでスキップフラグは不要
+      localStorage.removeItem("onboarding_skipped");
       setStep(3);
     } catch {
       setOrgCreateError("サーバーへの接続に失敗しました");
@@ -235,6 +246,14 @@ export default function OnboardingWizard() {
               >
                 次へ
               </button>
+              {/* ウィザード全体をスキップして /organizations へ進む */}
+              <button
+                type="button"
+                onClick={handleSkipWizard}
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center"
+              >
+                スキップ（あとで設定する）
+              </button>
             </div>
 
             {/* ---- Step 2: ポリシー設定 ---- */}
@@ -285,6 +304,15 @@ export default function OnboardingWizard() {
                 className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
               >
                 {isCreatingOrg ? "作成中..." : "次へ"}
+              </button>
+              {/* ウィザード全体をスキップして /organizations へ進む */}
+              <button
+                type="button"
+                onClick={handleSkipWizard}
+                disabled={isCreatingOrg}
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center disabled:opacity-40"
+              >
+                スキップ（あとで設定する）
               </button>
             </div>
 

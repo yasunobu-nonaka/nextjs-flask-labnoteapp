@@ -29,7 +29,9 @@ export default function OrganizationsPage() {
         }
         if (meRes.ok) {
           const me = await meRes.json();
-          if (me.needs_onboarding) {
+          // ウィザードをスキップ済みのユーザーはリダイレクトしない
+          const skipped = localStorage.getItem("onboarding_skipped");
+          if (me.needs_onboarding && !skipped) {
             router.replace("/onboarding");
             return;
           }
