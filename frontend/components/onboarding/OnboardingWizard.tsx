@@ -688,11 +688,11 @@ export default function OnboardingWizard() {
               {/* 作成内容のサマリー */}
               <div className="flex flex-col gap-2 text-sm">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-gray-500 shrink-0 w-12">組織</span>
+                  <span className="text-gray-500 shrink-0 w-20">組織</span>
                   <span className="font-medium">{orgName}</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-gray-500 shrink-0 w-12">招待</span>
+                  <span className="text-gray-500 shrink-0 w-20">招待</span>
                   <span>
                     {pendingInvitations.length > 0
                       ? `${pendingInvitations.length} 件`
@@ -700,7 +700,7 @@ export default function OnboardingWizard() {
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-gray-500 shrink-0 w-12">グループ</span>
+                  <span className="text-gray-500 shrink-0 w-20">グループ</span>
                   <span className="font-medium">
                     {wantsGroup && groupName ? groupName : "なし"}
                   </span>
