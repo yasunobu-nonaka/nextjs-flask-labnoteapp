@@ -217,7 +217,13 @@ export default function AppHeader({
       {/* 左端: アプリ名 + 戻るリンク */}
       <div className="flex items-center gap-4">
         {showLogo && (
-          <span className="text-lg font-bold tracking-tight">LabNoteApp</span>
+          /* アプリロゴ: クリックするとホームへ戻る */
+          <Link
+            href="/organizations"
+            className="text-lg font-bold tracking-tight hover:opacity-75 transition-opacity"
+          >
+            LabNoteApp
+          </Link>
         )}
         {backHref && (
           <Link

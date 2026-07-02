@@ -128,18 +128,16 @@ export default function GroupAdminLayout({
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる（画面上端まで広がる） */}
       <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col pt-4 px-4 gap-6">
-        {/* アプリロゴ: FolderSidebar と高さをそろえる */}
+        {/* アプリロゴ: クリックするとホームへ戻る */}
         <div className="h-12 flex items-center px-2 pt-2 shrink-0">
-          <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+          <Link
+            href="/organizations"
+            className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
+          >
+            LabNoteApp
+          </Link>
         </div>
         <div className="flex flex-col gap-2">
-          {/* ノートページへ戻るリンク */}
-          <Link
-            href={`/organizations/${orgId}/groups/${groupId}/notes`}
-            className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-          >
-            ← ノートに戻る
-          </Link>
           <div className="px-2 mt-1 flex flex-col gap-0.5">
             <p className="text-lg text-gray-400 uppercase tracking-wider font-semibold">
               グループ管理
