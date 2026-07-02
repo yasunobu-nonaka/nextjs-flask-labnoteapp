@@ -133,13 +133,6 @@ export default function GroupAdminLayout({
           <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
         </div>
         <div className="flex flex-col gap-2">
-          {/* ノートページへ戻るリンク */}
-          <Link
-            href={`/organizations/${orgId}/groups/${groupId}/notes`}
-            className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-          >
-            ← ノートに戻る
-          </Link>
           <div className="px-2 mt-1 flex flex-col gap-0.5">
             <p className="text-lg text-gray-400 uppercase tracking-wider font-semibold">
               グループ管理
