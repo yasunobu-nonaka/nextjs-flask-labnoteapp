@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import {
@@ -11,149 +11,136 @@ import {
 import RadioGroup from "@/components/common/RadioGroup";
 import { type OrgPolicy } from "@/lib/types";
 
-/**
- * 招待リストの1エントリ（メール送信前の中間状態）。
- * id は重複削除ボタン用のクライアント側キー。
- */
+/** 招待リストの1エントリ（メール送信前の中間状態）。 */
 type PendingInvitation = { id: number; email: string; role: string };
 
 /**
- * 招待送信後の結果を1件ずつ保持する。Step 5 の結果サマリーで使う。
+ * ウィザードのステップ識別子。
+ * org-name〜group-prompt まで全 API を保留し、done で一括送信する。
  */
-type InviteResult = {
-  id: number;
-  email: string;
-  status: "sent" | "error";
-  message: string;
-};
+type WizardStep =
+  | "org-name"
+  | "org-policy"
+  | "org-invitations"
+  | "group-prompt"
+  | "group-name"
+  | "group-policy"
+  | "done";
+
+const STEP_ORDER: WizardStep[] = [
+  "org-name",
+  "org-policy",
+  "org-invitations",
+  "group-prompt",
+  "group-name",
+  "group-policy",
+  "done",
+];
+
+/** 各ステップのスライド位置（0始まり）。 */
+function posOf(step: WizardStep): number {
+  return STEP_ORDER.indexOf(step);
+}
+
+/**
+ * フェーズインジケーター用のフェーズ番号。
+ * 組織設定=0 / 招待=1 / グループ設定=2 / 完了=3
+ */
+function phaseOf(step: WizardStep): number {
+  if (step === "org-name" || step === "org-policy") return 0;
+  if (step === "org-invitations") return 1;
+  if (
+    step === "group-prompt" ||
+    step === "group-name" ||
+    step === "group-policy"
+  )
+    return 2;
+  return 3;
+}
+
+const PHASE_LABELS = ["組織設定", "招待", "グループ設定", "完了"] as const;
+const N_PANELS = STEP_ORDER.length; // 7
+const PANEL_W = `${100 / N_PANELS}%`;
 
 /** 招待に割り当て可能な組織ロール（owner は自分自身なので除外）。 */
 const INVITE_ROLES = ["sys_admin", "user_admin", "member"] as const;
 
 /**
  * オンボーディングセットアップウィザード。
- * 5ステップで初めての組織作成・ポリシー設定・グループ作成・メンバー招待を行う。
+ * フォームデータを全ステップで保持し、最終の「始める」ボタンで一括作成する。
  *
- * Step 1: 組織名の入力
- * Step 2: ポリシー設定 → ここで POST /api/organizations を実行
- * Step 3: グループ作成（スキップ可）→ POST /api/organizations/{id}/groups を実行
- * Step 4: メンバーの招待（スキップ可）→ POST /api/organizations/{id}/invitations を順次実行
- * Step 5: 完了サマリー → グループノート一覧 or 組織グループ一覧へ遷移
- *
- * Step 3 以降は組織作成済みのため「戻る」ボタンを非表示にする。
+ * - org-name → org-policy: 組織名・ポリシーを収集
+ * - org-invitations: 招待予定リストを収集（スキップ可）
+ * - group-prompt: グループ作成の有無を選択
+ *   - No: done へ即時ジャンプ（スライドアニメーションなし）
+ *   - Yes: group-name → group-policy → done
+ * - done: 確認サマリーを表示し「始める」で一括 API 送信
  */
 export default function OnboardingWizard() {
   const router = useRouter();
   /** 招待エントリのクライアント側キー生成用カウンタ */
   const nextId = useRef(0);
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [step, setStep] = useState<WizardStep>("org-name");
+  /**
+   * group-prompt → done のスキップ時はスライドアニメーションを無効化する。
+   * 中間パネルが視覚的に通過するのを防ぐため。
+   */
+  const [animated, setAnimated] = useState(true);
 
-  // ---- Step 1: 組織名 ----
+  // ---- 組織設定 ----
   const [orgName, setOrgName] = useState("");
-
-  // ---- Step 2: ポリシー設定 ----
-  const [policy, setPolicy] = useState<OrgPolicy>({
+  const [orgPolicy, setOrgPolicy] = useState<OrgPolicy>({
     allow_private_groups: true,
     allow_private_notes: true,
     who_can_create_groups: "member",
     default_join_method: "invite_only",
   });
 
-  // ---- Step 2→3 遷移時に org を作成して id を保持 ----
-  const [createdOrg, setCreatedOrg] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
-  const [orgCreateError, setOrgCreateError] = useState<string | null>(null);
-
-  // ---- Step 3: グループ作成 ----
-  const [groupName, setGroupName] = useState("");
-  const [createdGroup, setCreatedGroup] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [groupCreateError, setGroupCreateError] = useState<string | null>(null);
-
-  // ---- Step 4: メンバーの招待 ----
+  // ---- 招待 ----
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
   >([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
-  const [isSendingInvites, setIsSendingInvites] = useState(false);
-  const [inviteResults, setInviteResults] = useState<InviteResult[]>([]);
+
+  // ---- グループ設定 ----
+  const [wantsGroup, setWantsGroup] = useState<boolean | null>(null);
+  const [groupName, setGroupName] = useState("");
+  const [groupIsPrivate, setGroupIsPrivate] = useState(false);
+  const [groupPolicy, setGroupPolicy] = useState({
+    allow_private_notes: true,
+    join_method: "invite_only",
+    is_notes_visible_to_org: false,
+  });
+
+  // ---- 送信状態 ----
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   /**
-   * ウィザード全体をスキップする。
-   * localStorage にフラグを立てて /organizations のリダイレクトガードを通過させる。
+   * アニメーションなしでステップを変更する。
+   * group-prompt → done のスキップなど、遠いパネルへジャンプする際に使う。
+   * double-RAF でブラウザが描画を確定した後にアニメーションを再有効化する。
    */
+  function jumpTo(target: WizardStep) {
+    setAnimated(false);
+    setStep(target);
+  }
+
+  useEffect(() => {
+    if (!animated) {
+      const id = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setAnimated(true)),
+      );
+      return () => cancelAnimationFrame(id);
+    }
+  }, [animated]);
+
+  /** ウィザード全体をスキップして /organizations へ進む。 */
   function handleSkipWizard() {
     localStorage.setItem("onboarding_skipped", "1");
     router.push("/organizations");
-  }
-
-  /**
-   * Step 2 → Step 3 遷移: 組織を作成してから次のステップへ進む。
-   * 二重送信防止のため先頭で isCreatingOrg を確認する。
-   */
-  async function handleCreateOrg() {
-    if (isCreatingOrg) return;
-    setIsCreatingOrg(true);
-    setOrgCreateError(null);
-    try {
-      const res = await authFetch("/api/organizations", {
-        method: "POST",
-        body: JSON.stringify({ name: orgName.trim(), policy }),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        setOrgCreateError(json.message ?? "組織の作成に失敗しました");
-        return;
-      }
-      const data = await res.json();
-      setCreatedOrg({ id: data.organization.id, name: data.organization.name });
-      // 組織が作成されたのでスキップフラグは不要
-      localStorage.removeItem("onboarding_skipped");
-      setStep(3);
-    } catch {
-      setOrgCreateError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsCreatingOrg(false);
-    }
-  }
-
-  /**
-   * Step 3 → Step 4 遷移: グループを作成してから次のステップへ進む。
-   * 二重送信防止のため先頭で isCreatingGroup を確認する。
-   */
-  async function handleCreateGroup() {
-    if (isCreatingGroup || !createdOrg) return;
-    setIsCreatingGroup(true);
-    setGroupCreateError(null);
-    try {
-      const res = await authFetch(
-        `/api/organizations/${createdOrg.id}/groups`,
-        {
-          method: "POST",
-          body: JSON.stringify({ name: groupName.trim() }),
-        },
-      );
-      if (!res.ok) {
-        const json = await res.json();
-        setGroupCreateError(json.message ?? "グループの作成に失敗しました");
-        return;
-      }
-      const data = await res.json();
-      setCreatedGroup({ id: data.group.id, name: data.group.name });
-      setStep(4);
-    } catch {
-      setGroupCreateError("サーバーへの接続に失敗しました");
-    } finally {
-      setIsCreatingGroup(false);
-    }
   }
 
   /** 入力中のメールアドレスを招待予定リストに追加する。重複は無視する。 */
@@ -172,48 +159,79 @@ export default function OnboardingWizard() {
   }
 
   /**
-   * Step 4 → Step 5 遷移: 招待予定リストを順次送信してから完了ステップへ進む。
-   * 個別の送信エラーは記録するが全件試行後に Step 5 へ進む（ブロッキングしない）。
+   * 最終ステップの「始める」で全データを一括送信する。
+   *
+   * 1. POST /api/organizations — 組織とポリシーを作成
+   * 2. POST /api/organizations/{id}/invitations — 招待を順次送信（個別エラーは無視）
+   * 3. POST /api/organizations/{id}/groups — グループとポリシーを作成（スキップ時は省略）
+   * 4. 作成したグループのノート一覧、またはグループ一覧へ遷移
    */
-  async function handleSendInvitesAndAdvance() {
-    if (isSendingInvites || !createdOrg) return;
-    if (pendingInvitations.length === 0) {
-      setStep(5);
-      return;
-    }
+  async function handleFinish() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    setIsSendingInvites(true);
-    const results: InviteResult[] = [];
+    try {
+      // 1. 組織を作成する
+      const orgRes = await authFetch("/api/organizations", {
+        method: "POST",
+        body: JSON.stringify({ name: orgName.trim(), policy: orgPolicy }),
+      });
+      if (!orgRes.ok) {
+        const json = await orgRes.json();
+        setSubmitError(json.message ?? "組織の作成に失敗しました");
+        return;
+      }
+      const orgData = await orgRes.json();
+      const orgId: number = orgData.organization.id;
+      localStorage.removeItem("onboarding_skipped");
 
-    for (const inv of pendingInvitations) {
-      try {
-        const res = await authFetch(
-          `/api/organizations/${createdOrg.id}/invitations`,
+      // 2. 招待を順次送信する（個別エラーはあとから org 管理画面で対応可能なので無視）
+      for (const inv of pendingInvitations) {
+        await authFetch(`/api/organizations/${orgId}/invitations`, {
+          method: "POST",
+          body: JSON.stringify({ email: inv.email, role: inv.role }),
+        }).catch(() => {});
+      }
+
+      // 3. グループを作成する（スキップ時は省略）
+      let groupId: number | null = null;
+      if (wantsGroup && groupName.trim()) {
+        const groupRes = await authFetch(
+          `/api/organizations/${orgId}/groups`,
           {
             method: "POST",
-            body: JSON.stringify({ email: inv.email, role: inv.role }),
+            body: JSON.stringify({
+              name: groupName.trim(),
+              is_private: groupIsPrivate,
+              policy: groupPolicy,
+            }),
           },
         );
-        results.push({
-          id: inv.id,
-          email: inv.email,
-          status: res.ok ? "sent" : "error",
-          message: res.ok ? "送信済み" : "送信に失敗しました",
-        });
-      } catch {
-        results.push({
-          id: inv.id,
-          email: inv.email,
-          status: "error",
-          message: "接続エラー",
-        });
+        if (!groupRes.ok) {
+          const json = await groupRes.json();
+          setSubmitError(json.message ?? "グループの作成に失敗しました");
+          return;
+        }
+        const groupData = await groupRes.json();
+        groupId = groupData.group.id;
       }
-    }
 
-    setInviteResults(results);
-    setIsSendingInvites(false);
-    setStep(5);
+      // 4. グループ作成済みならノート一覧へ、なければグループ一覧へ遷移する
+      if (groupId) {
+        router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
+      } else {
+        router.push(`/organizations/${orgId}/groups`);
+      }
+    } catch {
+      setSubmitError("サーバーへの接続に失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const currentPhase = phaseOf(step);
+  const translateX = `translateX(-${posOf(step) * (100 / N_PANELS)}%)`;
 
   return (
     <div className="w-full max-w-lg px-4">
@@ -226,24 +244,16 @@ export default function OnboardingWizard() {
           <h1 className="text-xl font-semibold">セットアップ</h1>
         </div>
 
-        {/* ステップインジケーター */}
+        {/* フェーズインジケーター */}
         <div className="flex items-center gap-2 text-sm">
-          {(
-            [
-              "1. 組織名",
-              "2. ポリシー",
-              "3. グループ",
-              "4. 招待",
-              "5. 完了",
-            ] as const
-          ).map((label, i) => (
+          {PHASE_LABELS.map((label, i) => (
             <span key={label} className="flex items-center gap-2">
               {i > 0 && (
                 <span className="text-gray-300 dark:text-gray-600">›</span>
               )}
               <span
                 className={
-                  step === i + 1
+                  i === currentPhase
                     ? "font-semibold"
                     : "text-gray-400 dark:text-gray-500"
                 }
@@ -257,14 +267,21 @@ export default function OnboardingWizard() {
         {/* スライドパネル: overflow-hidden でアクティブなステップのみ表示する */}
         <div className="overflow-hidden">
           <div
-            className="flex transition-transform duration-300 ease-in-out"
+            className={
+              animated
+                ? "flex transition-transform duration-300 ease-in-out"
+                : "flex"
+            }
             style={{
-              width: "500%",
-              transform: `translateX(-${(step - 1) * 20}%)`,
+              width: `${N_PANELS * 100}%`,
+              transform: translateX,
             }}
           >
-            {/* ---- Step 1: 組織名 ---- */}
-            <div className="w-1/5 flex flex-col gap-5 pr-6">
+            {/* ---- org-name: 組織名 ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 pr-6"
+            >
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-semibold">組織名</label>
                 <input
@@ -273,7 +290,8 @@ export default function OnboardingWizard() {
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && orgName.trim()) setStep(2);
+                    if (e.key === "Enter" && orgName.trim())
+                      setStep("org-policy");
                   }}
                   placeholder="例: ラボ研究チーム"
                   className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
@@ -282,7 +300,7 @@ export default function OnboardingWizard() {
               {/* 組織名が空のときは次へボタンを無効化する */}
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => setStep("org-policy")}
                 disabled={!orgName.trim()}
                 className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
               >
@@ -298,113 +316,74 @@ export default function OnboardingWizard() {
               </button>
             </div>
 
-            {/* ---- Step 2: ポリシー設定 ---- */}
-            <div className="w-1/5 flex flex-col gap-5 px-6">
+            {/* ---- org-policy: 組織ポリシー ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 px-6"
+            >
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep("org-name")}
                 className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               >
                 ← 戻る
               </button>
 
-              {/* グループ作成権限: WHO_CAN_CREATE_OPTIONS の値を使う */}
+              {/* グループ作成権限 */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold">グループの作成権限</p>
                 <RadioGroup
                   name="onboarding_who_can_create_groups"
                   options={WHO_CAN_CREATE_OPTIONS}
-                  value={policy.who_can_create_groups}
+                  value={orgPolicy.who_can_create_groups}
                   onChange={(v) =>
-                    setPolicy((p) => ({ ...p, who_can_create_groups: v }))
+                    setOrgPolicy((p) => ({ ...p, who_can_create_groups: v }))
                   }
                 />
               </div>
 
-              {/* デフォルト参加方式: JOIN_METHOD_OPTIONS の値を使う */}
+              {/* デフォルト参加方式 */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold">デフォルト参加方式</p>
                 <RadioGroup
                   name="onboarding_default_join_method"
                   options={JOIN_METHOD_OPTIONS}
-                  value={policy.default_join_method}
+                  value={orgPolicy.default_join_method}
                   onChange={(v) =>
-                    setPolicy((p) => ({ ...p, default_join_method: v }))
+                    setOrgPolicy((p) => ({ ...p, default_join_method: v }))
                   }
                 />
               </div>
 
-              {orgCreateError && (
-                <p className="text-sm text-red-500">{orgCreateError}</p>
-              )}
-
-              {/* 「次へ」クリックで組織を作成する */}
               <button
                 type="button"
-                onClick={handleCreateOrg}
-                disabled={isCreatingOrg}
-                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+                onClick={() => setStep("org-invitations")}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
               >
-                {isCreatingOrg ? "作成中..." : "次へ"}
+                次へ
               </button>
               {/* ウィザード全体をスキップして /organizations へ進む */}
               <button
                 type="button"
                 onClick={handleSkipWizard}
-                disabled={isCreatingOrg}
-                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center disabled:opacity-40"
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center"
               >
                 スキップ（あとで設定する）
               </button>
             </div>
 
-            {/* ---- Step 3: グループ作成 ---- */}
-            <div className="w-1/5 flex flex-col gap-5 px-6">
-              {/* 戻るボタンは表示しない: Step 2 で組織を作成済みのため */}
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold">グループ名</label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && groupName.trim())
-                      handleCreateGroup();
-                  }}
-                  placeholder="例: 論文執筆チーム"
-                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-                />
-              </div>
-
-              {groupCreateError && (
-                <p className="text-sm text-red-500">{groupCreateError}</p>
-              )}
-
-              {/* グループ名が空のときは次へボタンを無効化する */}
+            {/* ---- org-invitations: 組織メンバー招待 ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 px-6"
+            >
               <button
                 type="button"
-                onClick={handleCreateGroup}
-                disabled={isCreatingGroup || !groupName.trim()}
-                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+                onClick={() => setStep("org-policy")}
+                className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               >
-                {isCreatingGroup ? "作成中..." : "次へ"}
+                ← 戻る
               </button>
-
-              {/* 招待ステップへスキップ（グループ作成を後回しにする）*/}
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                disabled={isCreatingGroup}
-                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-center disabled:opacity-40"
-              >
-                スキップ（あとで作成する）
-              </button>
-            </div>
-
-            {/* ---- Step 4: メンバーの招待 ---- */}
-            <div className="w-1/5 flex flex-col gap-5 px-6">
-              {/* 戻るボタンは表示しない: Step 2 で組織を作成済みのため */}
 
               {/* メールアドレスとロールの入力行 */}
               <div className="flex gap-2 items-end flex-wrap">
@@ -479,102 +458,248 @@ export default function OnboardingWizard() {
                 </div>
               )}
 
-              {/* スキップ（招待リストを無視してStep 5へ進む）と招待送信ボタン */}
-              <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStep("group-prompt")}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
+              >
+                {pendingInvitations.length > 0
+                  ? `次へ（${pendingInvitations.length} 件招待）`
+                  : "次へ"}
+              </button>
+            </div>
+
+            {/* ---- group-prompt: グループを作成しますか？ ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 px-6"
+            >
+              <button
+                type="button"
+                onClick={() => setStep("org-invitations")}
+                className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                ← 戻る
+              </button>
+
+              <div className="flex flex-col gap-1.5">
+                <p className="text-base font-semibold">
+                  グループを作成しますか？
+                </p>
+                <p className="text-sm text-gray-500">
+                  グループはメンバーとノートを共有する単位です。あとから追加することもできます。
+                </p>
+              </div>
+
+              {/* Yes/No を並べて選択させる */}
+              <div className="flex flex-col gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(5)}
-                  disabled={isSendingInvites}
-                  className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-40"
+                  onClick={() => {
+                    setWantsGroup(true);
+                    setStep("group-name");
+                  }}
+                  className="px-4 py-3 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
                 >
-                  スキップ
+                  はい、作成する
                 </button>
                 <button
                   type="button"
-                  onClick={handleSendInvitesAndAdvance}
-                  disabled={isSendingInvites || pendingInvitations.length === 0}
-                  className="flex-1 px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+                  onClick={() => {
+                    setWantsGroup(false);
+                    // 中間パネルを視覚的に通過しないよう即時ジャンプする
+                    jumpTo("done");
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-base font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
-                  {isSendingInvites
-                    ? "送信中..."
-                    : `招待を送る（${pendingInvitations.length} 件）`}
+                  スキップ
                 </button>
               </div>
             </div>
 
-            {/* ---- Step 5: 完了 ---- */}
-            <div className="w-1/5 flex flex-col gap-5 pl-6">
-              {/* 組織・グループ作成結果サマリー */}
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-base font-semibold">
-                    {createdOrg?.name ?? ""}
-                  </p>
-                  <p className="text-sm text-gray-500">組織が作成されました。</p>
-                </div>
-                {createdGroup ? (
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-base font-semibold">{createdGroup.name}</p>
-                    <p className="text-sm text-gray-500">
-                      グループが作成されました。
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    グループはスキップしました。
-                  </p>
-                )}
-              </div>
-
-              {/* 招待送信結果のサマリー */}
-              {inviteResults.length > 0 ? (
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium text-gray-500">
-                    招待の送信結果
-                  </p>
-                  <ul className="flex flex-col gap-1">
-                    {inviteResults.map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm"
-                      >
-                        <span className="flex-1 truncate">{r.email}</span>
-                        <span
-                          className={
-                            r.status === "sent"
-                              ? "text-green-600 dark:text-green-400 shrink-0"
-                              : "text-red-500 shrink-0"
-                          }
-                        >
-                          {r.message}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">招待はスキップしました。</p>
-              )}
-
-              {/*
-               * グループを作成した場合はそのノート一覧へ、
-               * スキップした場合は組織のグループ一覧へ遷移する。
-               */}
+            {/* ---- group-name: グループ名・公開設定 ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 px-6"
+            >
               <button
                 type="button"
-                onClick={() => {
-                  if (!createdOrg) return;
-                  if (createdGroup) {
-                    router.push(
-                      `/organizations/${createdOrg.id}/groups/${createdGroup.id}/notes`,
-                    );
-                  } else {
-                    router.push(`/organizations/${createdOrg.id}/groups`);
+                onClick={() => setStep("group-prompt")}
+                className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                ← 戻る
+              </button>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold">グループ名</label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && groupName.trim())
+                      setStep("group-policy");
+                  }}
+                  placeholder="例: 論文執筆チーム"
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold">公開設定</label>
+                <select
+                  value={groupIsPrivate ? "private" : "public"}
+                  onChange={(e) =>
+                    setGroupIsPrivate(e.target.value === "private")
                   }
-                }}
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-background focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                >
+                  <option value="public">公開グループ</option>
+                  <option value="private">非公開グループ</option>
+                </select>
+              </div>
+
+              {/* グループ名が空のときは次へボタンを無効化する */}
+              <button
+                type="button"
+                onClick={() => setStep("group-policy")}
+                disabled={!groupName.trim()}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              >
+                次へ
+              </button>
+            </div>
+
+            {/* ---- group-policy: グループポリシー ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 px-6"
+            >
+              <button
+                type="button"
+                onClick={() => setStep("group-name")}
+                className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                ← 戻る
+              </button>
+
+              {/* プライベートノートの作成許可 */}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-semibold">プライベートノートの作成</p>
+                <RadioGroup
+                  name="onboarding_allow_private_notes"
+                  options={[
+                    { value: true, label: "許可" },
+                    { value: false, label: "禁止" },
+                  ]}
+                  value={groupPolicy.allow_private_notes}
+                  onChange={(v) =>
+                    setGroupPolicy((p) => ({ ...p, allow_private_notes: v }))
+                  }
+                />
+              </div>
+
+              {/* グループへの参加方式 */}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-semibold">参加方式</p>
+                <RadioGroup
+                  name="onboarding_group_join_method"
+                  options={JOIN_METHOD_OPTIONS}
+                  value={groupPolicy.join_method}
+                  onChange={(v) =>
+                    setGroupPolicy((p) => ({ ...p, join_method: v }))
+                  }
+                />
+              </div>
+
+              {/* グループのノートを組織全体へ公開するか */}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-semibold">
+                  ノートを組織メンバーに公開
+                </p>
+                <RadioGroup
+                  name="onboarding_is_notes_visible_to_org"
+                  options={[
+                    { value: true, label: "公開する" },
+                    { value: false, label: "公開しない" },
+                  ]}
+                  value={groupPolicy.is_notes_visible_to_org}
+                  onChange={(v) =>
+                    setGroupPolicy((p) => ({
+                      ...p,
+                      is_notes_visible_to_org: v,
+                    }))
+                  }
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setStep("done")}
                 className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
               >
-                ノートを始める
+                次へ
+              </button>
+            </div>
+
+            {/* ---- done: 確認・一括作成 ---- */}
+            <div
+              style={{ width: PANEL_W }}
+              className="flex flex-col gap-5 pl-6"
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setStep(wantsGroup ? "group-policy" : "group-prompt")
+                }
+                disabled={isSubmitting}
+                className="self-start text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-40"
+              >
+                ← 戻る
+              </button>
+
+              {/* ウェルカムメッセージ */}
+              <div className="flex flex-col gap-1">
+                <h2 className="text-lg font-semibold">ようこそ！始めましょう</h2>
+                <p className="text-sm text-gray-500">
+                  以下の内容でセットアップを完了します。
+                </p>
+              </div>
+
+              {/* 作成内容のサマリー */}
+              <div className="flex flex-col gap-2 text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-gray-500 shrink-0 w-12">組織</span>
+                  <span className="font-medium">{orgName}</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-gray-500 shrink-0 w-12">招待</span>
+                  <span>
+                    {pendingInvitations.length > 0
+                      ? `${pendingInvitations.length} 件`
+                      : "なし"}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-gray-500 shrink-0 w-12">グループ</span>
+                  <span className="font-medium">
+                    {wantsGroup && groupName ? groupName : "なし"}
+                  </span>
+                </div>
+              </div>
+
+              {submitError && (
+                <p className="text-sm text-red-500">{submitError}</p>
+              )}
+
+              {/* 始めるボタンで全 API を一括送信する */}
+              <button
+                type="button"
+                onClick={handleFinish}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity disabled:opacity-50"
+              >
+                {isSubmitting ? "作成中..." : "始める"}
               </button>
             </div>
           </div>
