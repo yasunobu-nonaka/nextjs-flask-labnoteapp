@@ -77,6 +77,9 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
   const joinedGroups = groups.filter((g) => g.role !== null);
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
+  // 選択中の組織ロール（グループ管理リンクの表示判定に使う）
+  const selectedOrgRole = orgs.find((o) => String(o.id) === selectedOrgId)?.role ?? null;
+
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-4 pb-6 px-3 flex flex-col gap-4">
       {/* アプリロゴ: クリックすると /organizations へ戻る */}
@@ -187,20 +190,41 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
           {joinedGroups.length > 0 ? (
             /* 所属グループのリスト: ノート一覧ページへリンクする */
             <div className="flex flex-col gap-1.5 px-2">
-              {joinedGroups.map((group) => (
-                <Link
-                  key={group.id}
-                  href={`/organizations/${selectedOrgId}/groups/${group.id}/notes`}
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <span className="truncate text-base">{group.name}</span>
-                  {group.is_private && (
-                    <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
-                      非公開
-                    </span>
-                  )}
-                </Link>
-              ))}
+              {joinedGroups.map((group) => {
+                // グループ admin またはorganization の owner/sys_admin/user_admin なら管理画面リンクを表示する
+                const canManageGroup =
+                  group.role === "admin" ||
+                  ["owner", "sys_admin", "user_admin"].includes(selectedOrgRole ?? "");
+                return (
+                  <div
+                    key={group.id}
+                    className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {/* グループ名: ノート一覧ページへのリンク */}
+                    <Link
+                      href={`/organizations/${selectedOrgId}/groups/${group.id}/notes`}
+                      className="flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0"
+                    >
+                      <span className="truncate text-base">{group.name}</span>
+                      {group.is_private && (
+                        <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                          非公開
+                        </span>
+                      )}
+                    </Link>
+                    {/* ⚙ アイコン: グループ管理者または組織管理者のみ表示する */}
+                    {canManageGroup && (
+                      <Link
+                        href={`/organizations/${selectedOrgId}/groups/${group.id}/admin`}
+                        className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
+                        title={`${group.name} の管理`}
+                      >
+                        ⚙
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="px-2 text-sm text-gray-400 dark:text-gray-500">
