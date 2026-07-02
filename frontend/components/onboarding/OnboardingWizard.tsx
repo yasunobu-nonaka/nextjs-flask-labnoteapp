@@ -11,8 +11,15 @@ import {
 import RadioGroup from "@/components/common/RadioGroup";
 import { type OrgPolicy } from "@/lib/types";
 
-/** 招待リストの1エントリ（メール送信前の中間状態）。 */
-type PendingInvitation = { id: number; email: string; role: string };
+/** 招待フォームの1行。emailError は「次へ」押下時のバリデーション結果を保持する。 */
+type InviteRow = {
+  id: number;
+  email: string;
+  role: string;
+  emailError: string | null;
+};
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
  * ウィザードのステップ識別子。
@@ -70,7 +77,7 @@ const INVITE_ROLES = ["sys_admin", "user_admin", "member"] as const;
  * フォームデータを全ステップで保持し、最終の「始める」ボタンで一括作成する。
  *
  * - org-name → org-policy: 組織名・ポリシーを収集
- * - org-invitations: 招待予定リストを収集（スキップ可）
+ * - org-invitations: 招待フォーム行を収集（スキップ可）
  * - group-prompt: グループ作成の有無を選択
  *   - No: done へ即時ジャンプ（スライドアニメーションなし）
  *   - Yes: group-name → group-policy → done
@@ -78,8 +85,8 @@ const INVITE_ROLES = ["sys_admin", "user_admin", "member"] as const;
  */
 export default function OnboardingWizard() {
   const router = useRouter();
-  /** 招待エントリのクライアント側キー生成用カウンタ */
-  const nextId = useRef(0);
+  /** 招待行のクライアント側キー生成用カウンタ。初期行が id=0 のため 1 から始める。 */
+  const nextId = useRef(1);
 
   const [step, setStep] = useState<WizardStep>("org-name");
   /**
@@ -97,13 +104,10 @@ export default function OnboardingWizard() {
     default_join_method: "invite_only",
   });
 
-  // ---- 招待 ----
-  const [pendingInvitations, setPendingInvitations] = useState<
-    PendingInvitation[]
-  >([]);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
-  const [inviteRole, setInviteRole] = useState("member");
+  // ---- 招待（行ベースグリッド。admin の招待ページと同形式）----
+  const [inviteRows, setInviteRows] = useState<InviteRow[]>([
+    { id: 0, email: "", role: "member", emailError: null },
+  ]);
 
   // ---- グループ設定 ----
   const [wantsGroup, setWantsGroup] = useState<boolean | null>(null);
@@ -144,24 +148,47 @@ export default function OnboardingWizard() {
     router.push("/organizations");
   }
 
-  /** 入力中のメールアドレスを招待予定リストに追加する。重複・形式不正は無視する。 */
-  function handleAddInvite() {
-    const email = inviteEmail.trim();
-    if (!email) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-      setInviteEmailError("正しいメールアドレスの形式で入力してください");
-      return;
-    }
-    setInviteEmailError(null);
-    if (pendingInvitations.some((p) => p.email === email)) {
-      setInviteEmail("");
-      return;
-    }
-    setPendingInvitations((prev) => [
+  // ---- 招待行の操作 ----
+
+  /** 指定 id の招待行を部分更新する。 */
+  function updateInviteRow(id: number, patch: Partial<InviteRow>) {
+    setInviteRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    );
+  }
+
+  /** 空の招待行を1行追加する。 */
+  function addInviteRow() {
+    setInviteRows((prev) => [
       ...prev,
-      { id: nextId.current++, email, role: inviteRole },
+      { id: nextId.current++, email: "", role: "member", emailError: null },
     ]);
-    setInviteEmail("");
+  }
+
+  /** 指定 id の招待行を削除する（最低1行は残す）。 */
+  function removeInviteRow(id: number) {
+    setInviteRows((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((r) => r.id !== id);
+    });
+  }
+
+  /**
+   * 招待ステップの「次へ」押下時に呼ぶ。
+   * 入力済み行のメールアドレス形式を検証し、問題なければ group-prompt へ進む。
+   */
+  function handleInviteNext() {
+    const filled = inviteRows.filter((r) => r.email.trim());
+    let hasError = false;
+    for (const row of filled) {
+      if (!EMAIL_REGEX.test(row.email.trim())) {
+        updateInviteRow(row.id, {
+          emailError: "正しいメールアドレスの形式で入力してください",
+        });
+        hasError = true;
+      }
+    }
+    if (!hasError) setStep("group-prompt");
   }
 
   /**
@@ -192,11 +219,14 @@ export default function OnboardingWizard() {
       const orgId: number = orgData.organization.id;
       localStorage.removeItem("onboarding_skipped");
 
-      // 2. 招待を順次送信する（個別エラーはあとから org 管理画面で対応可能なので無視）
-      for (const inv of pendingInvitations) {
+      // 2. 有効な招待行を順次送信する（個別エラーはあとから org 管理画面で対応可能なので無視）
+      const validInvites = inviteRows.filter(
+        (r) => r.email.trim() && EMAIL_REGEX.test(r.email.trim()),
+      );
+      for (const row of validInvites) {
         await authFetch(`/api/organizations/${orgId}/invitations`, {
           method: "POST",
-          body: JSON.stringify({ email: inv.email, role: inv.role }),
+          body: JSON.stringify({ email: row.email.trim(), role: row.role }),
         }).catch(() => {});
       }
 
@@ -232,6 +262,11 @@ export default function OnboardingWizard() {
       setIsSubmitting(false);
     }
   }
+
+  /** 完了サマリー用: 有効な招待行数。 */
+  const validInviteCount = inviteRows.filter(
+    (r) => r.email.trim() && EMAIL_REGEX.test(r.email.trim()),
+  ).length;
 
   const currentPhase = phaseOf(step);
   const translateX = `translateX(-${posOf(step) * (100 / N_PANELS)}%)`;
@@ -333,10 +368,11 @@ export default function OnboardingWizard() {
                 ← 戻る
               </button>
 
-              {/* グループ作成権限 */}
               <p className="text-lg font-semibold">
                 {orgName}の組織ポリシーを設定
               </p>
+
+              {/* グループ作成権限 */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold">グループの作成権限</p>
                 <RadioGroup
@@ -384,7 +420,7 @@ export default function OnboardingWizard() {
             {/* ---- org-invitations: 組織メンバー招待 ---- */}
             <div
               style={{ width: PANEL_W }}
-              className="flex flex-col gap-5 px-6"
+              className="flex flex-col gap-4 px-6"
             >
               <button
                 type="button"
@@ -394,104 +430,102 @@ export default function OnboardingWizard() {
                 ← 戻る
               </button>
 
-              {/* メールアドレスとロールの入力行 */}
-              <div className="mb-4">
+              <div>
                 <p className="text-lg font-semibold">
                   組織に所属するメンバーを招待
                 </p>
                 <p className="text-sm text-gray-400">
-                  組織に追加したいメンバーのメールアドレスを入力し、"リストに追加"から追加してください。任意の数のメンバーを追加できます（スキップ可）。
+                  追加したいメンバーのメールアドレスとロールを入力してください（スキップ可）。
                 </p>
               </div>
-              <div className="flex gap-2 items-end flex-wrap">
-                <div className="flex flex-col gap-1 flex-1 min-w-40">
-                  <label className="text-sm font-medium">メールアドレス</label>
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => {
-                      setInviteEmail(e.target.value);
-                      setInviteEmailError(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddInvite();
-                    }}
-                    placeholder="example@email.com"
-                    className={`px-3 py-2 rounded-lg border bg-transparent focus:outline-none focus:ring-1 text-base ${
-                      inviteEmailError
-                        ? "border-red-400 focus:ring-red-400"
-                        : "border-gray-300 dark:border-gray-700 focus:ring-foreground"
-                    }`}
-                  />
-                  {inviteEmailError && (
-                    <p className="text-xs text-red-500 mt-1">{inviteEmailError}</p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">ロール</label>
-                  <select
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value)}
-                    className="px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
-                  >
-                    {INVITE_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {ORG_ROLE_LABELS[role]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+
+              {/* カラムヘッダー */}
+              <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-1">
+                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                  メールアドレス
+                </span>
+                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 w-32">
+                  ロール
+                </span>
+                <span className="w-8" />
+              </div>
+
+              {/* 招待行リスト */}
+              <div className="flex flex-col gap-2">
+                {inviteRows.map((row) => (
+                  <div key={row.id} className="flex flex-col gap-0.5">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
+                      {/* メールアドレス入力 */}
+                      <input
+                        type="email"
+                        value={row.email}
+                        onChange={(e) =>
+                          updateInviteRow(row.id, {
+                            email: e.target.value,
+                            emailError: null,
+                          })
+                        }
+                        placeholder="example@email.com"
+                        className={`px-3 py-2 text-base rounded-lg border bg-transparent focus:outline-none focus:ring-1 ${
+                          row.emailError
+                            ? "border-red-400 focus:ring-red-400"
+                            : "border-gray-300 dark:border-gray-600 focus:ring-foreground"
+                        }`}
+                      />
+                      {/* ロール選択 */}
+                      <select
+                        value={row.role}
+                        onChange={(e) =>
+                          updateInviteRow(row.id, { role: e.target.value })
+                        }
+                        className="w-32 px-3 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+                      >
+                        {INVITE_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {ORG_ROLE_LABELS[role]}
+                          </option>
+                        ))}
+                      </select>
+                      {/* 行削除ボタン */}
+                      <button
+                        type="button"
+                        onClick={() => removeInviteRow(row.id)}
+                        disabled={inviteRows.length <= 1}
+                        className="w-8 h-8 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 transition-colors"
+                        aria-label="行を削除"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {/* 行ごとのバリデーションエラー */}
+                    {row.emailError && (
+                      <p className="text-xs text-red-500 pl-1">
+                        {row.emailError}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 行追加ボタン */}
+              <div>
                 <button
                   type="button"
-                  onClick={handleAddInvite}
-                  disabled={!inviteEmail.trim()}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 whitespace-nowrap"
+                  onClick={addInviteRow}
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 transition-colors"
                 >
-                  リストに追加
+                  ＋ 行を追加
                 </button>
               </div>
 
-              {/* 招待予定リスト */}
-              {pendingInvitations.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium text-gray-500">
-                    招待予定（{pendingInvitations.length} 件）
-                  </p>
-                  <ul className="flex flex-col gap-1">
-                    {pendingInvitations.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm"
-                      >
-                        <span className="flex-1 truncate">{p.email}</span>
-                        <span className="text-gray-600 dark:text-gray-300 shrink-0">
-                          {ORG_ROLE_LABELS[p.role]}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPendingInvitations((prev) =>
-                              prev.filter((x) => x.id !== p.id),
-                            )
-                          }
-                          className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                          aria-label={`${p.email} を招待リストから外す`}
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
+              {/* 次へ: 押下時にバリデーションを実行して group-prompt へ進む */}
               <button
                 type="button"
-                onClick={() => setStep("group-prompt")}
+                onClick={handleInviteNext}
                 className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
               >
-                {pendingInvitations.length > 0
-                  ? `次へ（${pendingInvitations.length} 件招待）`
+                {validInviteCount > 0
+                  ? `次へ（${validInviteCount} 件招待）`
                   : "次へ"}
               </button>
             </div>
@@ -611,10 +645,11 @@ export default function OnboardingWizard() {
                 ← 戻る
               </button>
 
-              {/* プライベートノートの作成許可 */}
               <p className="text-lg font-semibold">
                 {groupName}のグループポリシーを設定
               </p>
+
+              {/* プライベートノートの作成許可 */}
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold">
                   プライベートノートの作成
@@ -710,9 +745,7 @@ export default function OnboardingWizard() {
                 <div className="flex items-baseline gap-2">
                   <span className="text-gray-500 shrink-0 w-20">招待</span>
                   <span>
-                    {pendingInvitations.length > 0
-                      ? `${pendingInvitations.length} 件`
-                      : "なし"}
+                    {validInviteCount > 0 ? `${validInviteCount} 件` : "なし"}
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2">
