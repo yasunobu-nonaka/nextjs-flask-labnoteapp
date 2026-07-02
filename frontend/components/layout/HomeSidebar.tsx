@@ -56,11 +56,11 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
 
   // 選択中の組織が変わるたびにグループ一覧を取得する
   useEffect(() => {
-    if (!selectedOrgId) {
-      setGroups([]);
-      return;
-    }
     async function fetchGroups() {
+      if (!selectedOrgId) {
+        setGroups([]);
+        return;
+      }
       try {
         const res = await authFetch(`/api/organizations/${selectedOrgId}/groups`);
         if (res.ok) {
