@@ -197,17 +197,14 @@ export default function OnboardingWizard() {
       // 3. グループを作成する（スキップ時は省略）
       let groupId: number | null = null;
       if (wantsGroup && groupName.trim()) {
-        const groupRes = await authFetch(
-          `/api/organizations/${orgId}/groups`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              name: groupName.trim(),
-              is_private: groupIsPrivate,
-              policy: groupPolicy,
-            }),
-          },
-        );
+        const groupRes = await authFetch(`/api/organizations/${orgId}/groups`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: groupName.trim(),
+            is_private: groupIsPrivate,
+            policy: groupPolicy,
+          }),
+        });
         if (!groupRes.ok) {
           const json = await groupRes.json();
           setSubmitError(json.message ?? "グループの作成に失敗しました");
@@ -241,7 +238,8 @@ export default function OnboardingWizard() {
           <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-widest uppercase">
             LabNote
           </p>
-          <h1 className="text-xl font-semibold">セットアップ</h1>
+          <h1 className="text-xl font-semibold mb-2">セットアップ</h1>
+          <p className="text-gray-400">組織およびグループのセットアップ</p>
         </div>
 
         {/* フェーズインジケーター */}
@@ -283,7 +281,7 @@ export default function OnboardingWizard() {
               className="flex flex-col gap-5 pr-6"
             >
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold">組織名</label>
+                <label className="text-lg font-semibold">組織名</label>
                 <input
                   autoFocus
                   type="text"
@@ -330,6 +328,9 @@ export default function OnboardingWizard() {
               </button>
 
               {/* グループ作成権限 */}
+              <p className="text-lg font-semibold">
+                {orgName}の組織ポリシーを設定
+              </p>
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold">グループの作成権限</p>
                 <RadioGroup
@@ -344,7 +345,9 @@ export default function OnboardingWizard() {
 
               {/* デフォルト参加方式 */}
               <div className="flex flex-col gap-2">
-                <p className="text-sm font-semibold">デフォルト参加方式</p>
+                <p className="text-sm font-semibold">
+                  組織内グループのデフォルト参加方式
+                </p>
                 <RadioGroup
                   name="onboarding_default_join_method"
                   options={JOIN_METHOD_OPTIONS}
@@ -386,6 +389,14 @@ export default function OnboardingWizard() {
               </button>
 
               {/* メールアドレスとロールの入力行 */}
+              <div className="mb-4">
+                <p className="text-lg font-semibold">
+                  組織に所属するメンバーを招待
+                </p>
+                <p className="text-sm text-gray-400">
+                  組織に追加したいメンバーのメールアドレスを入力し、"リストに追加"から追加してください。任意の数のメンバーを追加できます（スキップ可）。
+                </p>
+              </div>
               <div className="flex gap-2 items-end flex-wrap">
                 <div className="flex flex-col gap-1 flex-1 min-w-40">
                   <label className="text-sm font-medium">メールアドレス</label>
@@ -486,7 +497,7 @@ export default function OnboardingWizard() {
                 <p className="text-base font-semibold">
                   グループを作成しますか？
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   グループはメンバーとノートを共有する単位です。あとから追加することもできます。
                 </p>
               </div>
@@ -530,6 +541,7 @@ export default function OnboardingWizard() {
                 ← 戻る
               </button>
 
+              <p className="text-lg font-semibold">グループ名を設定</p>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-semibold">グループ名</label>
                 <input
@@ -584,8 +596,13 @@ export default function OnboardingWizard() {
               </button>
 
               {/* プライベートノートの作成許可 */}
+              <p className="text-lg font-semibold">
+                {groupName}のグループポリシーを設定
+              </p>
               <div className="flex flex-col gap-2">
-                <p className="text-sm font-semibold">プライベートノートの作成</p>
+                <p className="text-sm font-semibold">
+                  プライベートノートの作成
+                </p>
                 <RadioGroup
                   name="onboarding_allow_private_notes"
                   options={[
@@ -660,7 +677,9 @@ export default function OnboardingWizard() {
 
               {/* ウェルカムメッセージ */}
               <div className="flex flex-col gap-1">
-                <h2 className="text-lg font-semibold">ようこそ！始めましょう</h2>
+                <h2 className="text-lg font-semibold">
+                  ようこそ！始めましょう
+                </h2>
                 <p className="text-sm text-gray-500">
                   以下の内容でセットアップを完了します。
                 </p>
