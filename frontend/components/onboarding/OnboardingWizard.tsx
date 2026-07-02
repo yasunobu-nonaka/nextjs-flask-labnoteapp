@@ -102,6 +102,7 @@ export default function OnboardingWizard() {
     PendingInvitation[]
   >([]);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState("member");
 
   // ---- グループ設定 ----
@@ -143,10 +144,15 @@ export default function OnboardingWizard() {
     router.push("/organizations");
   }
 
-  /** 入力中のメールアドレスを招待予定リストに追加する。重複は無視する。 */
+  /** 入力中のメールアドレスを招待予定リストに追加する。重複・形式不正は無視する。 */
   function handleAddInvite() {
     const email = inviteEmail.trim();
     if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      setInviteEmailError("正しいメールアドレスの形式で入力してください");
+      return;
+    }
+    setInviteEmailError(null);
     if (pendingInvitations.some((p) => p.email === email)) {
       setInviteEmail("");
       return;
@@ -403,13 +409,23 @@ export default function OnboardingWizard() {
                   <input
                     type="email"
                     value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
+                    onChange={(e) => {
+                      setInviteEmail(e.target.value);
+                      setInviteEmailError(null);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleAddInvite();
                     }}
                     placeholder="example@email.com"
-                    className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+                    className={`px-3 py-2 rounded-lg border bg-transparent focus:outline-none focus:ring-1 text-base ${
+                      inviteEmailError
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 dark:border-gray-700 focus:ring-foreground"
+                    }`}
                   />
+                  {inviteEmailError && (
+                    <p className="text-xs text-red-500 mt-1">{inviteEmailError}</p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">ロール</label>
