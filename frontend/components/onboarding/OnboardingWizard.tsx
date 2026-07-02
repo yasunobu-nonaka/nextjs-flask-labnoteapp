@@ -231,7 +231,7 @@ export default function OnboardingWizard() {
   const translateX = `translateX(-${posOf(step) * (100 / N_PANELS)}%)`;
 
   return (
-    <div className="w-full max-w-lg px-4">
+    <div className="w-full max-w-2xl px-4">
       <div className="bg-background border border-gray-200 dark:border-gray-700 rounded-2xl p-8 flex flex-col gap-6">
         {/* ロゴ + タイトル */}
         <div className="flex flex-col gap-0.5">
