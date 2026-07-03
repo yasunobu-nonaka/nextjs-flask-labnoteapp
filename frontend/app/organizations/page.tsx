@@ -21,6 +21,22 @@ export default function OrganizationsPage() {
   useEffect(() => {
     async function fetchOrgs() {
       try {
+        // オンボーディング状態を先に確認し、未完了ユーザーをウィザードへ誘導する
+        const meRes = await authFetch("/api/auth/me");
+        if (meRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (meRes.ok) {
+          const me = await meRes.json();
+          // ウィザードをスキップ済みのユーザーはリダイレクトしない
+          const skipped = localStorage.getItem("onboarding_skipped");
+          if (me.needs_onboarding && !skipped) {
+            router.replace("/onboarding");
+            return;
+          }
+        }
+
         const res = await authFetch("/api/organizations");
         if (res.status === 401) {
           router.replace("/login");
@@ -64,6 +80,16 @@ export default function OrganizationsPage() {
                 className="px-6 py-3 rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity"
               >
                 組織を作成する
+              </button>
+              {/* スキップ済みユーザーがウィザードに戻れるリンク */}
+              <button
+                onClick={() => {
+                  localStorage.removeItem("onboarding_skipped");
+                  router.push("/onboarding");
+                }}
+                className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                セットアップウィザードに戻る
               </button>
             </div>
           ) : (

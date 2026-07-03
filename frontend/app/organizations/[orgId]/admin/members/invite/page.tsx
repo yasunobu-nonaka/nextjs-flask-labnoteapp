@@ -16,6 +16,8 @@ type Entry = {
   message: string;
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const ROLES = [
   { value: "member", label: "メンバー" },
   { value: "user_admin", label: "ユーザー管理者" },
@@ -77,7 +79,21 @@ export default function InviteMembersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const validEntries = entries.filter((en) => en.email.trim());
+    const filledEntries = entries.filter((en) => en.email.trim());
+    if (filledEntries.length === 0) return;
+
+    // メールアドレスの形式チェック: 不正な行はエラー表示して送信をスキップする
+    for (const entry of filledEntries) {
+      if (!EMAIL_REGEX.test(entry.email.trim())) {
+        updateEntry(entry.id, {
+          status: "error",
+          message: "正しいメールアドレスの形式で入力してください",
+        });
+      }
+    }
+    const validEntries = filledEntries.filter((en) =>
+      EMAIL_REGEX.test(en.email.trim()),
+    );
     if (validEntries.length === 0) return;
 
     setIsSending(true);

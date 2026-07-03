@@ -771,6 +771,26 @@ class TestGetMe:
 
         assert res.status_code == 401
 
+    def test_needs_onboarding_true_for_new_user(self, client, auth_headers):
+        """組織に未所属のユーザーは needs_onboarding が true になる。"""
+        res = client.get("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 200
+        assert res.get_json()["needs_onboarding"] is True
+
+    def test_needs_onboarding_false_after_joining_org(self, client, auth_headers):
+        """組織を作成して所属すると needs_onboarding が false になる。"""
+        client.post(
+            "/api/organizations",
+            json={"name": "テスト組織"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.get("/api/auth/me", headers=auth_headers["headers"])
+
+        assert res.status_code == 200
+        assert res.get_json()["needs_onboarding"] is False
+
 
 #############################################
 # tests for PATCH /api/auth/me/username
