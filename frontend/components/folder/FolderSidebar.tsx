@@ -287,31 +287,6 @@ export default function FolderSidebar({
         </div>
       </form>
 
-      {/* タグフィルター: チェックボックス一覧 */}
-      {availableTags.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-            タグで絞り込み
-          </span>
-          <div className="flex flex-col gap-1 px-2">
-            {availableTags.map((tag) => (
-              <label
-                key={tag}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTags.includes(tag)}
-                  onChange={() => onTagToggle(tag)}
-                  className="rounded border-gray-300 dark:border-gray-700"
-                />
-                <span className="text-base truncate">{tag}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* 著者フィルター: ドロップダウンで選択したメンバーをチップとして下に追加していく */}
       {availableAuthors.length > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -356,6 +331,31 @@ export default function FolderSidebar({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* タグフィルター: チェックボックス一覧 */}
+      {availableTags.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
+            タグで絞り込み
+          </span>
+          <div className="flex flex-col gap-1 px-2">
+            {availableTags.map((tag) => (
+              <label
+                key={tag}
+                className="flex items-center gap-1.5 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedTags.includes(tag)}
+                  onChange={() => onTagToggle(tag)}
+                  className="rounded border-gray-300 dark:border-gray-700"
+                />
+                <span className="text-base truncate">{tag}</span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 
