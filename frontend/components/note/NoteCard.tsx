@@ -27,6 +27,7 @@ export type Note = {
   is_private: boolean;
   is_owner: boolean;
   private_members: PrivateMember[];
+  created_by_username: string | null;
 };
 
 /**
@@ -238,8 +239,10 @@ export default function NoteCard({
         </div>
       )}
 
-      {/* カード下部: 更新日 */}
-      <span className="text-sm text-gray-400">{date}</span>
+      {/* カード下部: 著者・更新日 */}
+      <span className="text-sm text-gray-400 truncate">
+        {note.created_by_username ?? "不明"} ・ {date}
+      </span>
 
       {/* フォルダー移動モーダル */}
       {mode === "moving" && (

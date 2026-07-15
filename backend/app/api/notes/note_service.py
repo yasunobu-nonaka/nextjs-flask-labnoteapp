@@ -46,6 +46,7 @@ def get_notes_service(
     group_id,
     query_word=None,
     tag_names=None,
+    author_ids=None,
     folder_id=None,
     page=1,
     per_page=10,
@@ -59,7 +60,11 @@ def get_notes_service(
     query = (
         db.select(Note)
         .filter(base_filter, access_filter)
-        .options(selectinload(Note.tags), selectinload(Note.private_members))
+        .options(
+            selectinload(Note.tags),
+            selectinload(Note.private_members),
+            selectinload(Note.creator),
+        )
     )
     count_query = db.select(func.count(Note.id)).filter(base_filter, access_filter)
 
@@ -70,6 +75,11 @@ def get_notes_service(
     for tag_name in tag_names or []:
         query = query.filter(Note.tags.any(Tag.tagname == tag_name))
         count_query = count_query.filter(Note.tags.any(Tag.tagname == tag_name))
+
+    # 著者フィルターは OR 条件（いずれかの著者に一致）なので IN で一括指定する
+    if author_ids:
+        query = query.filter(Note.created_by_user_id.in_(author_ids))
+        count_query = count_query.filter(Note.created_by_user_id.in_(author_ids))
 
     # "null" センチネルはフォルダー未所属ノートのみを返す
     if folder_id == "null":
@@ -100,7 +110,11 @@ def get_note_or_404_service(note_id, group_id, current_user_id=None):
     note = db.one_or_404(
         db.select(Note)
         .filter_by(id=note_id, group_id=group_id)
-        .options(selectinload(Note.tags), selectinload(Note.private_members))
+        .options(
+            selectinload(Note.tags),
+            selectinload(Note.private_members),
+            selectinload(Note.creator),
+        )
     )
 
     if note.is_private and current_user_id is not None:

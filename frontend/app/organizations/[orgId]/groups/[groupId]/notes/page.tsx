@@ -50,6 +50,12 @@ export default function NotesPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
+  // 著者フィルター: selectedAuthorIds は選択中の著者ID、availableAuthors は選択肢一覧（グループメンバー）
+  const [selectedAuthorIds, setSelectedAuthorIds] = useState<number[]>([]);
+  const [availableAuthors, setAvailableAuthors] = useState<
+    { id: number; username: string }[]
+  >([]);
+
   // ページネーション
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -92,11 +98,12 @@ export default function NotesPage() {
     fetchGroupName();
   }, [orgIdNum, groupIdNum]);
 
-  // キーワード検索・タグフィルターをリセットして1ページ目に戻る（フォルダー位置は維持）
+  // キーワード検索・タグフィルター・著者フィルターをリセットして1ページ目に戻る（フォルダー位置は維持）
   function handleClear() {
     setQuery("");
     setSubmittedQuery("");
     setSelectedTags([]);
+    setSelectedAuthorIds([]);
     setCurrentPage(1);
   }
 
@@ -122,6 +129,20 @@ export default function NotesPage() {
     setCurrentPage(1);
   }
 
+  // ドロップダウンで選択された著者をフィルターに追加して1ページ目に戻る
+  function handleAuthorAdd(authorId: number) {
+    setSelectedAuthorIds((prev) =>
+      prev.includes(authorId) ? prev : [...prev, authorId],
+    );
+    setCurrentPage(1);
+  }
+
+  // チップのクリックで著者フィルターから除外して1ページ目に戻る
+  function handleAuthorRemove(authorId: number) {
+    setSelectedAuthorIds((prev) => prev.filter((id) => id !== authorId));
+    setCurrentPage(1);
+  }
+
   // 全フォルダーを取得して allFolders を更新する（FolderCard の CRUD 後にも呼ぶ）
   const fetchAllFolders = useCallback(async () => {
     const res = await authFetch(
@@ -133,7 +154,7 @@ export default function NotesPage() {
     }
   }, [orgIdNum, groupIdNum]);
 
-  // マウント時に一度だけタグ一覧とフォルダー一覧を取得する
+  // マウント時に一度だけタグ一覧・フォルダー一覧・グループメンバー一覧（著者フィルターの選択肢）を取得する
   useEffect(() => {
     async function fetchTags() {
       const res = await authFetch(
@@ -144,7 +165,19 @@ export default function NotesPage() {
         setAvailableTags(data);
       }
     }
+    async function fetchAuthors() {
+      const res = await authFetch(
+        `/api/organizations/${orgIdNum}/groups/${groupIdNum}/members`,
+      );
+      if (res.ok) {
+        const data: { user_id: number; username: string }[] = await res.json();
+        setAvailableAuthors(
+          data.map((m) => ({ id: m.user_id, username: m.username })),
+        );
+      }
+    }
     fetchTags();
+    fetchAuthors();
     // fetchAllFolders は useCallback で安定化済みの非同期関数（内部の setState は非同期）
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAllFolders();
@@ -159,6 +192,9 @@ export default function NotesPage() {
         const params = new URLSearchParams();
         if (submittedQuery) params.set("q", submittedQuery);
         selectedTags.forEach((tag) => params.append("tag", tag));
+        selectedAuthorIds.forEach((id) =>
+          params.append("author_id", String(id)),
+        );
         params.set(
           "folder_id",
           currentFolderId === null ? "null" : String(currentFolderId),
@@ -208,6 +244,7 @@ export default function NotesPage() {
     router,
     submittedQuery,
     selectedTags,
+    selectedAuthorIds,
     currentFolderId,
     currentPage,
     refreshKey,
@@ -232,7 +269,8 @@ export default function NotesPage() {
   }
 
   const breadcrumb = getBreadcrumb();
-  const isFiltering = !!submittedQuery || selectedTags.length > 0;
+  const isFiltering =
+    !!submittedQuery || selectedTags.length > 0 || selectedAuthorIds.length > 0;
   // グループ内のノート一覧ページのベース URL（Link href の組み立てに使う）
   const notesBase = `/organizations/${orgId}/groups/${groupId}/notes`;
 
@@ -256,6 +294,10 @@ export default function NotesPage() {
         selectedTags={selectedTags}
         availableTags={availableTags}
         onTagToggle={handleTagToggle}
+        selectedAuthorIds={selectedAuthorIds}
+        availableAuthors={availableAuthors}
+        onAuthorAdd={handleAuthorAdd}
+        onAuthorRemove={handleAuthorRemove}
       />
 
       {/* 右カラム: ヘッダー＋メインコンテンツ */}

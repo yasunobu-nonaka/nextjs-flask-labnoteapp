@@ -22,6 +22,7 @@ type Note = {
   is_private: boolean;
   is_owner: boolean;
   private_members: PrivateMember[];
+  created_by_username: string | null;
 };
 
 type Status = "loading" | "success" | "error";
@@ -196,7 +197,8 @@ export default function NoteDetailPage() {
             </div>
           )}
           <p className="text-sm text-gray-400">
-            作成日: {createdAt}　更新日: {updatedAt}
+            作成者: {note.created_by_username ?? "不明"}　作成日: {createdAt}
+            　更新日: {updatedAt}
           </p>
         </div>
 
