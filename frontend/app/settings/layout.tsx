@@ -1,39 +1,31 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import clsx from "clsx";
-import AppHeader from "@/components/layout/AppHeader";
+import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import clsx from 'clsx';
+import AppHeader from '@/components/layout/AppHeader';
 
-export default function SettingsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
   /* returnTo クエリパラメータを優先し、なければ localStorage の最終訪問ノート一覧 URL、
      それもなければ組織一覧をデフォルトにする */
-  const [backHref, setBackHref] = useState(
-    searchParams.get("returnTo") ?? null,
-  );
+  const [backHref, setBackHref] = useState(searchParams.get('returnTo') ?? null);
   useEffect(() => {
     if (!backHref) {
       // localStorage は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBackHref(
-        localStorage.getItem("last_notes_url") ?? "/organizations",
-      );
+      setBackHref(localStorage.getItem('last_notes_url') ?? '/organizations');
     }
     // マウント時のみ実行したいため依存配列は空にする（意図的）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const navItems = [
-    { label: "基本設定", href: `/settings` },
-    { label: "セキュリティ", href: `/settings/security` },
+    { label: '基本設定', href: `/settings` },
+    { label: 'セキュリティ', href: `/settings/security` },
   ];
 
   return (
@@ -42,7 +34,12 @@ export default function SettingsLayout({
       <aside className="w-72 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col pt-4 px-4 gap-6">
         {/* アプリロゴ */}
         <div className="h-12 flex items-center px-2 pt-2 shrink-0">
-          <span className="text-2xl font-bold tracking-tight">LabNoteApp</span>
+          <Link
+            href="/organizations"
+            className="text-2xl font-bold tracking-tight hover:opacity-75 transition-opacity"
+          >
+            LabNoteApp
+          </Link>
         </div>
         <div className="flex flex-col gap-2">
           <div className="px-2 mt-1 flex flex-col gap-0.5">
@@ -56,19 +53,16 @@ export default function SettingsLayout({
         <nav className="flex flex-col gap-1">
           {navItems.map(({ label, href }) => {
             /* 基本設定は完全一致、その他は前方一致でアクティブ判定する */
-            const isActive =
-              href === `/settings`
-                ? pathname === href
-                : pathname.startsWith(href);
+            const isActive = href === `/settings` ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
                 href={href}
                 className={clsx(
-                  "px-3 py-2 rounded-lg text-base transition-colors",
+                  'px-3 py-2 rounded-lg text-base transition-colors',
                   isActive
-                    ? "bg-gray-100 dark:bg-gray-800 font-semibold"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
+                    ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
                 )}
               >
                 {label}
@@ -83,7 +77,7 @@ export default function SettingsLayout({
         {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
         <AppHeader
           showLogo={false}
-          backHref={backHref ?? "/organizations"}
+          backHref={backHref ?? '/organizations'}
           backLabel="ノート一覧へ"
         />
         {/* メインコンテンツエリア: 各ページの内容を表示する */}
