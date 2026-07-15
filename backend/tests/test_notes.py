@@ -275,6 +275,41 @@ class TestNoteIndex:
         assert data["total"] == 1
         assert data["notes"][0]["title"] == "Tagged"
 
+    def test_note_filter_by_author(self, client, auth_headers):
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        create_note(client, auth_headers["headers"], org_id, group_id, "Mine", "c")
+        _, member_headers = add_second_member(client, auth_headers["headers"], org_id, group_id)
+        create_note(client, member_headers, org_id, group_id, "Theirs", "c")
+
+        res = client.get(
+            notes_url(org_id, group_id) + f"?author_id={auth_headers['user_id']}",
+            headers=auth_headers["headers"],
+        )
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 1
+        assert data["notes"][0]["title"] == "Mine"
+        assert data["notes"][0]["created_by_username"] == "testuser"
+
+    def test_note_filter_by_multiple_authors_or_semantics(self, client, auth_headers):
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        create_note(client, auth_headers["headers"], org_id, group_id, "Mine", "c")
+        member_id, member_headers = add_second_member(client, auth_headers["headers"], org_id, group_id)
+        create_note(client, member_headers, org_id, group_id, "Theirs", "c")
+
+        res = client.get(
+            notes_url(org_id, group_id)
+            + f"?author_id={auth_headers['user_id']}&author_id={member_id}",
+            headers=auth_headers["headers"],
+        )
+        data = res.get_json()
+
+        assert res.status_code == 200
+        assert data["total"] == 2
+        titles = {note["title"] for note in data["notes"]}
+        assert titles == {"Mine", "Theirs"}
+
     def test_note_filter_by_folder_id(self, client, auth_headers):
         org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
         folder_id = create_folder(

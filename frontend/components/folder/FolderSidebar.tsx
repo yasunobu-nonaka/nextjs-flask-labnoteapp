@@ -24,6 +24,12 @@ type Props = {
   /** 選択肢として表示するタグ一覧 */
   availableTags: string[];
   onTagToggle: (tag: string) => void;
+  /** 選択中の著者ID一覧 */
+  selectedAuthorIds: number[];
+  /** 選択肢として表示する著者（グループメンバー）一覧 */
+  availableAuthors: { id: number; username: string }[];
+  onAuthorAdd: (authorId: number) => void;
+  onAuthorRemove: (authorId: number) => void;
 };
 
 
@@ -43,6 +49,10 @@ export default function FolderSidebar({
   selectedTags,
   availableTags,
   onTagToggle,
+  selectedAuthorIds,
+  availableAuthors,
+  onAuthorAdd,
+  onAuthorRemove,
 }: Props) {
   const [orgName, setOrgName] = useState("");
   const [orgRole, setOrgRole] = useState<string | null>(null);
@@ -299,6 +309,53 @@ export default function FolderSidebar({
               </label>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 著者フィルター: ドロップダウンで選択したメンバーをチップとして下に追加していく */}
+      {availableAuthors.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
+            著者で絞り込み
+          </span>
+          <div className="px-2">
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  onAuthorAdd(Number(e.target.value));
+                }
+              }}
+              className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
+            >
+              <option value="">著者を選択...</option>
+              {availableAuthors
+                .filter((author) => !selectedAuthorIds.includes(author.id))
+                .map((author) => (
+                  <option key={author.id} value={author.id}>
+                    {author.username}
+                  </option>
+                ))}
+            </select>
+          </div>
+          {selectedAuthorIds.length > 0 && (
+            <div className="flex flex-wrap gap-1 px-2">
+              {selectedAuthorIds.map((id) => {
+                const author = availableAuthors.find((a) => a.id === id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onAuthorRemove(id)}
+                    title="クリックで除外"
+                    className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                  >
+                    {author?.username ?? id} ×
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

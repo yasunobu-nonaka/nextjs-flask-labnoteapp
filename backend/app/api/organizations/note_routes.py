@@ -86,6 +86,7 @@ def list_notes(org_id, group_id):
 
     query_word = request.args.get("q")
     tag_names = request.args.getlist("tag")
+    author_ids = [int(v) for v in request.args.getlist("author_id")]
     _folder_id_str = request.args.get("folder_id")
     if _folder_id_str is None:
         folder_id = None
@@ -97,7 +98,7 @@ def list_notes(org_id, group_id):
     per_page = 10
 
     notes, total = get_notes_service(
-        group_id, query_word, tag_names, folder_id, page, per_page,
+        group_id, query_word, tag_names, author_ids, folder_id, page, per_page,
         current_user_id=current_user.id,
     )
 

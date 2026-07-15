@@ -37,6 +37,7 @@ class NoteResponseSchema(Schema):
     id = fields.Int(dump_only=True)
     group_id = fields.Int(dump_only=True)
     created_by_user_id = fields.Int(dump_only=True)
+    created_by_username = fields.Method("get_creator_username", dump_only=True)
     title = fields.Str(dump_only=True)
     content_md = fields.Str(dump_only=True)
     folder_id = fields.Int(dump_only=True, allow_none=True)
@@ -52,6 +53,9 @@ class NoteResponseSchema(Schema):
 
     def get_tags(self, obj):
         return [tag.tagname for tag in obj.tags]
+
+    def get_creator_username(self, obj):
+        return obj.creator.username if obj.creator else None
 
 
 class NoteShareSchema(Schema):
