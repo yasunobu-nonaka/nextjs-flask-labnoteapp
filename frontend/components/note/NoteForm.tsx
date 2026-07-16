@@ -82,12 +82,19 @@ export default function NoteForm({
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium">内容</label>
-          {/* Markdown記法に不慣れなユーザー向けのクイックリファレンスを開くボタン */}
+          {/* Markdown記法に不慣れなユーザー向けのクイックリファレンスを開くボタン。
+              「?」バッジでヘルプ機能であることが一目でわかるようにする */}
           <button
             type="button"
             onClick={() => setIsCheatsheetOpen(true)}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
+            <span
+              aria-hidden="true"
+              className="flex items-center justify-center w-4 h-4 rounded-full border border-current text-xs leading-none shrink-0"
+            >
+              ?
+            </span>
             Markdown 記法一覧
           </button>
         </div>
