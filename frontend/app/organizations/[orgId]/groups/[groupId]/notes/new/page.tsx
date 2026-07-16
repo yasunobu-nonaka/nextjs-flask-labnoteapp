@@ -6,6 +6,11 @@ import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/schemas/noteSchema";
 import NoteForm from "@/components/note/NoteForm";
 import AppHeader from "@/components/layout/AppHeader";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import MarkdownTutorialModal from "@/components/note/MarkdownTutorialModal";
+
+/** チュートリアルの表示可否を一度確認したかどうかを覚えておく localStorage キー */
+const TUTORIAL_PROMPTED_KEY = "markdown_tutorial_prompted";
 
 /**
  * ノート新規作成ページ（グループスコープ版）
@@ -18,6 +23,8 @@ export default function NewNotePage() {
 
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<number | null>(null);
+  const [showTutorialPrompt, setShowTutorialPrompt] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const router = useRouter();
 
   // URLクエリパラメータ folder_id を読み取り、指定フォルダーにノートを作成するかどうかを決める
@@ -28,6 +35,26 @@ export default function NewNotePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (id) setFolderId(Number(id));
   }, []);
+
+  // 初めてこのページを開いたときだけ、Markdownチュートリアルを見るかどうかを確認する。
+  // localStorage は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!localStorage.getItem(TUTORIAL_PROMPTED_KEY)) setShowTutorialPrompt(true);
+  }, []);
+
+  // 確認ダイアログで「見る」を選んだ場合: チュートリアルモーダルを開く
+  function handleAcceptTutorial() {
+    localStorage.setItem(TUTORIAL_PROMPTED_KEY, "1");
+    setShowTutorialPrompt(false);
+    setShowTutorial(true);
+  }
+
+  // 確認ダイアログで「あとで」を選んだ場合: 二度と確認しないようにするだけで閉じる
+  function handleDeclineTutorial() {
+    localStorage.setItem(TUTORIAL_PROMPTED_KEY, "1");
+    setShowTutorialPrompt(false);
+  }
 
   async function onSubmit(data: NoteFormValues) {
     setGlobalError(null);
@@ -76,6 +103,20 @@ export default function NewNotePage() {
         />
       </div>
       </main>
+
+      <ConfirmModal
+        isOpen={showTutorialPrompt}
+        title="Markdown記法のチュートリアル"
+        message={"Markdown記法のチュートリアルを見ますか？\n書き方と実際の表示を見比べながら確認できます。"}
+        confirmLabel="見る"
+        cancelLabel="あとで"
+        onConfirm={handleAcceptTutorial}
+        onCancel={handleDeclineTutorial}
+      />
+      <MarkdownTutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
     </div>
   );
 }
