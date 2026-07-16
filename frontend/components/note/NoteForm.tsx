@@ -87,7 +87,7 @@ export default function NoteForm({
           <button
             type="button"
             onClick={() => setIsCheatsheetOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 mb-3 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <span
               aria-hidden="true"
