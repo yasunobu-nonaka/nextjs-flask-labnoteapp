@@ -7,6 +7,7 @@ import { noteSchema, type NoteFormValues } from "@/lib/schemas/noteSchema";
 import { useTagInput } from "@/lib/hooks/useTagInput";
 import MarkdownEditor from "@/components/note/MarkdownEditor";
 import MarkdownCheatsheetModal from "@/components/note/MarkdownCheatsheetModal";
+import MarkdownTutorialModal from "@/components/note/MarkdownTutorialModal";
 
 type Props = {
   // マウント時のフォーム初期値。編集ページでは取得したノートのデータを渡す。
@@ -59,6 +60,14 @@ export default function NoteForm({
 
   // Markdown クイックリファレンスモーダルの開閉状態
   const [isCheatsheetOpen, setIsCheatsheetOpen] = useState(false);
+  // Markdown チュートリアルモーダルの開閉状態（早見表からのリンクで開く）
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  // 早見表の「もう一度チュートリアルを見る」リンク押下時: 早見表を閉じてチュートリアルを開く
+  function handleOpenTutorial() {
+    setIsCheatsheetOpen(false);
+    setIsTutorialOpen(true);
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
@@ -187,6 +196,11 @@ export default function NoteForm({
       <MarkdownCheatsheetModal
         isOpen={isCheatsheetOpen}
         onClose={() => setIsCheatsheetOpen(false)}
+        onOpenTutorial={handleOpenTutorial}
+      />
+      <MarkdownTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
       />
     </form>
   );

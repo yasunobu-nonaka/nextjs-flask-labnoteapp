@@ -10,6 +10,9 @@ type Props = {
   isOpen: boolean;
   /** バックドロップクリックや「閉じる」ボタンで呼ばれる閉じるハンドラ */
   onClose: () => void;
+  /** 「もう一度Markdownのチュートリアルを見る」リンク押下時のハンドラ。
+   *  呼び出し側でこのモーダルを閉じ、MarkdownTutorialModal を開く想定 */
+  onOpenTutorial: () => void;
 };
 
 /** 記法一覧の1行分のデータ型 */
@@ -56,11 +59,29 @@ const CHEATSHEET_ROWS: CheatsheetRow[] = [
  * 記法を見ただけで実際の見た目もイメージできるようにする。フォームや送信処理を持たない
  * 表示専用のモーダルで、既存の isOpen/onClose ラッパー方式で Modal をラップする。
  */
-export default function MarkdownCheatsheetModal({ isOpen, onClose }: Props) {
+export default function MarkdownCheatsheetModal({
+  isOpen,
+  onClose,
+  onOpenTutorial,
+}: Props) {
   if (!isOpen) return null;
 
   return (
     <Modal title="Markdown クイックリファレンス" onClose={onClose}>
+      {/* 早見表だけでは物足りない場合に、文章付きのチュートリアルへ誘導するリンク */}
+      <button
+        type="button"
+        onClick={onOpenTutorial}
+        className="flex items-center gap-1.5 text-sm text-foreground hover:underline self-start"
+      >
+        <span
+          aria-hidden="true"
+          className="flex items-center justify-center w-4 h-4 rounded-full border border-current text-xs leading-none shrink-0"
+        >
+          !
+        </span>
+        もう一度Markdownのチュートリアルを見る
+      </button>
       <table className="w-full border border-gray-300 dark:border-gray-700 text-sm">
         <thead>
           <tr className="border-b border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
