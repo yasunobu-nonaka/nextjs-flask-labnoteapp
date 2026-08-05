@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { noteSchema, type NoteFormValues } from "@/lib/schemas/noteSchema";
 import { useTagInput } from "@/lib/hooks/useTagInput";
 import MarkdownEditor from "@/components/note/MarkdownEditor";
+import MarkdownCheatsheetModal from "@/components/note/MarkdownCheatsheetModal";
+import MarkdownTutorialModal from "@/components/note/MarkdownTutorialModal";
 
 type Props = {
   // マウント時のフォーム初期値。編集ページでは取得したノートのデータを渡す。
@@ -55,6 +58,17 @@ export default function NoteForm({
     setValue("tags", newTags, { shouldValidate: true }),
   );
 
+  // Markdown クイックリファレンスモーダルの開閉状態
+  const [isCheatsheetOpen, setIsCheatsheetOpen] = useState(false);
+  // Markdown チュートリアルモーダルの開閉状態（早見表からのリンクで開く）
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  // 早見表の「もう一度チュートリアルを見る」リンク押下時: 早見表を閉じてチュートリアルを開く
+  function handleOpenTutorial() {
+    setIsCheatsheetOpen(false);
+    setIsTutorialOpen(true);
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
       {/* タイトル */}
@@ -75,7 +89,24 @@ export default function NoteForm({
 
       {/* 内容: MarkdownEditor でスプリットプレビュー付き入力 */}
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium">内容</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">内容</label>
+          {/* Markdown記法に不慣れなユーザー向けのクイックリファレンスを開くボタン。
+              「?」バッジでヘルプ機能であることが一目でわかるようにする */}
+          <button
+            type="button"
+            onClick={() => setIsCheatsheetOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 mb-3 rounded-lg border border-gray-300 dark:border-gray-700 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <span
+              aria-hidden="true"
+              className="flex items-center justify-center w-4 h-4 rounded-full border border-current text-xs leading-none shrink-0"
+            >
+              ?
+            </span>
+            Markdown 記法一覧
+          </button>
+        </div>
         <MarkdownEditor
           value={contentMd}
           onChange={(val) =>
@@ -161,6 +192,16 @@ export default function NoteForm({
       >
         {isSubmitting ? submittingLabel : submitLabel}
       </button>
+
+      <MarkdownCheatsheetModal
+        isOpen={isCheatsheetOpen}
+        onClose={() => setIsCheatsheetOpen(false)}
+        onOpenTutorial={handleOpenTutorial}
+      />
+      <MarkdownTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+      />
     </form>
   );
 }
