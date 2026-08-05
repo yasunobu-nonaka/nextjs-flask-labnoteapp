@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { authFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import AppHeader from "@/components/layout/AppHeader";
@@ -206,7 +207,7 @@ export default function NoteDetailPage() {
 
         {/* Markdown コンテンツ */}
         <div className="prose prose-base dark:prose-invert max-w-none">
-          <Markdown>{note.content_md}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]}>{note.content_md}</Markdown>
         </div>
       </div>
       </main>
