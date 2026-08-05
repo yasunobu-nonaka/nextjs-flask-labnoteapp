@@ -9,7 +9,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import MarkdownTutorialModal from "@/components/note/MarkdownTutorialModal";
 
-/** チュートリアルの表示可否を一度確認したかどうかを覚えておく localStorage キー */
+/** チュートリアルの表示可否を一度確認したかどうかを覚えておく localStorage キーの接頭辞（ユーザーIDごとに分ける） */
 const TUTORIAL_PROMPTED_KEY = "markdown_tutorial_prompted";
 
 /**
@@ -25,6 +25,8 @@ export default function NewNotePage() {
   const [folderId, setFolderId] = useState<number | null>(null);
   const [showTutorialPrompt, setShowTutorialPrompt] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  // ログインユーザーごとの localStorage キー。/api/auth/me の取得完了まで null
+  const [tutorialPromptedKey, setTutorialPromptedKey] = useState<string | null>(null);
   const router = useRouter();
 
   // URLクエリパラメータ folder_id を読み取り、指定フォルダーにノートを作成するかどうかを決める
@@ -37,22 +39,27 @@ export default function NewNotePage() {
   }, []);
 
   // 初めてこのページを開いたときだけ、Markdownチュートリアルを見るかどうかを確認する。
-  // localStorage は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
+  // ブラウザを複数ユーザーで共有していても区別できるよう、キーにユーザーIDを含める。
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!localStorage.getItem(TUTORIAL_PROMPTED_KEY)) setShowTutorialPrompt(true);
+    authFetch("/api/auth/me").then(async (res) => {
+      if (!res.ok) return;
+      const { id } = await res.json();
+      const key = `${TUTORIAL_PROMPTED_KEY}_${id}`;
+      setTutorialPromptedKey(key);
+      if (!localStorage.getItem(key)) setShowTutorialPrompt(true);
+    });
   }, []);
 
   // 確認ダイアログで「見る」を選んだ場合: チュートリアルモーダルを開く
   function handleAcceptTutorial() {
-    localStorage.setItem(TUTORIAL_PROMPTED_KEY, "1");
+    if (tutorialPromptedKey) localStorage.setItem(tutorialPromptedKey, "1");
     setShowTutorialPrompt(false);
     setShowTutorial(true);
   }
 
   // 確認ダイアログで「あとで」を選んだ場合: 二度と確認しないようにするだけで閉じる
   function handleDeclineTutorial() {
-    localStorage.setItem(TUTORIAL_PROMPTED_KEY, "1");
+    if (tutorialPromptedKey) localStorage.setItem(tutorialPromptedKey, "1");
     setShowTutorialPrompt(false);
   }
 
