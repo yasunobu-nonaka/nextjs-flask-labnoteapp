@@ -75,15 +75,14 @@ export default function GroupAdminMembersPage() {
   const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(
     null,
   );
-  // プライベートノートオーナー警告モーダルの内容（null = 非表示。自己脱退がブロックされたときのみ使う）
-  const [ownerBlockInfo, setOwnerBlockInfo] = useState<{
+  // 削除・脱退がブロック/失敗したときに表示する情報モーダルの内容（null = 非表示）
+  const [infoModal, setInfoModal] = useState<{
+    title: string;
     message: string;
-    noteList: string;
   } | null>(null);
-  // 脱退確認モーダルの表示状態とエラー
+  // 脱退確認モーダルの表示状態
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   // 参加申請一覧の状態
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
@@ -298,12 +297,18 @@ export default function GroupAdminMembersPage() {
         // 最後の管理者ブロック・非公開ノートオーナーブロックのどちらも message のみが返る
         // （対象ユーザーの非公開ノートの詳細は、削除する側に閲覧権限があるとは限らないため返さない）
         const json = await res.json();
-        alert(json.message ?? "削除できません");
+        setInfoModal({
+          title: "削除できません",
+          message: json.message ?? "削除できません",
+        });
         return;
       }
       if (!res.ok) {
         const json = await res.json();
-        alert(json.message ?? "削除に失敗しました");
+        setInfoModal({
+          title: "削除できません",
+          message: json.message ?? "削除に失敗しました",
+        });
         return;
       }
       setMembers((prev) => prev.filter((m) => m.user_id !== member.user_id));
@@ -313,19 +318,21 @@ export default function GroupAdminMembersPage() {
         return next;
       });
     } catch {
-      alert("サーバーへの接続に失敗しました");
+      setInfoModal({
+        title: "削除できません",
+        message: "サーバーへの接続に失敗しました",
+      });
     }
   }
 
   /**
    * 自分自身をこのグループから脱退させる。
    * 最後のadminの場合、または自分がオーナーの非公開ノートが残っている場合はバックエンドが409を返す。
-   * 後者は自分自身のノートのタイトルなので、ownerBlockInfo モーダルでタイトル付きで表示してよい。
+   * 後者は自分自身のノートのタイトルなので、infoModal でタイトル付きで表示してよい。
    * 成功後はこのグループの管理画面にアクセスできなくなるためグループ一覧へ戻る。
    */
   async function handleLeaveGroup() {
     setIsLeaving(true);
-    setLeaveError(null);
     try {
       const res = await authFetch(
         `/api/organizations/${orgId}/groups/${groupId}/leave`,
@@ -341,20 +348,32 @@ export default function GroupAdminMembersPage() {
           const noteList = (json.owned_notes as { title: string }[])
             .map((n) => `・${n.title}`)
             .join("\n");
-          setOwnerBlockInfo({ message: json.message, noteList });
+          setInfoModal({
+            title: "脱退できません",
+            message: `${json.message}\n\n${noteList}`,
+          });
         } else {
-          setLeaveError(json.message ?? "脱退できません");
+          setInfoModal({
+            title: "脱退できません",
+            message: json.message ?? "脱退できません",
+          });
         }
         return;
       }
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setLeaveError(json.message ?? "脱退に失敗しました");
+        setInfoModal({
+          title: "脱退できません",
+          message: json.message ?? "脱退に失敗しました",
+        });
         return;
       }
       router.push(`/organizations/${orgId}/groups`);
     } catch {
-      setLeaveError("サーバーへの接続に失敗しました");
+      setInfoModal({
+        title: "脱退できません",
+        message: "サーバーへの接続に失敗しました",
+      });
     } finally {
       setIsLeaving(false);
     }
@@ -666,15 +685,15 @@ export default function GroupAdminMembersPage() {
       )}
 
       {/* メンバー追加モーダル */}
-      {/* プライベートノートオーナー警告モーダル（自己脱退がブロックされたときのみ使う） */}
+      {/* 削除・脱退がブロック/失敗したときの情報モーダル（削除・脱退の両フローで共用） */}
       <ConfirmModal
-        isOpen={ownerBlockInfo !== null}
-        title="操作できません"
-        message={`${ownerBlockInfo?.message ?? ""}\n\n${ownerBlockInfo?.noteList ?? ""}`}
+        isOpen={infoModal !== null}
+        title={infoModal?.title ?? ""}
+        message={infoModal?.message ?? ""}
         confirmLabel="閉じる"
         hideCancelButton
-        onConfirm={() => setOwnerBlockInfo(null)}
-        onCancel={() => setOwnerBlockInfo(null)}
+        onConfirm={() => setInfoModal(null)}
+        onCancel={() => setInfoModal(null)}
       />
 
       {/* メンバー削除確認モーダル */}
@@ -693,9 +712,6 @@ export default function GroupAdminMembersPage() {
         }}
         onCancel={() => setMemberToRemove(null)}
       />
-
-      {/* 脱退エラー表示（最後のadminなど、ownerBlockInfo以外の409エラー） */}
-      {leaveError && <p className="text-sm text-red-500">{leaveError}</p>}
 
       {/* グループ脱退確認モーダル */}
       <ConfirmModal
