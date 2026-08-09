@@ -635,6 +635,17 @@ def remove_grp_member(org_id, group_id, member_user_id):
     if not member:
         return jsonify({"message": "グループメンバーが見つかりません"}), 404
 
+    # 削除対象が唯一のadminの場合は、自己削除・他者からの削除を問わずブロックする
+    if member.role.name == "admin" and count_active_group_admins(group_id) <= 1:
+        return (
+            jsonify(
+                {
+                    "message": "唯一の管理者のため削除できません。先に他のメンバーをadminにしてください。"
+                }
+            ),
+            409,
+        )
+
     # オーナーであるプライベートノートが残っている場合は削除をブロックする
     owned_notes = get_owned_private_notes_in_group(member_user_id, group_id)
     if owned_notes:

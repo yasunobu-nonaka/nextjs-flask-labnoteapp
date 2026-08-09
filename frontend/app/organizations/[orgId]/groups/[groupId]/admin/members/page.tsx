@@ -285,10 +285,15 @@ export default function GroupAdminMembersPage() {
       }
       if (res.status === 409) {
         const json = await res.json();
-        const noteList = (json.owned_notes as { title: string }[])
-          .map((n) => `・${n.title}`)
-          .join("\n");
-        setOwnerBlockInfo({ message: json.message, noteList });
+        // owned_notesが付いていれば非公開ノートオーナーのブロック、なければ唯一の管理者によるブロック
+        if (json.owned_notes) {
+          const noteList = (json.owned_notes as { title: string }[])
+            .map((n) => `・${n.title}`)
+            .join("\n");
+          setOwnerBlockInfo({ message: json.message, noteList });
+        } else {
+          alert(json.message ?? "削除できません");
+        }
         return;
       }
       if (!res.ok) {
