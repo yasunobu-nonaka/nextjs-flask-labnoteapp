@@ -27,8 +27,6 @@ type JoinRequest = {
   joined_at: string;
 };
 
-
-
 /**
  * グループ管理: メンバー管理ページ。
  * グループメンバーのロール変更（複数一括）・削除・追加ができる。
@@ -74,9 +72,14 @@ export default function GroupAdminMembersPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // 削除確認モーダルの対象（null = 非表示）
-  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null);
-  // プライベートノートオーナー警告モーダルの内容（null = 非表示。削除ブロック・脱退ブロックの両方で使い回す）
-  const [ownerBlockInfo, setOwnerBlockInfo] = useState<{ message: string; noteList: string } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(
+    null,
+  );
+  // プライベートノートオーナー警告モーダルの内容（null = 非表示。自己脱退がブロックされたときのみ使う）
+  const [ownerBlockInfo, setOwnerBlockInfo] = useState<{
+    message: string;
+    noteList: string;
+  } | null>(null);
   // 脱退確認モーダルの表示状態とエラー
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -245,7 +248,11 @@ export default function GroupAdminMembersPage() {
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
-      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+      setProcessingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(req.user_id);
+        return s;
+      });
     }
   }
 
@@ -268,7 +275,11 @@ export default function GroupAdminMembersPage() {
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
-      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+      setProcessingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(req.user_id);
+        return s;
+      });
     }
   }
 
@@ -284,16 +295,10 @@ export default function GroupAdminMembersPage() {
         return;
       }
       if (res.status === 409) {
+        // 最後の管理者ブロック・非公開ノートオーナーブロックのどちらも message のみが返る
+        // （対象ユーザーの非公開ノートの詳細は、削除する側に閲覧権限があるとは限らないため返さない）
         const json = await res.json();
-        // owned_notesが付いていれば非公開ノートオーナーのブロック、なければ唯一の管理者によるブロック
-        if (json.owned_notes) {
-          const noteList = (json.owned_notes as { title: string }[])
-            .map((n) => `・${n.title}`)
-            .join("\n");
-          setOwnerBlockInfo({ message: json.message, noteList });
-        } else {
-          alert(json.message ?? "削除できません");
-        }
+        alert(json.message ?? "削除できません");
         return;
       }
       if (!res.ok) {
@@ -315,7 +320,7 @@ export default function GroupAdminMembersPage() {
   /**
    * 自分自身をこのグループから脱退させる。
    * 最後のadminの場合、または自分がオーナーの非公開ノートが残っている場合はバックエンドが409を返す。
-   * 後者は削除ブロックと同じ ownerBlockInfo モーダルを再利用して表示する。
+   * 後者は自分自身のノートのタイトルなので、ownerBlockInfo モーダルでタイトル付きで表示してよい。
    * 成功後はこのグループの管理画面にアクセスできなくなるためグループ一覧へ戻る。
    */
   async function handleLeaveGroup() {
@@ -365,7 +370,12 @@ export default function GroupAdminMembersPage() {
     if (!member) return;
     setPendingMembers((prev) => [
       ...prev,
-      { userId: member.user_id, username: member.username, email: member.email, role: addRole },
+      {
+        userId: member.user_id,
+        username: member.username,
+        email: member.email,
+        role: addRole,
+      },
     ]);
     setAddUserId("");
   }
@@ -394,7 +404,10 @@ export default function GroupAdminMembersPage() {
           `/api/organizations/${orgId}/groups/${groupId}/members`,
           {
             method: "POST",
-            body: JSON.stringify({ user_id: pending.userId, role: pending.role }),
+            body: JSON.stringify({
+              user_id: pending.userId,
+              role: pending.role,
+            }),
           },
         );
         if (res.ok) {
@@ -402,7 +415,9 @@ export default function GroupAdminMembersPage() {
           addedMembers.push(json.member);
         } else {
           const json = await res.json();
-          errors.push(`${pending.username}: ${json.message ?? "追加に失敗しました"}`);
+          errors.push(
+            `${pending.username}: ${json.message ?? "追加に失敗しました"}`,
+          );
           failedUserIds.add(pending.userId);
         }
       } catch {
@@ -417,7 +432,9 @@ export default function GroupAdminMembersPage() {
 
     if (errors.length > 0) {
       // 失敗したメンバーのみ pending に残す
-      setPendingMembers((prev) => prev.filter((p) => failedUserIds.has(p.userId)));
+      setPendingMembers((prev) =>
+        prev.filter((p) => failedUserIds.has(p.userId)),
+      );
       setAddError(errors.join(" / "));
     } else {
       // 全員成功: モーダルを閉じてリセット
@@ -560,7 +577,11 @@ export default function GroupAdminMembersPage() {
                       {/* 閲覧専用の非adminユーザーには固定テキスト表示 */}
                       {!isAdmin ? (
                         <span className="text-gray-600 dark:text-gray-300">
-                          {GROUP_ROLE_LABELS[m.role as keyof typeof GROUP_ROLE_LABELS]}
+                          {
+                            GROUP_ROLE_LABELS[
+                              m.role as keyof typeof GROUP_ROLE_LABELS
+                            ]
+                          }
                         </span>
                       ) : (
                         <select
@@ -619,9 +640,7 @@ export default function GroupAdminMembersPage() {
           {/* ロール変更保存エリア: admin かつ変更があるときのみ表示 */}
           {isAdmin && hasPendingChanges && (
             <div className="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              {saveError && (
-                <p className="text-sm text-red-500">{saveError}</p>
-              )}
+              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -647,7 +666,7 @@ export default function GroupAdminMembersPage() {
       )}
 
       {/* メンバー追加モーダル */}
-      {/* プライベートノートオーナー警告モーダル（削除ブロック・脱退ブロックの両方で使い回す） */}
+      {/* プライベートノートオーナー警告モーダル（自己脱退がブロックされたときのみ使う） */}
       <ConfirmModal
         isOpen={ownerBlockInfo !== null}
         title="操作できません"

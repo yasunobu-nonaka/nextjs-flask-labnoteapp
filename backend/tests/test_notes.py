@@ -984,7 +984,12 @@ class TestPrivateNotes:
         assert res.status_code == 404
 
     def test_remove_group_member_blocked_if_owns_private_notes(self, client, auth_headers):
-        """プライベートノートのオーナーであるメンバーは 409 でグループ削除をブロックされる。"""
+        """プライベートノートのオーナーであるメンバーは 409 でグループ削除をブロックされる。
+
+        削除する側は対象の非公開ノートに対する閲覧権限を持つとは限らないため、
+        タイトルなど非公開ノートの詳細は一切返さない
+        （本人による脱退時は owned_notes にタイトルを含めてよい）。
+        """
         org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
 
         user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
@@ -1000,8 +1005,8 @@ class TestPrivateNotes:
         )
         assert res.status_code == 409
         data = res.get_json()
-        assert "owned_notes" in data
-        assert any(n["title"] == note_title for n in data["owned_notes"])
+        assert "owned_notes" not in data
+        assert "owned_note_count" not in data
 
     def test_remove_group_member_succeeds_after_transfer(self, client, auth_headers):
         """オーナー移管後はグループメンバーを削除できる。"""

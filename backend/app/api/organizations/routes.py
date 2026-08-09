@@ -653,9 +653,6 @@ def remove_grp_member(org_id, group_id, member_user_id):
             jsonify(
                 {
                     "message": "このメンバーがオーナーのプライベートノートが残っています。先にオーナーを移管してください。",
-                    "owned_notes": [
-                        {"id": n.id, "title": n.title} for n in owned_notes
-                    ],
                 }
             ),
             409,
