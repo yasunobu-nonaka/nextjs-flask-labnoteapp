@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 type Props = {
   /** モーダルの表示フラグ */
   isOpen: boolean;
@@ -48,8 +50,10 @@ export default function ConfirmModal({
       ? "px-4 py-2 text-base rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
       : "px-4 py-2 text-base rounded-lg bg-foreground text-background font-semibold hover:opacity-80 transition-opacity";
 
-  return (
-    /* バックドロップ: z-60 で他モーダルより前面に表示する */
+  return createPortal(
+    /* バックドロップ: z-60 で他モーダルより前面に表示する。
+       document.body 直下に portal で描画し、呼び出し元の祖先要素が isolate 等で
+       stacking context を作っていても、それに関係なく画面全体の最前面に表示されるようにする。 */
     <div
       className="fixed inset-0 z-60 flex items-center justify-center bg-black/40"
       onClick={onCancel}
@@ -81,6 +85,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
