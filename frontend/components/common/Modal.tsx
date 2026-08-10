@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   /** モーダルのタイトル */
@@ -17,8 +18,10 @@ type Props = {
  * バックドロップのクリックで onClose が呼ばれ、ダイアログ内クリックはバックドロップに伝播しない。
  */
 export default function Modal({ title, onClose, children }: Props) {
-  return (
-    /* バックドロップ: クリックでモーダルを閉じる */
+  return createPortal(
+    /* バックドロップ: クリックでモーダルを閉じる。
+       document.body 直下に portal で描画し、呼び出し元の祖先要素が isolate 等で
+       stacking context を作っていても、それに関係なく画面全体の最前面に表示されるようにする。 */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
@@ -32,6 +35,7 @@ export default function Modal({ title, onClose, children }: Props) {
         <h2 className="text-lg font-semibold">{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
