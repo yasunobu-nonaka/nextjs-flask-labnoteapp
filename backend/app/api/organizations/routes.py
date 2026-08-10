@@ -604,6 +604,21 @@ def update_grp_member_role(org_id, group_id, member_user_id):
     if not member:
         return jsonify({"message": "グループメンバーが見つかりません"}), 404
 
+    # 唯一のadminを降格させようとする場合はブロックする（admin→adminの再送信は許可する）
+    if (
+        member.role.name == "admin"
+        and data["role"] != "admin"
+        and count_active_group_admins(group_id) <= 1
+    ):
+        return (
+            jsonify(
+                {
+                    "message": "唯一の管理者のため、ロールを変更できません。先に他のメンバーをadminにしてください。"
+                }
+            ),
+            409,
+        )
+
     member = update_group_member_role(member, data["role"])
     return jsonify(
         {

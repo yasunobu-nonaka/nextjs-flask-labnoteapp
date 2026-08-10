@@ -335,7 +335,7 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | PATCH | `/api/organizations/<id>/groups/<gid>/join-requests/<uid>` | group admin | Approve or reject join request |
 | GET | `/api/organizations/<id>/groups/<gid>/members` | group member | List group members |
 | POST | `/api/organizations/<id>/groups/<gid>/members` | group admin / org sys_admin | Add org member to group |
-| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role |
+| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role; blocked if demoting the sole active `admin` away from `admin` (re-submitting `admin` is a no-op and always allowed) |
 | DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group; blocked if target is the sole active `admin`, or owns private notes in the group (no note titles returned — remover may lack visibility into them) |
 | POST | `/api/organizations/<id>/groups/<gid>/leave` | group member | Leave group (self); blocked if caller is the sole active `admin`, or owns private notes (titles included — it's the caller's own data) |
 
