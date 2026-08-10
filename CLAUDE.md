@@ -146,7 +146,7 @@ components/
     ConfirmModal.tsx     # generic confirmation dialog (yes/no)
     RadioGroup.tsx       # reusable radio button group component
   layout/
-    AppHeader.tsx        # top navigation bar; org switcher, user menu
+    AppHeader.tsx        # top navigation bar; org switcher, user menu; confirmBeforeLeave prop guards its own Links/logout against unsaved-changes navigation
   org/
     OrgCreateModal.tsx   # create organization form (name input)
     OrgSwitchModal.tsx   # switch between orgs the user belongs to; exports OrgList
@@ -163,7 +163,7 @@ components/
     FolderCreateModal.tsx# create folder modal
   note/
     NoteCard.tsx         # note card; owns ··· menu popover + move-to-folder modal; exports PrivateMember type
-    NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput
+    NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput; reports formState.isDirty via onDirtyChange prop
     NoteShareModal.tsx   # note share settings modal (private note member management)
     MarkdownEditor.tsx   # Markdown editor wrapper
     NewItemButton.tsx    # "新規作成" button that opens popover (note / folder)
@@ -177,6 +177,7 @@ lib/
     noteSchema.ts        # Zod schema + NoteFormValues type (shared by new and edit pages)
   hooks/
     useTagInput.ts       # custom hook managing tag input state
+    useUnsavedChangesGuard.ts # takes isDirty; adds a beforeunload listener and returns confirmBeforeLeave for AppHeader
 ```
 
 **API calls**: always use `authFetch(path, init?)` from `lib/api.ts`. It prepends `NEXT_PUBLIC_API_URL` and attaches the JWT token from `localStorage`.
@@ -188,6 +189,8 @@ lib/
 **New item creation**: The "新規作成" button (`NewItemButton`) opens a popover menu. "ノート" navigates to `notes/new`; "フォルダー" opens a `Modal` for folder name input.
 
 **Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
+
+**Unsaved-changes guard on note create/edit**: `NoteForm` reports `formState.isDirty` up to the page via `onDirtyChange` (note `content_md`/`tags` are set via `setValue(..., { shouldDirty: true })` since they bypass `register()` and wouldn't otherwise count toward `isDirty`). The page holds that in its own `isDirty` state, resets it to `false` right before the post-save `router.push` (so the save's own navigation isn't blocked), and passes it to `useUnsavedChangesGuard(isDirty)`, which returns a `confirmBeforeLeave` function. That function is passed to `AppHeader`, which calls it from every internal `<Link>`'s `onNavigate` (via a shared `guardNavigate` helper) and from the logout button, prompting via `window.confirm` and cancelling navigation if declined. The same hook also registers a `beforeunload` listener for tab-close/reload/URL-bar navigation, reading the latest `isDirty` through a ref (registering the listener once and mutating the ref avoids a stale-closure read). The browser back/forward button is intentionally not covered — App Router's client-side history navigation doesn't fire `beforeunload`.
 
 **Org/group admin access**: `admin/layout.tsx` (org) and `groups/[groupId]/admin/layout.tsx` (group) no longer redirect non-admin members away entirely — they compute `isAdmin` from the caller's role and expose it via context (`AdminContext` for org, the group layout's existing `PendingCountContext` for group) so `members/page.tsx` can render a read-only member list + self-leave button for non-admins, while confining them to the members sub-route (redirecting away from other admin pages) and hiding admin-only controls (invite/add, role edit, remove, join requests). Self-leave posts to `.../leave`; the backend blocks an org owner (must transfer ownership first) and a group's sole remaining admin.
 
