@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/schemas/noteSchema";
+import { useUnsavedChangesGuard } from "@/lib/hooks/useUnsavedChangesGuard";
 import NoteForm from "@/components/note/NoteForm";
 import AppHeader from "@/components/layout/AppHeader";
 
@@ -26,6 +27,10 @@ export default function EditNotePage() {
   // NoteForm に渡す初期値。API 取得後にセットする。
   const [noteData, setNoteData] = useState<NoteFormValues | null>(null);
   const router = useRouter();
+
+  // NoteForm から通知される、defaultValues からの変更有無。離脱確認の判定に使う。
+  const [isDirty, setIsDirty] = useState(false);
+  const confirmBeforeLeave = useUnsavedChangesGuard(isDirty);
 
   const notesListHref = `/organizations/${orgId}/groups/${groupId}/notes`;
   const noteDetailHref = `/organizations/${orgId}/groups/${groupId}/notes/${noteId}`;
@@ -86,6 +91,8 @@ export default function EditNotePage() {
         return;
       }
 
+      // 保存成功後の遷移は離脱確認の対象外にするため、先に dirty 状態を解除する
+      setIsDirty(false);
       router.push(noteDetailHref);
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
@@ -99,7 +106,11 @@ export default function EditNotePage() {
   if (loadStatus === "loading") {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
-        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <AppHeader
+          backHref={notesListHref}
+          backLabel="ノート一覧へ"
+          confirmBeforeLeave={confirmBeforeLeave}
+        />
         <main className="flex-1 flex items-center justify-center">
           <p className="text-gray-500">読み込み中...</p>
         </main>
@@ -110,7 +121,11 @@ export default function EditNotePage() {
   if (loadStatus === "error") {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
-        <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+        <AppHeader
+          backHref={notesListHref}
+          backLabel="ノート一覧へ"
+          confirmBeforeLeave={confirmBeforeLeave}
+        />
         <main className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-red-500">{loadError}</p>
         </main>
@@ -120,7 +135,11 @@ export default function EditNotePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+      <AppHeader
+        backHref={notesListHref}
+        backLabel="ノート一覧へ"
+        confirmBeforeLeave={confirmBeforeLeave}
+      />
       <main className="flex-1 px-6 py-10">
         <div className="max-w-full mx-auto flex flex-col gap-6">
           <h1 className="text-3xl font-bold">ノートを編集</h1>
@@ -133,6 +152,7 @@ export default function EditNotePage() {
             submitLabel="保存する"
             submittingLabel="保存中..."
             globalError={globalError}
+            onDirtyChange={setIsDirty}
           />
         </div>
       </main>
