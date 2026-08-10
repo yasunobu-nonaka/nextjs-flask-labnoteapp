@@ -984,7 +984,12 @@ class TestPrivateNotes:
         assert res.status_code == 404
 
     def test_remove_group_member_blocked_if_owns_private_notes(self, client, auth_headers):
-        """プライベートノートのオーナーであるメンバーは 409 でグループ削除をブロックされる。"""
+        """プライベートノートのオーナーであるメンバーは 409 でグループ削除をブロックされる。
+
+        削除する側は対象の非公開ノートに対する閲覧権限を持つとは限らないため、
+        タイトルなど非公開ノートの詳細は一切返さない
+        （本人による脱退時は owned_notes にタイトルを含めてよい）。
+        """
         org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
 
         user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
@@ -997,6 +1002,31 @@ class TestPrivateNotes:
         res = client.delete(
             f"/api/organizations/{org_id}/groups/{group_id}/members/{user2_id}",
             headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+        data = res.get_json()
+        assert "owned_notes" not in data
+        assert "owned_note_count" not in data
+
+    def test_leave_group_blocked_if_owns_private_notes_includes_titles(self, client, auth_headers):
+        """自分自身が脱退する場合は、自分の非公開ノートのタイトルを含めてよい。
+
+        脱退する本人はそのノートのオーナーであり、既にタイトル・内容とも
+        閲覧権限を持っているため、管理者による削除ブロックとは異なり
+        タイトルを見せても新たな情報漏洩にはならない。
+        """
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+
+        _user2_id, headers2 = add_second_member(client, auth_headers["headers"], org_id, group_id)
+
+        # user2 が自分の非公開ノートを作成する
+        note_title = "自分の非公開ノート"
+        create_private_note(client, headers2, org_id, group_id, note_title)
+
+        # user2 が自分自身をグループから脱退させようとする → 409（タイトル付き）
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/leave",
+            headers=headers2,
         )
         assert res.status_code == 409
         data = res.get_json()

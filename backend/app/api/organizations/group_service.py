@@ -95,11 +95,13 @@ def create_group(
             if m["user_id"] == user_id:
                 continue
             role_obj = get_role_local(m.get("role", "editor"))
-            db.session.add(GroupMember(
-                user_id=m["user_id"],
-                group_id=group.id,
-                role_id=role_obj.id,
-            ))
+            db.session.add(
+                GroupMember(
+                    user_id=m["user_id"],
+                    group_id=group.id,
+                    role_id=role_obj.id,
+                )
+            )
 
     db.session.commit()
     return group
@@ -109,22 +111,25 @@ def get_accessible_groups(org_id: int, user_id: int) -> List[Group]:
     """ユーザーがアクセス可能なグループ一覧を返す（公開グループ + 所属プライベートグループ）。"""
 
     # active メンバーとして所属するグループのIDを取得する
-    memberships = db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, status="active")
-    ).scalars().all()
+    memberships = (
+        db.session.execute(
+            db.select(GroupMember).filter_by(user_id=user_id, status="active")
+        )
+        .scalars()
+        .all()
+    )
     member_group_ids = {m.group_id for m in memberships}
 
-    groups = db.session.execute(
-        db.select(Group)
-        .filter_by(organization_id=org_id)
-        .order_by(Group.name)
-    ).scalars().all()
+    groups = (
+        db.session.execute(
+            db.select(Group).filter_by(organization_id=org_id).order_by(Group.name)
+        )
+        .scalars()
+        .all()
+    )
 
     # 公開グループ または 所属グループのみを返す
-    accessible = [
-        g for g in groups
-        if not g.is_private or g.id in member_group_ids
-    ]
+    accessible = [g for g in groups if not g.is_private or g.id in member_group_ids]
     return accessible
 
 
@@ -157,7 +162,9 @@ def check_group_membership(user_id: int, group_id: int) -> Optional[GroupMember]
     """
 
     return db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="active")
+        db.select(GroupMember).filter_by(
+            user_id=user_id, group_id=group_id, status="active"
+        )
     ).scalar_one_or_none()
 
 
@@ -178,6 +185,26 @@ def check_group_permission(user_id: int, group_id: int, permission_code: str) ->
     if not member or not member.role:
         return False
     return member.role.has_permission(permission_code)
+
+
+def count_active_group_admins(group_id: int) -> int:
+    """グループのアクティブなadminロールメンバー数を返す。最後の1人の脱退防止に使う。"""
+    from sqlalchemy import func
+    from app.model.rbac import RoleLocal
+
+    return (
+        db.session.execute(
+            db.select(func.count())
+            .select_from(GroupMember)
+            .join(RoleLocal, GroupMember.role_id == RoleLocal.id)
+            .filter(
+                GroupMember.group_id == group_id,
+                GroupMember.status == "active",
+                RoleLocal.name == "admin",
+            )
+        ).scalar()
+        or 0
+    )
 
 
 def add_group_member(group_id: int, user_id: int, role: str = "editor") -> GroupMember:
@@ -261,25 +288,37 @@ def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
 def get_pending_join_requests(group_id: int) -> List[GroupMember]:
     """グループの参加申請中（pending）メンバー一覧を返す。"""
 
-    return db.session.execute(
-        db.select(GroupMember).filter_by(group_id=group_id, status="pending")
-    ).scalars().all()
+    return (
+        db.session.execute(
+            db.select(GroupMember).filter_by(group_id=group_id, status="pending")
+        )
+        .scalars()
+        .all()
+    )
 
 
 def get_pending_join_request_count(group_id: int) -> int:
     """グループの未承認申請数を返す（バッジ表示用）。"""
 
     from sqlalchemy import func
-    return db.session.execute(
-        db.select(func.count()).select_from(GroupMember).filter_by(group_id=group_id, status="pending")
-    ).scalar() or 0
+
+    return (
+        db.session.execute(
+            db.select(func.count())
+            .select_from(GroupMember)
+            .filter_by(group_id=group_id, status="pending")
+        ).scalar()
+        or 0
+    )
 
 
 def approve_join_request(group_id: int, user_id: int) -> GroupMember:
     """参加申請を承認し、pending → active に変更する。approved_at を記録する。"""
 
     member = db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+        db.select(GroupMember).filter_by(
+            user_id=user_id, group_id=group_id, status="pending"
+        )
     ).scalar_one_or_none()
     if not member:
         raise ValueError("参加申請が見つかりません")
@@ -298,7 +337,9 @@ def reject_join_request(group_id: int, user_id: int) -> None:
     """
 
     member = db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+        db.select(GroupMember).filter_by(
+            user_id=user_id, group_id=group_id, status="pending"
+        )
     ).scalar_one_or_none()
     if not member:
         raise ValueError("参加申請が見つかりません")
@@ -312,7 +353,9 @@ def cancel_join_request(group_id: int, user_id: int) -> None:
     """申請者自身が pending 申請を取り消す。レコードを hard delete（再申請を許容）。"""
 
     member = db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id, status="pending")
+        db.select(GroupMember).filter_by(
+            user_id=user_id, group_id=group_id, status="pending"
+        )
     ).scalar_one_or_none()
     if not member:
         raise ValueError("参加申請が見つかりません")
@@ -337,16 +380,20 @@ def get_owned_private_notes_in_group(user_id: int, group_id: int):
     """
     from app.model import Note, PrivateNoteMember
 
-    return db.session.execute(
-        db.select(Note)
-        .join(PrivateNoteMember, PrivateNoteMember.note_id == Note.id)
-        .filter(
-            Note.group_id == group_id,
-            Note.is_private == True,  # noqa: E712
-            PrivateNoteMember.user_id == user_id,
-            PrivateNoteMember.role == "owner",
+    return (
+        db.session.execute(
+            db.select(Note)
+            .join(PrivateNoteMember, PrivateNoteMember.note_id == Note.id)
+            .filter(
+                Note.group_id == group_id,
+                Note.is_private == True,  # noqa: E712
+                PrivateNoteMember.user_id == user_id,
+                PrivateNoteMember.role == "owner",
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
 
 def remove_group_member(member: GroupMember) -> None:

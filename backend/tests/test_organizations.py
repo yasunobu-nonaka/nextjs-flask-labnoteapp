@@ -316,6 +316,69 @@ class TestOrganizationMembers:
 
 
 ###############################################
+#  組織の自己脱退テスト
+###############################################
+class TestOrganizationLeave:
+    def _add_member(self, client, auth_headers, org_id, username, email, role="member"):
+        """ヘルパー: ユーザーを登録して組織に追加し、そのユーザーの ID と認証ヘッダーを返す。"""
+        other_headers = register_and_get_headers(client, username, email)
+        from app.extensions import db
+        from app.model import User
+        with client.application.app_context():
+            other_user = db.session.execute(
+                db.select(User).filter_by(email=email)
+            ).scalar_one()
+            other_id = other_user.id
+
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id, "role": role},
+            headers=auth_headers["headers"],
+        )
+        return other_id, other_headers
+
+    def test_member_can_leave_organization(self, client, auth_headers):
+        """一般メンバーは自分自身を組織から脱退させることができる。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        member_id, member_headers = self._add_member(
+            client, auth_headers, org_id, "leaver", "leaver@example.com"
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/leave", headers=member_headers
+        )
+        assert res.status_code == 204
+
+        list_res = client.get(
+            f"/api/organizations/{org_id}/members",
+            headers=auth_headers["headers"],
+        )
+        member_ids = [m["user_id"] for m in list_res.get_json()]
+        assert member_id not in member_ids
+
+    def test_owner_cannot_leave_organization(self, client, auth_headers):
+        """ownerは事前にオーナーを移譲しない限り組織を脱退できない。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+
+        res = client.post(
+            f"/api/organizations/{org_id}/leave", headers=auth_headers["headers"]
+        )
+        assert res.status_code == 409
+
+    def test_leave_organization_returns_404_for_non_member(self, client, auth_headers):
+        """組織メンバーでないユーザーが脱退しようとすると 404 を返す（存在を漏洩させない）。"""
+        org_id = create_org(client, auth_headers).get_json()["organization"]["id"]
+        outside_headers = register_and_get_headers(
+            client, "outsider4", "outsider4@example.com"
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/leave", headers=outside_headers
+        )
+        assert res.status_code == 404
+
+
+###############################################
 #  非メンバーアクセスの 404 テスト
 ###############################################
 class TestNonMemberAccessReturns404:

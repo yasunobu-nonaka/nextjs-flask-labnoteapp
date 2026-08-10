@@ -32,7 +32,6 @@ type Props = {
   onAuthorRemove: (authorId: number) => void;
 };
 
-
 /**
  * FolderSidebar コンポーネント
  * 現在の組織名・グループ一覧、キーワード検索フォーム、タグフィルターを表示する左サイドバー。
@@ -169,17 +168,16 @@ export default function FolderSidebar({
           <span className="text-base text-gray-700 dark:text-gray-300">
             {orgName}
           </span>
-          {/* 組織管理へのリンク: owner / sys_admin / user_admin のみ表示する */}
-          {orgRole &&
-            ["owner", "sys_admin", "user_admin"].includes(orgRole) && (
-              <Link
-                href={`/organizations/${orgId}/admin`}
-                className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-                title="組織管理"
-              >
-                ⚙
-              </Link>
-            )}
+          {/* 組織メンバー全員に表示する */}
+          {orgRole && (
+            <Link
+              href={`/organizations/${orgId}/admin`}
+              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              title="組織管理"
+            >
+              ⚙
+            </Link>
+          )}
         </div>
       </div>
 
@@ -212,10 +210,6 @@ export default function FolderSidebar({
           <div className="flex flex-col gap-1.5 px-2">
             {joinedGroups.slice(0, 5).map((group) => {
               const isActive = String(group.id) === groupId;
-              // グループ管理者またはグループ管理権限を持つ組織ロールであれば管理画面へのリンクを表示する
-              const canManage =
-                group.role === "admin" ||
-                ["owner", "sys_admin", "user_admin"].includes(orgRole ?? "");
               return (
                 <div
                   key={group.id}
@@ -242,8 +236,8 @@ export default function FolderSidebar({
                       </span>
                     )}
                   </Link>
-                  {/* ⚙ アイコン: グループ管理者または組織管理者のみ表示する */}
-                  {canManage && (
+                  {/* ⚙ アイコン: 全員に表示する */}
+                  {
                     <Link
                       href={`/organizations/${orgId}/groups/${group.id}/admin`}
                       className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
@@ -251,7 +245,7 @@ export default function FolderSidebar({
                     >
                       ⚙
                     </Link>
-                  )}
+                  }
                 </div>
               );
             })}
@@ -412,9 +406,7 @@ export default function FolderSidebar({
             ),
           );
           setIsGroupListModalOpen(false);
-          router.push(
-            `/organizations/${orgId}/groups/${joinedGroupId}/notes`,
-          );
+          router.push(`/organizations/${orgId}/groups/${joinedGroupId}/notes`);
         }}
         onCancelledRequest={(cancelledGroupId) => {
           // 申請キャンセル: join_status を null にリセットする

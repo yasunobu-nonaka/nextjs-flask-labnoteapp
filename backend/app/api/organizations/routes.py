@@ -56,6 +56,7 @@ from app.api.organizations.group_service import (
     delete_group,
     build_group_member_response,
     build_group_response,
+    count_active_group_admins,
 )
 from . import organizations_bp
 
@@ -106,7 +107,9 @@ def create_org():
     except ValidationError as err:
         return jsonify({"message": "validation error", "errors": err.messages}), 400
 
-    org = create_organization(data["name"], current_user.id, policy_data=data.get("policy"))
+    org = create_organization(
+        data["name"], current_user.id, policy_data=data.get("policy")
+    )
     member = check_org_membership(current_user.id, org.id)
 
     return (
@@ -180,10 +183,14 @@ def transfer_ownership(org_id):
     # 移譲後の呼び出し元のロールは member に変わっているため、更新後の状態を返す
     org = get_organization_or_404(org_id)
     member = check_org_membership(current_user.id, org_id)
-    return jsonify({
-        "message": "オーナーを移譲しました",
-        "organization": build_org_response(org, member.role.name if member else None),
-    })
+    return jsonify(
+        {
+            "message": "オーナーを移譲しました",
+            "organization": build_org_response(
+                org, member.role.name if member else None
+            ),
+        }
+    )
 
 
 @organizations_bp.route("/<int:org_id>", methods=["DELETE"])
@@ -325,6 +332,18 @@ def remove_member(org_id, member_user_id):
     return "", 204
 
 
+@organizations_bp.route("/<int:org_id>/leave", methods=["POST"])
+@jwt_required()
+def leave_organization(org_id):
+    """自分自身をこの組織から脱退させる。ownerは事前にオーナー移譲が必要。"""
+    member = require_org_member(current_user.id, org_id)
+    try:
+        remove_org_member(member)  # role.name == "owner" なら ValueError
+    except ValueError as err:
+        return jsonify({"message": str(err)}), 409
+    return "", 204
+
+
 # ============================================================
 #  グループ（Group）エンドポイント
 # ============================================================
@@ -342,7 +361,11 @@ def list_groups(org_id):
     result = []
     for group in groups:
         membership = get_any_membership(current_user.id, group.id)
-        user_role = membership.role.name if membership and membership.status == "active" else None
+        user_role = (
+            membership.role.name
+            if membership and membership.status == "active"
+            else None
+        )
         join_status = membership.status if membership else None
         result.append(build_group_response(group, user_role, join_status))
 
@@ -393,7 +416,9 @@ def create_grp(org_id):
         jsonify(
             {
                 "message": "グループを作成しました",
-                "group": build_group_response(group, member.role.name if member else None),
+                "group": build_group_response(
+                    group, member.role.name if member else None
+                ),
             }
         ),
         201,
@@ -489,9 +514,14 @@ def list_group_members(org_id, group_id):
 
     from app.model.group import GroupMember
     from app.extensions import db as _db
-    active_members = _db.session.execute(
-        _db.select(GroupMember).filter_by(group_id=group_id, status="active")
-    ).scalars().all()
+
+    active_members = (
+        _db.session.execute(
+            _db.select(GroupMember).filter_by(group_id=group_id, status="active")
+        )
+        .scalars()
+        .all()
+    )
     result = [build_group_member_response(m) for m in active_members]
     return jsonify(group_member_res_many_schema.dump(result))
 
@@ -574,6 +604,21 @@ def update_grp_member_role(org_id, group_id, member_user_id):
     if not member:
         return jsonify({"message": "グループメンバーが見つかりません"}), 404
 
+    # 唯一のadminを降格させようとする場合はブロックする（admin→adminの再送信は許可する）
+    if (
+        member.role.name == "admin"
+        and data["role"] != "admin"
+        and count_active_group_admins(group_id) <= 1
+    ):
+        return (
+            jsonify(
+                {
+                    "message": "唯一の管理者のため、ロールを変更できません。先に他のメンバーをadminにしてください。"
+                }
+            ),
+            409,
+        )
+
     member = update_group_member_role(member, data["role"])
     return jsonify(
         {
@@ -605,13 +650,68 @@ def remove_grp_member(org_id, group_id, member_user_id):
     if not member:
         return jsonify({"message": "グループメンバーが見つかりません"}), 404
 
+    # 削除対象が唯一のadminの場合は、自己削除・他者からの削除を問わずブロックする
+    if member.role.name == "admin" and count_active_group_admins(group_id) <= 1:
+        return (
+            jsonify(
+                {
+                    "message": "唯一の管理者のため削除できません。先に他のメンバーをadminにしてください。"
+                }
+            ),
+            409,
+        )
+
     # オーナーであるプライベートノートが残っている場合は削除をブロックする
     owned_notes = get_owned_private_notes_in_group(member_user_id, group_id)
     if owned_notes:
-        return jsonify({
-            "message": "このメンバーがオーナーのプライベートノートが残っています。先にオーナーを移管してください。",
-            "owned_notes": [{"id": n.id, "title": n.title} for n in owned_notes],
-        }), 409
+        return (
+            jsonify(
+                {
+                    "message": "このメンバーがオーナーのプライベートノートが残っています。先にオーナーを移管してください。",
+                }
+            ),
+            409,
+        )
+
+    remove_group_member(member)
+    return "", 204
+
+
+@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/leave", methods=["POST"])
+@jwt_required()
+def leave_group(org_id, group_id):
+    """自分自身をこのグループから脱退させる。最後のadmin、または非公開ノートのオーナーの場合はブロックする。"""
+    require_org_member(current_user.id, org_id)
+    group = get_group_or_404(group_id, org_id)
+    require_group_visible(current_user.id, group)
+
+    member = check_group_membership(current_user.id, group_id)
+    if not member:
+        return jsonify({"message": "このグループのメンバーではありません"}), 404
+
+    if member.role.name == "admin" and count_active_group_admins(group_id) <= 1:
+        return (
+            jsonify(
+                {
+                    "message": "あなたはこのグループで唯一の管理者です。先に他のメンバーをadminにしてください。"
+                }
+            ),
+            409,
+        )
+
+    owned_notes = get_owned_private_notes_in_group(current_user.id, group_id)
+    if owned_notes:
+        return (
+            jsonify(
+                {
+                    "message": "オーナーであるプライベートノートが残っています。先にオーナーを移管してください。",
+                    "owned_notes": [
+                        {"id": n.id, "title": n.title} for n in owned_notes
+                    ],
+                }
+            ),
+            409,
+        )
 
     remove_group_member(member)
     return "", 204
@@ -648,10 +748,14 @@ def join_group(org_id, group_id):
         return jsonify({"message": code}), 400
 
     return (
-        jsonify({
-            "result": result,
-            "member": group_member_res_schema.dump(build_group_member_response(member)),
-        }),
+        jsonify(
+            {
+                "result": result,
+                "member": group_member_res_schema.dump(
+                    build_group_member_response(member)
+                ),
+            }
+        ),
         201,
     )
 
@@ -676,7 +780,9 @@ def cancel_join(org_id, group_id):
     return "", 204
 
 
-@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join-requests", methods=["GET"])
+@organizations_bp.route(
+    "/<int:org_id>/groups/<int:group_id>/join-requests", methods=["GET"]
+)
 @jwt_required()
 def list_join_requests(org_id, group_id):
     """グループへの参加申請一覧を返す。グループadminまたは組織adminのみアクセス可能。"""
@@ -696,7 +802,9 @@ def list_join_requests(org_id, group_id):
     return jsonify(group_member_res_many_schema.dump(result))
 
 
-@organizations_bp.route("/<int:org_id>/groups/<int:group_id>/join-requests/count", methods=["GET"])
+@organizations_bp.route(
+    "/<int:org_id>/groups/<int:group_id>/join-requests/count", methods=["GET"]
+)
 @jwt_required()
 def count_join_requests(org_id, group_id):
     """グループの未承認参加申請数を返す（バッジ表示用）。グループadminのみアクセス可能。"""
@@ -741,10 +849,14 @@ def process_join_request(org_id, group_id, target_user_id):
     try:
         if data["action"] == "approve":
             member = approve_join_request(group_id, target_user_id)
-            return jsonify({
-                "message": "参加申請を承認しました",
-                "member": group_member_res_schema.dump(build_group_member_response(member)),
-            })
+            return jsonify(
+                {
+                    "message": "参加申請を承認しました",
+                    "member": group_member_res_schema.dump(
+                        build_group_member_response(member)
+                    ),
+                }
+            )
         else:
             reject_join_request(group_id, target_user_id)
             return "", 204

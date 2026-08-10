@@ -34,6 +34,8 @@ export default function GroupAdminLayout({
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [groupName, setGroupName] = useState("");
+  /** グループadminまたは組織admin系ロールを持つか（管理系ナビ・操作の出し分けに使う） */
+  const [isAdmin, setIsAdmin] = useState(false);
   /** 未承認の参加申請数（メンバー管理ナビのバッジ用） */
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -73,25 +75,43 @@ export default function GroupAdminLayout({
         const groupData = await groupRes.json();
         const orgData = await orgRes.json();
 
+        const isGroupMember = groupData.role !== null;
         const isGroupAdmin = groupData.role === "admin";
         const isOrgAdmin = ORG_ADMIN_ROLES.includes(orgData.role);
 
-        if (!isGroupAdmin && !isOrgAdmin) {
+        // グループの非メンバーかつ組織admin系ロールでもない場合のみアクセス不可とする
+        if (!isGroupMember && !isOrgAdmin) {
           router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
           return;
         }
 
+        const admin = isGroupAdmin || isOrgAdmin;
+
         setGroupName(groupData.name);
+        setIsAdmin(admin);
         setAuthorized(true);
 
-        // 権限確認後に参加申請数を取得する
-        await fetchPendingCount();
+        // 参加申請数の取得は管理権限が必要なため、adminのときのみ行う
+        if (admin) {
+          await fetchPendingCount();
+        }
       } catch {
         router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
       }
     }
     checkAccess();
   }, [orgId, groupId, router, fetchPendingCount]);
+
+  // admin系ロールを持たないメンバーが基本設定・ポリシー管理へURL直打ちで入れないよう、メンバー一覧へ戻す
+  useEffect(() => {
+    if (
+      authorized &&
+      !isAdmin &&
+      pathname !== `/organizations/${orgId}/groups/${groupId}/admin/members`
+    ) {
+      router.push(`/organizations/${orgId}/groups/${groupId}/admin/members`);
+    }
+  }, [authorized, isAdmin, pathname, orgId, groupId, router]);
 
   if (isNotFound) {
     notFound();
@@ -106,24 +126,31 @@ export default function GroupAdminLayout({
     );
   }
 
-  const navItems = [
-    {
-      label: "基本設定",
-      href: `/organizations/${orgId}/groups/${groupId}/admin`,
-    },
-    {
-      label: "メンバー管理",
-      href: `/organizations/${orgId}/groups/${groupId}/admin/members`,
-    },
-    {
-      label: "ポリシー管理",
-      href: `/organizations/${orgId}/groups/${groupId}/admin/policy`,
-    },
-  ];
+  const navItems = isAdmin
+    ? [
+        {
+          label: "基本設定",
+          href: `/organizations/${orgId}/groups/${groupId}/admin`,
+        },
+        {
+          label: "メンバー管理",
+          href: `/organizations/${orgId}/groups/${groupId}/admin/members`,
+        },
+        {
+          label: "ポリシー管理",
+          href: `/organizations/${orgId}/groups/${groupId}/admin/policy`,
+        },
+      ]
+    : [
+        {
+          label: "メンバー一覧",
+          href: `/organizations/${orgId}/groups/${groupId}/admin/members`,
+        },
+      ];
 
   return (
     <PendingCountContext.Provider
-      value={{ pendingCount, refreshPendingCount: fetchPendingCount }}
+      value={{ pendingCount, refreshPendingCount: fetchPendingCount, isAdmin }}
     >
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
       {/* 左サイドバー: ナビゲーションリンクを縦に並べる（画面上端まで広がる） */}

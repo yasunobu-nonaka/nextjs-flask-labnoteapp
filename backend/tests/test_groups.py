@@ -379,6 +379,58 @@ class TestGroupMembers:
         assert res.status_code == 200
         assert res.get_json()["member"]["role"] == "viewer"
 
+    def test_demote_sole_group_admin_fails(self, client, auth_headers):
+        """唯一のadminを editor/viewer に降格させようとすると 409 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        owner_id = auth_headers["user_id"]
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{owner_id}",
+            json={"role": "editor"},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+
+    def test_resubmit_sole_group_admin_as_admin_succeeds(self, client, auth_headers):
+        """唯一のadminのロールを admin のまま再送信しても（実質変更なしのため）ブロックされない。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        owner_id = auth_headers["user_id"]
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{owner_id}",
+            json={"role": "admin"},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+
+    def test_demote_group_admin_succeeds_when_another_admin_remains(self, client, auth_headers):
+        """他にもadminがいれば、adminをeditor/viewerに降格させられる。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+
+        other_headers = register_and_get_headers(client, "coadmin3", "coadmin3@example.com")
+        other_id = get_user_id(client, "coadmin3@example.com")
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id},
+            headers=auth_headers["headers"],
+        )
+        client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            json={"user_id": other_id, "role": "admin"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{other_id}",
+            json={"role": "editor"},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 200
+        assert res.get_json()["member"]["role"] == "editor"
+
     def test_remove_group_member(self, client, auth_headers):
         """グループadminはメンバーを削除できる。"""
         org_id = create_org(client, auth_headers["headers"])["id"]
@@ -402,6 +454,126 @@ class TestGroupMembers:
             headers=auth_headers["headers"],
         )
         assert res.status_code == 204
+
+
+###############################################
+#  グループの自己脱退・最後の管理者ガードのテスト
+###############################################
+class TestGroupLeave:
+    def test_member_can_leave_group(self, client, auth_headers):
+        """editorロールのメンバーは自分自身をグループから脱退させることができる。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+
+        member_headers = register_and_get_headers(client, "gleaver", "gleaver@example.com")
+        member_id = get_user_id(client, "gleaver@example.com")
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": member_id},
+            headers=auth_headers["headers"],
+        )
+        client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            json={"user_id": member_id, "role": "editor"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/leave",
+            headers=member_headers,
+        )
+        assert res.status_code == 204
+
+        list_res = client.get(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            headers=auth_headers["headers"],
+        )
+        member_ids = [m["user_id"] for m in list_res.get_json()]
+        assert member_id not in member_ids
+
+    def test_sole_admin_cannot_leave_group(self, client, auth_headers):
+        """グループで唯一のadminは脱退できない。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/leave",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+
+    def test_admin_can_leave_group_when_another_admin_remains(self, client, auth_headers):
+        """他にもadminがいる場合は脱退できる。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+
+        other_headers = register_and_get_headers(client, "coadmin", "coadmin@example.com")
+        other_id = get_user_id(client, "coadmin@example.com")
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id},
+            headers=auth_headers["headers"],
+        )
+        client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            json={"user_id": other_id, "role": "admin"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/leave",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 204
+
+    def test_remove_sole_group_admin_fails(self, client, auth_headers):
+        """DELETEエンドポイント経由でも、唯一のadminは削除できない
+        （自己削除・他者からの削除のどちらでも同じガードが働く）。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        owner_id = auth_headers["user_id"]
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{owner_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 409
+
+    def test_remove_group_admin_succeeds_when_another_admin_remains(self, client, auth_headers):
+        """他にもadminがいれば、adminをDELETEエンドポイントで削除できる。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+
+        other_headers = register_and_get_headers(client, "coadmin2", "coadmin2@example.com")
+        other_id = get_user_id(client, "coadmin2@example.com")
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": other_id},
+            headers=auth_headers["headers"],
+        )
+        client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/members",
+            json={"user_id": other_id, "role": "admin"},
+            headers=auth_headers["headers"],
+        )
+
+        res = client.delete(
+            f"/api/organizations/{org_id}/groups/{group_id}/members/{other_id}",
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 204
+
+    def test_leave_group_returns_404_for_non_org_member(self, client, auth_headers):
+        """組織に所属していないユーザーがグループを脱退しようとすると 404 を返す。"""
+        org_id = create_org(client, auth_headers["headers"])["id"]
+        group_id = create_group(client, auth_headers["headers"], org_id).get_json()["group"]["id"]
+        outside_headers = register_and_get_headers(client, "outsider5", "outsider5@example.com")
+
+        res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/leave",
+            headers=outside_headers,
+        )
+        assert res.status_code == 404
 
 
 ###############################################

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { authFetch } from "@/lib/api";
 import AppHeader from "@/components/layout/AppHeader";
+import { AdminContext } from "./admin-context";
 
 /** 組織管理画面にアクセスできるロール */
 const ADMIN_ROLES = ["owner", "sys_admin", "user_admin"];
@@ -33,6 +34,7 @@ export default function ConsoleLayout({
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const [orgName, setOrgName] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function checkAccess() {
@@ -51,18 +53,26 @@ export default function ConsoleLayout({
           return;
         }
         const data = await res.json();
-        if (!ADMIN_ROLES.includes(data.role)) {
-          router.push(`/organizations/${orgId}/groups`);
-          return;
-        }
+
         setOrgName(data.name);
         setAuthorized(true);
+        setIsAdmin(ADMIN_ROLES.includes(data.role));
       } catch {
         router.push(`/organizations/${orgId}/groups`);
       }
     }
     checkAccess();
   }, [orgId, router]);
+
+  useEffect(() => {
+    if (
+      authorized &&
+      !isAdmin &&
+      pathname !== `/organizations/${orgId}/admin/members`
+    ) {
+      router.push(`/organizations/${orgId}/admin/members`);
+    }
+  }, [authorized, isAdmin, pathname, orgId, router]);
 
   if (isNotFound) {
     notFound();
@@ -77,12 +87,22 @@ export default function ConsoleLayout({
     );
   }
 
-  const navItems = [
-    { label: "基本設定", href: `/organizations/${orgId}/admin` },
-    { label: "メンバー管理", href: `/organizations/${orgId}/admin/members` },
-    { label: "グループ管理", href: `/organizations/${orgId}/admin/groups` },
-    { label: "ポリシー管理", href: `/organizations/${orgId}/admin/policy` },
-  ];
+  const navItems = isAdmin
+    ? [
+        { label: "基本設定", href: `/organizations/${orgId}/admin` },
+        {
+          label: "メンバー管理",
+          href: `/organizations/${orgId}/admin/members`,
+        },
+        { label: "グループ管理", href: `/organizations/${orgId}/admin/groups` },
+        { label: "ポリシー管理", href: `/organizations/${orgId}/admin/policy` },
+      ]
+    : [
+        {
+          label: "メンバー一覧",
+          href: `/organizations/${orgId}/admin/members`,
+        },
+      ];
 
   return (
     <div className="h-screen overflow-hidden flex bg-background text-foreground">
@@ -135,9 +155,17 @@ export default function ConsoleLayout({
       {/* 右カラム: ヘッダー＋メインコンテンツ */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* 共通ヘッダー: ベル通知・ユーザーメニューを提供する */}
-        <AppHeader showLogo={false} backHref={`/organizations/${orgId}/groups`} backLabel="グループ一覧へ" />
+        <AppHeader
+          showLogo={false}
+          backHref={`/organizations/${orgId}/groups`}
+          backLabel="グループ一覧へ"
+        />
         {/* メインコンテンツエリア: 各ページの内容を表示する */}
-        <main className="flex-1 overflow-y-auto px-10 py-10">{children}</main>
+        <main className="flex-1 overflow-y-auto px-10 py-10">
+          <AdminContext.Provider value={{ isAdmin }}>
+            {children}
+          </AdminContext.Provider>
+        </main>
       </div>
     </div>
   );

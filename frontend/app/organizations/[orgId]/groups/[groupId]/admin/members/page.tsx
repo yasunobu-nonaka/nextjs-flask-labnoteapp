@@ -27,8 +27,6 @@ type JoinRequest = {
   joined_at: string;
 };
 
-
-
 /**
  * グループ管理: メンバー管理ページ。
  * グループメンバーのロール変更（複数一括）・削除・追加ができる。
@@ -42,8 +40,10 @@ export default function GroupAdminMembersPage() {
   const { orgId, groupId } = useParams<{ orgId: string; groupId: string }>();
   const router = useRouter();
 
-  // layout のサイドバーバッジを承認・拒否後に更新するための再取得関数
-  const { refreshPendingCount } = usePendingCount();
+  // layout から渡される、承認・拒否後の再取得関数と自分の管理権限フラグ
+  const { refreshPendingCount, isAdmin } = usePendingCount();
+  // ログイン中の自分自身のuser_id。メンバー一覧の中から自分の行を特定し、脱退ボタンを出すために使う
+  const [myUserId, setMyUserId] = useState<number | null>(null);
 
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,23 +72,32 @@ export default function GroupAdminMembersPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // 削除確認モーダルの対象（null = 非表示）
-  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(null);
-  // プライベートノートオーナー警告モーダルの内容（null = 非表示）
-  const [ownerBlockInfo, setOwnerBlockInfo] = useState<{ message: string; noteList: string } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<GroupMember | null>(
+    null,
+  );
+  // 削除・脱退がブロック/失敗したときに表示する情報モーダルの内容（null = 非表示）
+  const [infoModal, setInfoModal] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+  // 脱退確認モーダルの表示状態
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // 参加申請一覧の状態
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
   const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
 
-  // マウント時にグループメンバーと組織メンバー一覧と参加申請を並行取得する
+  // マウント時にグループメンバー・組織メンバー一覧・自分のuser_idを並行取得する
+  // 参加申請一覧はグループadmin限定APIのため、isAdminのときのみ別途取得する
   useEffect(() => {
     async function fetchData() {
       try {
-        const [membersRes, orgMembersRes, joinRequestsRes] = await Promise.all([
+        const [membersRes, orgMembersRes, meRes] = await Promise.all([
           authFetch(`/api/organizations/${orgId}/groups/${groupId}/members`),
           authFetch(`/api/organizations/${orgId}/members`),
-          authFetch(`/api/organizations/${orgId}/groups/${groupId}/join-requests`),
+          authFetch(`/api/auth/me`),
         ]);
         if (membersRes.status === 401) {
           router.push("/login");
@@ -112,9 +121,19 @@ export default function GroupAdminMembersPage() {
           setOrgMembers(orgMembersData);
         }
 
-        if (joinRequestsRes.ok) {
-          const requestsData: JoinRequest[] = await joinRequestsRes.json();
-          setJoinRequests(requestsData);
+        if (isAdmin) {
+          const joinRequestsRes = await authFetch(
+            `/api/organizations/${orgId}/groups/${groupId}/join-requests`,
+          );
+          if (joinRequestsRes.ok) {
+            const requestsData: JoinRequest[] = await joinRequestsRes.json();
+            setJoinRequests(requestsData);
+          }
+        }
+
+        if (meRes.ok) {
+          const me: { id: number } = await meRes.json();
+          setMyUserId(me.id);
         }
       } catch {
         setFetchError("サーバーへの接続に失敗しました");
@@ -123,7 +142,7 @@ export default function GroupAdminMembersPage() {
       }
     }
     fetchData();
-  }, [orgId, groupId, router]);
+  }, [orgId, groupId, router, isAdmin]);
 
   /**
    * ロール選択が変更されたときに pendingRoles を更新する。
@@ -228,7 +247,11 @@ export default function GroupAdminMembersPage() {
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
-      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+      setProcessingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(req.user_id);
+        return s;
+      });
     }
   }
 
@@ -251,7 +274,11 @@ export default function GroupAdminMembersPage() {
     } catch {
       setJoinRequestError("サーバーへの接続に失敗しました");
     } finally {
-      setProcessingIds((prev) => { const s = new Set(prev); s.delete(req.user_id); return s; });
+      setProcessingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(req.user_id);
+        return s;
+      });
     }
   }
 
@@ -267,16 +294,21 @@ export default function GroupAdminMembersPage() {
         return;
       }
       if (res.status === 409) {
+        // 最後の管理者ブロック・非公開ノートオーナーブロックのどちらも message のみが返る
+        // （対象ユーザーの非公開ノートの詳細は、削除する側に閲覧権限があるとは限らないため返さない）
         const json = await res.json();
-        const noteList = (json.owned_notes as { title: string }[])
-          .map((n) => `・${n.title}`)
-          .join("\n");
-        setOwnerBlockInfo({ message: json.message, noteList });
+        setInfoModal({
+          title: "削除できません",
+          message: json.message ?? "削除できません",
+        });
         return;
       }
       if (!res.ok) {
         const json = await res.json();
-        alert(json.message ?? "削除に失敗しました");
+        setInfoModal({
+          title: "削除できません",
+          message: json.message ?? "削除に失敗しました",
+        });
         return;
       }
       setMembers((prev) => prev.filter((m) => m.user_id !== member.user_id));
@@ -286,7 +318,64 @@ export default function GroupAdminMembersPage() {
         return next;
       });
     } catch {
-      alert("サーバーへの接続に失敗しました");
+      setInfoModal({
+        title: "削除できません",
+        message: "サーバーへの接続に失敗しました",
+      });
+    }
+  }
+
+  /**
+   * 自分自身をこのグループから脱退させる。
+   * 最後のadminの場合、または自分がオーナーの非公開ノートが残っている場合はバックエンドが409を返す。
+   * 後者は自分自身のノートのタイトルなので、infoModal でタイトル付きで表示してよい。
+   * 成功後はこのグループの管理画面にアクセスできなくなるためグループ一覧へ戻る。
+   */
+  async function handleLeaveGroup() {
+    setIsLeaving(true);
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${groupId}/leave`,
+        { method: "POST" },
+      );
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (res.status === 409) {
+        const json = await res.json();
+        if (json.owned_notes) {
+          const noteList = (json.owned_notes as { title: string }[])
+            .map((n) => `・${n.title}`)
+            .join("\n");
+          setInfoModal({
+            title: "脱退できません",
+            message: `${json.message}\n\n${noteList}`,
+          });
+        } else {
+          setInfoModal({
+            title: "脱退できません",
+            message: json.message ?? "脱退できません",
+          });
+        }
+        return;
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setInfoModal({
+          title: "脱退できません",
+          message: json.message ?? "脱退に失敗しました",
+        });
+        return;
+      }
+      router.push(`/organizations/${orgId}/groups`);
+    } catch {
+      setInfoModal({
+        title: "脱退できません",
+        message: "サーバーへの接続に失敗しました",
+      });
+    } finally {
+      setIsLeaving(false);
     }
   }
 
@@ -300,7 +389,12 @@ export default function GroupAdminMembersPage() {
     if (!member) return;
     setPendingMembers((prev) => [
       ...prev,
-      { userId: member.user_id, username: member.username, email: member.email, role: addRole },
+      {
+        userId: member.user_id,
+        username: member.username,
+        email: member.email,
+        role: addRole,
+      },
     ]);
     setAddUserId("");
   }
@@ -329,7 +423,10 @@ export default function GroupAdminMembersPage() {
           `/api/organizations/${orgId}/groups/${groupId}/members`,
           {
             method: "POST",
-            body: JSON.stringify({ user_id: pending.userId, role: pending.role }),
+            body: JSON.stringify({
+              user_id: pending.userId,
+              role: pending.role,
+            }),
           },
         );
         if (res.ok) {
@@ -337,7 +434,9 @@ export default function GroupAdminMembersPage() {
           addedMembers.push(json.member);
         } else {
           const json = await res.json();
-          errors.push(`${pending.username}: ${json.message ?? "追加に失敗しました"}`);
+          errors.push(
+            `${pending.username}: ${json.message ?? "追加に失敗しました"}`,
+          );
           failedUserIds.add(pending.userId);
         }
       } catch {
@@ -352,7 +451,9 @@ export default function GroupAdminMembersPage() {
 
     if (errors.length > 0) {
       // 失敗したメンバーのみ pending に残す
-      setPendingMembers((prev) => prev.filter((p) => failedUserIds.has(p.userId)));
+      setPendingMembers((prev) =>
+        prev.filter((p) => failedUserIds.has(p.userId)),
+      );
       setAddError(errors.join(" / "));
     } else {
       // 全員成功: モーダルを閉じてリセット
@@ -392,19 +493,22 @@ export default function GroupAdminMembersPage() {
       {/* ページヘッダー: タイトルと追加ボタンを横並びに配置 */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">メンバー管理</h2>
-        {!loading && !fetchError && (currentMemberIds.size + pendingMemberIds.size) < orgMembers.length && (
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
-          >
-            メンバーを追加
-          </button>
-        )}
+        {isAdmin &&
+          !loading &&
+          !fetchError &&
+          currentMemberIds.size + pendingMemberIds.size < orgMembers.length && (
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity"
+            >
+              メンバーを追加
+            </button>
+          )}
       </div>
 
-      {/* 参加申請一覧: 申請が1件以上あるときのみ表示する */}
-      {joinRequests.length > 0 && (
+      {/* 参加申請一覧: admin かつ申請が1件以上あるときのみ表示する */}
+      {isAdmin && joinRequests.length > 0 && (
         <section className="flex flex-col gap-3 p-5 rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30">
           <h3 className="text-lg font-semibold">
             参加申請（{joinRequests.length} 件）
@@ -489,35 +593,62 @@ export default function GroupAdminMembersPage() {
                       {m.email}
                     </td>
                     <td className="py-3 px-3">
-                      <select
-                        value={displayRole}
-                        onChange={(e) =>
-                          handleRoleChange(m.user_id, m.role, e.target.value)
-                        }
-                        className={[
-                          "px-3 py-2 border rounded-md bg-transparent",
-                          "focus:outline-none focus:ring-1 focus:ring-foreground",
-                          isChanged
-                            ? "border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400"
-                            : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300",
-                        ].join(" ")}
-                      >
-                        {ASSIGNABLE_GROUP_ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {GROUP_ROLE_LABELS[role]}
-                          </option>
-                        ))}
-                      </select>
+                      {/* 閲覧専用の非adminユーザーには固定テキスト表示 */}
+                      {!isAdmin ? (
+                        <span className="text-gray-600 dark:text-gray-300">
+                          {
+                            GROUP_ROLE_LABELS[
+                              m.role as keyof typeof GROUP_ROLE_LABELS
+                            ]
+                          }
+                        </span>
+                      ) : (
+                        <select
+                          value={displayRole}
+                          onChange={(e) =>
+                            handleRoleChange(m.user_id, m.role, e.target.value)
+                          }
+                          className={[
+                            "px-3 py-2 border rounded-md bg-transparent",
+                            "focus:outline-none focus:ring-1 focus:ring-foreground",
+                            isChanged
+                              ? "border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400"
+                              : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300",
+                          ].join(" ")}
+                        >
+                          {ASSIGNABLE_GROUP_ROLES.map((role) => (
+                            <option key={role} value={role}>
+                              {GROUP_ROLE_LABELS[role]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setMemberToRemove(m)}
-                        className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
-                        aria-label={`${m.username} を削除`}
-                      >
-                        削除
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setMemberToRemove(m)}
+                            className="text-red-400 hover:text-red-500 transition-colors text-sm px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950"
+                            aria-label={`${m.username} を削除`}
+                          >
+                            削除
+                          </button>
+                        )}
+                        {/* 自分自身の行にだけ脱退ボタンを表示する */}
+                        {m.user_id === myUserId && (
+                          <button
+                            type="button"
+                            onClick={() => setIsLeaveModalOpen(true)}
+                            disabled={isLeaving}
+                            className="text-orange-500 hover:text-orange-600 transition-colors text-sm px-2 py-1 rounded hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50"
+                            aria-label="このグループを脱退"
+                          >
+                            脱退する
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -525,12 +656,10 @@ export default function GroupAdminMembersPage() {
             </tbody>
           </table>
 
-          {/* ロール変更保存エリア: 変更があるときのみ表示 */}
-          {hasPendingChanges && (
+          {/* ロール変更保存エリア: admin かつ変更があるときのみ表示 */}
+          {isAdmin && hasPendingChanges && (
             <div className="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              {saveError && (
-                <p className="text-sm text-red-500">{saveError}</p>
-              )}
+              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -556,15 +685,15 @@ export default function GroupAdminMembersPage() {
       )}
 
       {/* メンバー追加モーダル */}
-      {/* プライベートノートオーナー警告モーダル */}
+      {/* 削除・脱退がブロック/失敗したときの情報モーダル（削除・脱退の両フローで共用） */}
       <ConfirmModal
-        isOpen={ownerBlockInfo !== null}
-        title="メンバーを削除できません"
-        message={`${ownerBlockInfo?.message ?? ""}\n\n${ownerBlockInfo?.noteList ?? ""}`}
+        isOpen={infoModal !== null}
+        title={infoModal?.title ?? ""}
+        message={infoModal?.message ?? ""}
         confirmLabel="閉じる"
         hideCancelButton
-        onConfirm={() => setOwnerBlockInfo(null)}
-        onCancel={() => setOwnerBlockInfo(null)}
+        onConfirm={() => setInfoModal(null)}
+        onCancel={() => setInfoModal(null)}
       />
 
       {/* メンバー削除確認モーダル */}
@@ -582,6 +711,20 @@ export default function GroupAdminMembersPage() {
           }
         }}
         onCancel={() => setMemberToRemove(null)}
+      />
+
+      {/* グループ脱退確認モーダル */}
+      <ConfirmModal
+        isOpen={isLeaveModalOpen}
+        title="グループを脱退しますか？"
+        message="このグループから脱退します。この操作は取り消せません。"
+        confirmLabel="脱退する"
+        variant="danger"
+        onConfirm={() => {
+          setIsLeaveModalOpen(false);
+          handleLeaveGroup();
+        }}
+        onCancel={() => setIsLeaveModalOpen(false)}
       />
 
       {isAddModalOpen && (

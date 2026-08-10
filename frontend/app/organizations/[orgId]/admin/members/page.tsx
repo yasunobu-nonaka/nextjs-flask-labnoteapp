@@ -7,6 +7,7 @@ import Link from "next/link";
 import { authFetch } from "@/lib/api";
 import { ORG_ROLE_LABELS } from "@/lib/constants";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { useAdmin } from "../admin-context";
 
 type Member = {
   user_id: number;
@@ -31,6 +32,8 @@ const PER_PAGE = 20;
 export default function ConsoleMembersPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
+  // layout から渡される、自分が組織admin系ロールかどうかのフラグ。管理系UIの出し分けに使う
+  const { isAdmin } = useAdmin();
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +42,8 @@ export default function ConsoleMembersPage() {
   const [page, setPage] = useState(1);
   // 現在のユーザーの組織ロール（オーナー移譲ボタンの表示制御に使う）
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  // ログイン中の自分自身のuser_id。メンバー一覧の中から自分の行を特定し、脱退ボタンを出すために使う
+  const [myUserId, setMyUserId] = useState<number | null>(null);
 
   // user_id → 変更後のロール。変更があったメンバーのみ保持する
   const [pendingRoles, setPendingRoles] = useState<Record<number, string>>({});
@@ -51,14 +56,19 @@ export default function ConsoleMembersPage() {
   const [memberToTransfer, setMemberToTransfer] = useState<Member | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
+  // 脱退確認モーダルの表示状態とエラー
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  // マウント時にメンバー一覧と現在ユーザーのロールを並行取得する
+  // マウント時にメンバー一覧・現在ユーザーのロール・自分のuser_idを並行取得する
   useEffect(() => {
     async function fetchData() {
       try {
-        const [membersRes, orgRes] = await Promise.all([
+        const [membersRes, orgRes, meRes] = await Promise.all([
           authFetch(`/api/organizations/${orgId}/members`),
           authFetch(`/api/organizations/${orgId}`),
+          authFetch(`/api/auth/me`),
         ]);
         if (membersRes.status === 401 || orgRes.status === 401) {
           router.push("/login");
@@ -78,6 +88,10 @@ export default function ConsoleMembersPage() {
           await Promise.all([membersRes.json(), orgRes.json()]);
         setMembers(membersData);
         setCurrentUserRole(orgData.role);
+        if (meRes.ok) {
+          const me: { id: number } = await meRes.json();
+          setMyUserId(me.id);
+        }
       } catch {
         setFetchError("サーバーへの接続に失敗しました");
       } finally {
@@ -203,6 +217,35 @@ export default function ConsoleMembersPage() {
     }
   }
 
+  /**
+   * 自分自身をこの組織から脱退させる。
+   * ownerの場合はバックエンドが409を返すため、そのメッセージをそのまま表示する。
+   * 成功後はこの組織にアクセスできなくなるため組織一覧へ戻る。
+   */
+  async function handleLeaveOrganization() {
+    setIsLeaving(true);
+    setLeaveError(null);
+    try {
+      const res = await authFetch(`/api/organizations/${orgId}/leave`, {
+        method: "POST",
+      });
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setLeaveError(json.message ?? "脱退に失敗しました");
+        return;
+      }
+      router.push("/organizations");
+    } catch {
+      setLeaveError("サーバーへの接続に失敗しました");
+    } finally {
+      setIsLeaving(false);
+    }
+  }
+
   /** メンバーを組織から削除する（確認モーダル経由で呼ばれる） */
   async function handleRemoveMember(member: Member) {
     try {
@@ -244,12 +287,15 @@ export default function ConsoleMembersPage() {
       {/* ヘッダー: タイトルと招待ボタン */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">メンバー管理</h2>
-        <Link
-          href={`/organizations/${orgId}/admin/members/invite`}
-          className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
-        >
-          メンバーを招待
-        </Link>
+        {/* メンバー招待は組織admin系ロールのみ可能な操作 */}
+        {isAdmin && (
+          <Link
+            href={`/organizations/${orgId}/admin/members/invite`}
+            className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
+          >
+            メンバーを招待
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -293,10 +339,10 @@ export default function ConsoleMembersPage() {
                       {m.email}
                     </td>
                     <td className="py-3 px-3">
-                      {/* owner は変更不可のため固定テキスト表示 */}
-                      {m.role === "owner" ? (
+                      {/* owner、または閲覧専用の非adminユーザーには固定テキスト表示 */}
+                      {!isAdmin || m.role === "owner" ? (
                         <span className="text-gray-600 dark:text-gray-300">
-                          {ORG_ROLE_LABELS.owner}
+                          {ORG_ROLE_LABELS[m.role as keyof typeof ORG_ROLE_LABELS]}
                         </span>
                       ) : (
                         <select
@@ -322,8 +368,8 @@ export default function ConsoleMembersPage() {
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        {/* 現在のユーザーがオーナーで、かつ対象が非オーナーのときのみ移譲ボタンを表示する */}
-                        {currentUserRole === "owner" && m.role !== "owner" && (
+                        {/* 現在のユーザーがオーナーで、かつ対象が非オーナーのときのみ移譲ボタンを表示する（admin限定操作） */}
+                        {isAdmin && currentUserRole === "owner" && m.role !== "owner" && (
                           <button
                             type="button"
                             onClick={() => setMemberToTransfer(m)}
@@ -334,8 +380,8 @@ export default function ConsoleMembersPage() {
                             オーナー移譲
                           </button>
                         )}
-                        {/* owner は削除不可 */}
-                        {m.role !== "owner" && (
+                        {/* owner は削除不可。削除自体もadmin限定操作 */}
+                        {isAdmin && m.role !== "owner" && (
                           <button
                             type="button"
                             onClick={() => setMemberToRemove(m)}
@@ -345,6 +391,23 @@ export default function ConsoleMembersPage() {
                             削除
                           </button>
                         )}
+                        {/* 自分自身の行にだけ脱退ボタンを表示する。ownerは先にオーナー移譲が必要 */}
+                        {m.user_id === myUserId &&
+                          (m.role === "owner" ? (
+                            <span className="text-xs text-gray-400">
+                              オーナーは移譲後に脱退できます
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsLeaveModalOpen(true)}
+                              disabled={isLeaving}
+                              className="text-orange-500 hover:text-orange-600 transition-colors text-sm px-2 py-1 rounded hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50"
+                              aria-label="この組織を脱退"
+                            >
+                              脱退する
+                            </button>
+                          ))}
                       </div>
                     </td>
                   </tr>
@@ -376,8 +439,8 @@ export default function ConsoleMembersPage() {
             </div>
           )}
 
-          {/* ロール変更保存エリア: 変更があるときのみ表示 */}
-          {hasPendingChanges && (
+          {/* ロール変更保存エリア: admin かつ変更があるときのみ表示 */}
+          {isAdmin && hasPendingChanges && (
             <div className="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
               {saveError && <p className="text-sm text-red-500">{saveError}</p>}
               <div className="flex items-center gap-4">
@@ -406,6 +469,8 @@ export default function ConsoleMembersPage() {
       )}
       {/* 移譲エラー表示 */}
       {transferError && <p className="text-sm text-red-500">{transferError}</p>}
+      {/* 脱退エラー表示 */}
+      {leaveError && <p className="text-sm text-red-500">{leaveError}</p>}
 
       {/* メンバー削除確認モーダル */}
       <ConfirmModal
@@ -439,6 +504,20 @@ export default function ConsoleMembersPage() {
           }
         }}
         onCancel={() => setMemberToTransfer(null)}
+      />
+
+      {/* 組織脱退確認モーダル */}
+      <ConfirmModal
+        isOpen={isLeaveModalOpen}
+        title="組織を脱退しますか？"
+        message="この組織から脱退します。この操作は取り消せません。"
+        confirmLabel="脱退する"
+        variant="danger"
+        onConfirm={() => {
+          setIsLeaveModalOpen(false);
+          handleLeaveOrganization();
+        }}
+        onCancel={() => setIsLeaveModalOpen(false)}
       />
     </div>
   );

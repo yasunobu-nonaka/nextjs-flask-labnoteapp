@@ -108,6 +108,8 @@ app/
   verify-email-change/[token]/page.tsx    # email address change verification
   invitations/
     [token]/page.tsx                      # accept email invitation link (Phase 5)
+  onboarding/
+    page.tsx                              # setup wizard for new self-registered users (Phase 7); redirects to /organizations if needs_onboarding is false
   settings/
     layout.tsx                            # settings sidebar layout
     page.tsx                              # profile settings (username change)
@@ -116,21 +118,23 @@ app/
     page.tsx                              # org list; shows orgs the user belongs to + OrgCreateModal
     [orgId]/
       admin/
-        layout.tsx                        # org admin sidebar layout
+        layout.tsx                        # org admin sidebar layout; non-admins are allowed in but confined to members/ (read-only)
+        admin-context.tsx                 # AdminContext — isAdmin flag from layout, consumed by members/page.tsx
         page.tsx                          # org admin dashboard (name, policy overview); org deletion (owner only)
         policy/page.tsx                   # edit org-level policy (who_can_create_groups, etc.)
         groups/page.tsx                   # group list for org admins; create/delete groups
         members/
-          page.tsx                        # org member list; role change, remove, add by email; ownership transfer (owner only)
+          page.tsx                        # org member list; role change, remove, add by email, ownership transfer, self-leave (owner blocked until transfer)
           invite/page.tsx                 # send email invitation to join org (Phase 5)
       groups/
         page.tsx                          # group list for org members; join / enter group
         [groupId]/
           admin/
-            layout.tsx                    # group admin sidebar layout
+            layout.tsx                    # group admin sidebar layout; non-admins are allowed in but confined to members/ (read-only)
+            pending-count-context.ts      # PendingCountContext — join-request count + isAdmin flag, consumed by members/page.tsx
             page.tsx                      # group admin dashboard; join request count badge; group deletion (group admin only)
             policy/page.tsx               # edit group-level policy (join_method, visibility)
-            members/page.tsx              # group member list; role change, remove, add; join request approval
+            members/page.tsx              # group member list; role change, remove, add, join request approval, self-leave (sole admin blocked)
           notes/
             page.tsx                      # file-browser style note list; folder+note grid, breadcrumb, search, tag filter, pagination
             new/page.tsx                  # create note
@@ -150,6 +154,8 @@ components/
     CreateGroupWizard.tsx  # multi-step group creation wizard (name, visibility, policy)
     GroupCreateModal.tsx   # simple group create modal (used from admin/groups)
     GroupListModal.tsx     # group list picker modal; exports GroupList
+  onboarding/
+    OnboardingWizard.tsx   # Phase 7 setup wizard; org name/policy/invites + optional first group, submitted in one batch on the final "始める" step
   folder/
     FolderSidebar.tsx    # left sidebar: keyword search form + tag filter checkboxes
     FolderCard.tsx       # folder card (tab design); owns ··· menu popover, rename/delete modals
@@ -183,11 +189,13 @@ lib/
 
 **Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
 
+**Org/group admin access**: `admin/layout.tsx` (org) and `groups/[groupId]/admin/layout.tsx` (group) no longer redirect non-admin members away entirely — they compute `isAdmin` from the caller's role and expose it via context (`AdminContext` for org, the group layout's existing `PendingCountContext` for group) so `members/page.tsx` can render a read-only member list + self-leave button for non-admins, while confining them to the members sub-route (redirecting away from other admin pages) and hiding admin-only controls (invite/add, role edit, remove, join requests). Self-leave posts to `.../leave`; the backend blocks an org owner (must transfer ownership first) and a group's sole remaining admin.
+
 **Layout**: Notes page uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
 
 ## Organization & Group Redesign
 
-The app is being extended from a personal note tool to an organization/group-based shared note platform. **Phases 1–6 are complete. Phase 7 is pending.**
+The app is being extended from a personal note tool to an organization/group-based shared note platform. **Phases 1–6 are complete. Phase 7 is partially done** (onboarding wizard shipped; audit log and advanced policies are still pending).
 
 ### Phase Plan
 
@@ -199,7 +207,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 | 4 | ✅ Done | #19 #20 #26 | Frontend — org/group navigation, group-scoped note pages, group creation wizard, org/group list pages |
 | 5 | ✅ Done | #19 #21 #22 #24 | Access control & sharing — email invitations, group join requests & approval, 404 hardening for non-members, private notes |
 | 6 | ✅ Done | #8 #25 #27 | User account management — password reset, user settings (username/email change, account deletion) |
-| 7 | Pending | — | Onboarding setup wizard, audit log, advanced org/group policies |
+| 7 | 🔶 Partial | `9e63418` | Onboarding setup wizard — done. Audit log, advanced org/group policies — pending |
 
 ### Domain Concepts
 
@@ -272,7 +280,7 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | GET | `/api/auth/user/status` | — | Check email verification status |
 | POST | `/api/auth/login` | — | Login; returns access + refresh tokens |
 | POST | `/api/auth/refresh` | refresh JWT | Rotate access token |
-| GET | `/api/auth/me` | JWT | Get current user profile |
+| GET | `/api/auth/me` | JWT | Get current user profile; includes `needs_onboarding` (true when the user has zero org memberships — drives the Phase 7 onboarding redirect) |
 | DELETE | `/api/auth/me` | JWT | Delete account |
 | PATCH | `/api/auth/me/username` | JWT | Change username |
 | POST | `/api/auth/me/password/verify` | JWT | Verify current password (pre-change step) |
@@ -313,6 +321,7 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | POST | `/api/organizations/<id>/members` | owner/sys_admin/user_admin | Add member |
 | PATCH | `/api/organizations/<id>/members/<uid>` | owner/sys_admin | Change member role |
 | DELETE | `/api/organizations/<id>/members/<uid>` | owner/sys_admin/user_admin | Remove member |
+| POST | `/api/organizations/<id>/leave` | member | Leave org (self); blocked if caller is `owner` (transfer ownership first) |
 | POST | `/api/organizations/<id>/invitations` | owner/sys_admin/user_admin | Send email invitation to join org |
 | GET | `/api/organizations/<id>/groups` | member | List accessible groups |
 | POST | `/api/organizations/<id>/groups` | policy-dependent | Create group (caller becomes `admin`) |
@@ -326,8 +335,9 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | PATCH | `/api/organizations/<id>/groups/<gid>/join-requests/<uid>` | group admin | Approve or reject join request |
 | GET | `/api/organizations/<id>/groups/<gid>/members` | group member | List group members |
 | POST | `/api/organizations/<id>/groups/<gid>/members` | group admin / org sys_admin | Add org member to group |
-| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role |
-| DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group |
+| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role; blocked if demoting the sole active `admin` away from `admin` (re-submitting `admin` is a no-op and always allowed) |
+| DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group; blocked if target is the sole active `admin`, or owns private notes in the group (no note titles returned — remover may lack visibility into them) |
+| POST | `/api/organizations/<id>/groups/<gid>/leave` | group member | Leave group (self); blocked if caller is the sole active `admin`, or owns private notes (titles included — it's the caller's own data) |
 
 Service functions live in `organization_service.py`, `group_service.py`, and `invitation_service.py` inside `app/api/organizations/`.
 
@@ -354,32 +364,15 @@ All routes require `org:read` org-level permission plus the group-level permissi
 
 Route implementations live in `note_routes.py` and `folder_routes.py` inside `app/api/organizations/`.
 
-## Phase 7: Onboarding Setup Wizard
+## Phase 7: Onboarding Setup Wizard (done) / Audit Log & Advanced Policies (pending)
 
-### Overview
+### Onboarding wizard (implemented, `9e63418`)
 
-When a user registers an account themselves (i.e. not via an email invitation), show a multi-step setup wizard on first login to guide them through creating their first organization. Users who accepted an invitation and joined an existing org skip the wizard entirely.
+When a user registers an account themselves (i.e. not via an email invitation), `GET /api/auth/me` returns `needs_onboarding: true` (zero org memberships) and `/organizations` redirects them to `/onboarding` (`frontend/app/onboarding/page.tsx`). Users who accepted an invitation already belong to an org, so `needs_onboarding` is `false` and they skip straight to `/organizations`. Once the wizard finishes (or the user completes setup and later revisits `/organizations` directly), `needs_onboarding` is `false` and the redirect no longer fires.
 
-### Trigger Condition
+`OnboardingWizard` (`frontend/components/onboarding/OnboardingWizard.tsx`) holds all form state client-side across 7 internal steps — `org-name → org-policy → org-invitations → group-prompt → group-name → group-policy → done` — grouped into 4 visible phases (組織設定 / 招待 / グループ設定 / 完了). The `group-*` steps are optional (skippable via `group-prompt`); nothing is sent to the backend until the final review screen's "始める" button, which then calls `POST /api/organizations` (+ policy), `POST /api/organizations/<id>/invitations` per invite row, and `POST /api/organizations/<id>/groups` (+ policy) if a first group was configured — then navigates to that group's note list, or to the org's group list if no group was created.
 
-- **Show wizard**: user registered via `POST /api/auth/register` and has no organization membership yet
-- **Skip wizard**: user registered via invitation acceptance (`POST /api/invitations/<token>/accept`) — they already belong to an org
+### Still pending
 
-Detection approach: on the `GET /api/auth/me` response, add a flag (e.g. `needs_onboarding: bool`) that the frontend checks after login. The flag is `true` when the user has zero org memberships.
-
-### Wizard Steps
-
-| Step | Content |
-|------|---------|
-| 1 | **組織名** — text input for the organization name |
-| 2 | **ポリシー設定** — who can create groups (`owner_only` / `all_members`), default join method (`open` / `request` / `invite_only`) |
-| 3 | **メンバーの招待** — add members by email and assign each an org role (`sys_admin` / `user_admin` / `member`); can skip |
-| 4 | **完了** — summary screen; "ノートを始める" button navigates to the new org's group list |
-
-### Implementation Notes
-
-- The wizard reuses `OrgCreateModal` logic (Step 1) and `CreateGroupWizard` design patterns (multi-step state machine) — extract shared UI primitives as needed rather than duplicating.
-- Step 3 sends invitations via `POST /api/organizations/<id>/invitations` after the org is created in Step 1.
-- The wizard lives at `/onboarding` (a new page) and is shown via a redirect from `/organizations` when `needs_onboarding` is `true`.
-- Once the user creates an org (or explicitly skips), `needs_onboarding` becomes `false` and the redirect no longer triggers.
-- Do not show the wizard to users who land on `/organizations` via a direct URL after already completing setup.
+- Audit log
+- Advanced org/group policies (beyond what `OrganizationPolicy`/`GroupPolicy` already cover)
