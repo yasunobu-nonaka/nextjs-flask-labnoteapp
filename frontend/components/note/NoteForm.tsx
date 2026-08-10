@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { noteSchema, type NoteFormValues } from "@/lib/schemas/noteSchema";
@@ -18,6 +18,8 @@ type Props = {
   submittingLabel: string;
   // API 呼び出し後のサーバーエラーを親ページから受け取って表示する
   globalError: string | null;
+  // フォームが defaultValues から変更されたかどうかを親ページに伝える（離脱確認に使う）
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
 export default function NoteForm({
@@ -26,17 +28,23 @@ export default function NoteForm({
   submitLabel,
   submittingLabel,
   globalError,
+  onDirtyChange,
 }: Props) {
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<NoteFormValues>({
     resolver: zodResolver(noteSchema),
     defaultValues,
   });
+
+  // isDirty が変わるたびに親ページへ通知する（親は離脱確認の判定にこの値を使う）
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // content_md は MDEditor の onChange で直接 setValue するため watch で現在値を取得する
   // React Hook Form の watch() は React Compiler と相性が悪いが、このコンポーネントでは問題ない
@@ -45,7 +53,8 @@ export default function NoteForm({
 
   // tags フィールドを監視し、useTagInput に現在値を渡す
   const tags = watch("tags");
-  // タグが追加・削除されると setValue で react-hook-form の値を更新する
+  // タグが追加・削除されると setValue で react-hook-form の値を更新する。
+  // shouldDirty: true を指定し、isDirty に反映させる（register していないフィールドのため既定では反映されない）
   const {
     tagInput,
     setTagInput,
@@ -55,7 +64,7 @@ export default function NoteForm({
     removeTag,
     handleTagKeyDown,
   } = useTagInput(tags, (newTags) =>
-    setValue("tags", newTags, { shouldValidate: true }),
+    setValue("tags", newTags, { shouldValidate: true, shouldDirty: true }),
   );
 
   // Markdown クイックリファレンスモーダルの開閉状態
@@ -110,7 +119,10 @@ export default function NoteForm({
         <MarkdownEditor
           value={contentMd}
           onChange={(val) =>
-            setValue("content_md", val, { shouldValidate: true })
+            setValue("content_md", val, {
+              shouldValidate: true,
+              shouldDirty: true,
+            })
           }
         />
         {errors.content_md && (

@@ -77,15 +77,32 @@ type AppHeaderProps = {
   backLabel?: string;
   /** アプリ名 "LabNoteApp" を表示するか。サイドバーに既に表示されるページでは false を渡す。デフォルト true */
   showLogo?: boolean;
+  /**
+   * 離脱前チェック。未保存の変更があるページ（ノート編集など）から渡す。
+   * true を返せば遷移を続行、false を返せば遷移をブロックする
+   * （呼び出し側で確認ダイアログを出して結果を返す想定）。
+   */
+  confirmBeforeLeave?: () => boolean;
 };
 
 export default function AppHeader({
   backHref,
   backLabel,
   showLogo = true,
+  confirmBeforeLeave,
 }: AppHeaderProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
+
+  /**
+   * <Link> の onNavigate から呼ぶ共通ガード。
+   * confirmBeforeLeave が false を返した場合のみ遷移を preventDefault する。
+   */
+  function guardNavigate(e: { preventDefault: () => void }) {
+    if (confirmBeforeLeave && !confirmBeforeLeave()) {
+      e.preventDefault();
+    }
+  }
 
   const [username, setUsername] = useState<string>("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -206,6 +223,7 @@ export default function AppHeader({
   }
 
   function handleLogout() {
+    if (confirmBeforeLeave && !confirmBeforeLeave()) return;
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem(LAST_SEEN_KEY);
@@ -220,6 +238,7 @@ export default function AppHeader({
           /* アプリロゴ: クリックするとホームへ戻る */
           <Link
             href="/organizations"
+            onNavigate={guardNavigate}
             className="text-lg font-bold tracking-tight hover:opacity-75 transition-opacity"
           >
             LabNoteApp
@@ -228,6 +247,7 @@ export default function AppHeader({
         {backHref && (
           <Link
             href={backHref}
+            onNavigate={guardNavigate}
             className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
           >
             {backLabel ?? "戻る"}
@@ -292,6 +312,7 @@ export default function AppHeader({
                           <Link
                             href={`/organizations/${n.org_id}/groups/${n.group_id}/admin/members`}
                             onClick={() => setIsBellOpen(false)}
+                            onNavigate={guardNavigate}
                             className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           >
                             <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
@@ -321,6 +342,7 @@ export default function AppHeader({
                           <Link
                             href={`/organizations/${n.org_id}/groups/${n.group_id}/notes`}
                             onClick={() => setIsBellOpen(false)}
+                            onNavigate={guardNavigate}
                             className="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           >
                             <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
@@ -380,6 +402,7 @@ export default function AppHeader({
                             <Link
                               href={n.link_url}
                               onClick={() => setIsBellOpen(false)}
+                              onNavigate={guardNavigate}
                               className="block hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                             >
                               {inner}
@@ -434,6 +457,7 @@ export default function AppHeader({
                 <div>
                   <Link
                     href={`/settings?returnTo=${encodeURIComponent(pathname)}`}
+                    onNavigate={guardNavigate}
                     className="w-full text-left px-3 py-2 text-base rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     設定

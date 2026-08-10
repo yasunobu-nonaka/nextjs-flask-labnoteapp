@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { type NoteFormValues } from "@/lib/schemas/noteSchema";
+import { useUnsavedChangesGuard } from "@/lib/hooks/useUnsavedChangesGuard";
 import NoteForm from "@/components/note/NoteForm";
 import AppHeader from "@/components/layout/AppHeader";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -28,6 +29,10 @@ export default function NewNotePage() {
   // ログインユーザーごとの localStorage キー。/api/auth/me の取得完了まで null
   const [tutorialPromptedKey, setTutorialPromptedKey] = useState<string | null>(null);
   const router = useRouter();
+
+  // NoteForm から通知される、defaultValues からの変更有無。離脱確認の判定に使う。
+  const [isDirty, setIsDirty] = useState(false);
+  const confirmBeforeLeave = useUnsavedChangesGuard(isDirty);
 
   // URLクエリパラメータ folder_id を読み取り、指定フォルダーにノートを作成するかどうかを決める
   // window は SSR で参照できないため useEffect 内で読む（意図的な同期 setState）
@@ -84,6 +89,8 @@ export default function NewNotePage() {
         return;
       }
 
+      // 保存成功後の遷移は離脱確認の対象外にするため、先に dirty 状態を解除する
+      setIsDirty(false);
       router.push(`/organizations/${orgId}/groups/${groupId}/notes`);
     } catch {
       setGlobalError("サーバーへの接続に失敗しました");
@@ -94,7 +101,11 @@ export default function NewNotePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <AppHeader backHref={notesListHref} backLabel="ノート一覧へ" />
+      <AppHeader
+        backHref={notesListHref}
+        backLabel="ノート一覧へ"
+        confirmBeforeLeave={confirmBeforeLeave}
+      />
       <main className="flex-1 px-6 py-10">
       <div className="max-w-full mx-auto flex flex-col gap-6">
         <div className="flex items-center justify-between">
@@ -107,6 +118,7 @@ export default function NewNotePage() {
           submitLabel="作成する"
           submittingLabel="作成中..."
           globalError={globalError}
+          onDirtyChange={setIsDirty}
         />
       </div>
       </main>
