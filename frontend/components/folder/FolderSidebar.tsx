@@ -244,7 +244,7 @@ export default function FolderSidebar({
                   <Link
                     href={`/organizations/${orgId}/groups/${group.id}/notes`}
                     className={clsx(
-                      "flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0",
+                      "flex-1 flex items-center gap-1.5 px-2 py-1 min-w-0",
                       isActive && "font-semibold",
                     )}
                   >
