@@ -2,6 +2,7 @@
 
 import { authFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
@@ -59,6 +60,15 @@ export default function FolderSidebar({
   const [orgPolicy, setOrgPolicy] = useState<OrgPolicy | null>(null);
   // 全グループ（所属・未所属）を保持し、描画時にフィルターする
   const [groups, setGroups] = useState<Group[]>([]);
+  // ⋮ 管理メニューポップオーバーを開いているグループの ID（null なら全て閉じている）
+  const [openAdminMenuGroupId, setOpenAdminMenuGroupId] = useState<
+    number | null
+  >(null);
+  // 管理メニューポップオーバーの表示位置（⋮ ボタンの画面上の座標から算出する）
+  const [adminMenuPosition, setAdminMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // モーダルの開閉状態
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
@@ -236,14 +246,81 @@ export default function FolderSidebar({
                       </span>
                     )}
                   </Link>
-                  {/* ⋮ アイコン: 行にホバーしたときだけ表示する */}
-                  <Link
-                    href={`/organizations/${orgId}/groups/${group.id}/admin`}
-                    className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none opacity-0 group-hover:opacity-100"
+                  {/* ⋮ 管理メニュー: 行にホバーしたとき、またはメニューが開いているときに表示する */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (openAdminMenuGroupId === group.id) {
+                        setOpenAdminMenuGroupId(null);
+                        return;
+                      }
+                      // ⋮ ボタンの画面上の座標からポップオーバーの表示位置を算出する
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setAdminMenuPosition({
+                        top: rect.top,
+                        left: rect.right + 4,
+                      });
+                      setOpenAdminMenuGroupId(group.id);
+                    }}
+                    className={clsx(
+                      "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
+                      openAdminMenuGroupId === group.id
+                        ? "opacity-100"
+                        : "opacity-0",
+                    )}
                     title={`${group.name} の管理`}
                   >
                     ⋮
-                  </Link>
+                  </button>
+
+                  {/*
+                   * 管理メニューポップオーバー: <aside> の overflow-y-auto によるクリッピングや
+                   * 右カラム側の要素との重なりを避けるため、document.body に直接ポータルする
+                   * （Modal / ConfirmModal と同じ考え方。詳細は CLAUDE.md 参照）。
+                   * 通常の absolute 配置ではなく、ボタンの座標を基準にした fixed 配置になる。
+                   */}
+                  {openAdminMenuGroupId === group.id &&
+                    adminMenuPosition &&
+                    createPortal(
+                      <>
+                        {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setOpenAdminMenuGroupId(null)}
+                        />
+                        {/* 管理ページへのリンク一覧 */}
+                        <div
+                          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                          style={{
+                            top: adminMenuPosition.top,
+                            left: adminMenuPosition.left,
+                          }}
+                        >
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            基本設定
+                          </Link>
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin/members`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            メンバー管理
+                          </Link>
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin/policy`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            ポリシー管理
+                          </Link>
+                        </div>
+                      </>,
+                      document.body,
+                    )}
                 </div>
               );
             })}
