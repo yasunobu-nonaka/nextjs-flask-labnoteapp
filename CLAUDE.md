@@ -115,7 +115,7 @@ app/
     page.tsx                              # profile settings (username change)
     security/page.tsx                     # security settings (password change, email change, account deletion)
   organizations/
-    page.tsx                              # org list; shows orgs the user belongs to + OrgCreateModal
+    page.tsx                              # auto-redirects to the last-visited org's groups/ page (localStorage last_org_id) when still a member; otherwise shows the org list via HomeSidebar + an empty state / OrgCreateModal prompt
     [orgId]/
       admin/
         layout.tsx                        # org admin sidebar layout; non-admins are allowed in but confined to members/ (read-only)
@@ -136,28 +136,29 @@ app/
             policy/page.tsx               # edit group-level policy (join_method, visibility)
             members/page.tsx              # group member list; role change, remove, add, join request approval, self-leave (sole admin blocked)
           notes/
-            page.tsx                      # file-browser style note list; folder+note grid, breadcrumb, search, tag filter, pagination
+            page.tsx                      # file-browser style note list; folder+note grid, breadcrumb, active-filter banner (under the group name), pagination — search/tag/author filtering lives in NoteSearchModal, opened from FolderSidebar
             new/page.tsx                  # create note
             [noteId]/page.tsx             # note detail (read-only); private badge, share management
             [noteId]/edit/page.tsx        # edit note
 components/
   common/
-    Modal.tsx            # generic modal shell (backdrop + dialog box); content passed as children; renders via createPortal to document.body
+    Modal.tsx            # generic modal shell (backdrop + dialog box); content passed as children; optional headerAction renders next to the title (e.g. OrgSwitchModal's create button); renders via createPortal to document.body
     ConfirmModal.tsx     # generic confirmation dialog (yes/no); renders via createPortal to document.body
     RadioGroup.tsx       # reusable radio button group component
   layout/
-    AppHeader.tsx        # top navigation bar; org switcher, user menu; confirmBeforeLeave prop guards its own Links/logout against unsaved-changes navigation
+    AppHeader.tsx        # top navigation bar; bell notification popover, user menu; confirmBeforeLeave prop guards its own Links/logout against unsaved-changes navigation. No org switcher here — that lives in the sidebars (see FolderSidebar/HomeSidebar below)
+    HomeSidebar.tsx      # left sidebar for /organizations and /organizations/<id>/groups; mirrors FolderSidebar's design (see below) but its org section switches between a single-org display (selectedOrgId set) and a full org list with per-row ⋮ menus (selectedOrgId unset, i.e. plain /organizations)
   org/
     OrgCreateModal.tsx   # create organization form (name input)
-    OrgSwitchModal.tsx   # switch between orgs the user belongs to; exports OrgList
+    OrgSwitchModal.tsx   # org list modal; takes onCreateClick, rendered as Modal's headerAction as a filled "組織を作成" button; exports OrgList
   group/
     CreateGroupWizard.tsx  # multi-step group creation wizard (name, visibility, policy)
     GroupCreateModal.tsx   # simple group create modal (used from admin/groups)
-    GroupListModal.tsx     # group list picker modal; exports GroupList
+    GroupListModal.tsx     # exports the Group type (still used) and a GroupList component that is no longer rendered anywhere — FolderSidebar/HomeSidebar now list unjoined groups + join/request controls inline instead of opening this as a modal
   onboarding/
     OnboardingWizard.tsx   # Phase 7 setup wizard; org name/policy/invites + optional first group, submitted in one batch on the final "始める" step
   folder/
-    FolderSidebar.tsx    # left sidebar: keyword search form + tag filter checkboxes
+    FolderSidebar.tsx    # left sidebar for the notes page; see "Sidebar navigation" below for its full layout
     FolderCard.tsx       # folder card (tab design); owns ··· menu popover, rename/delete modals
     FolderBreadcrumb.tsx # breadcrumb navigation for folder hierarchy
     FolderCreateModal.tsx# create folder modal
@@ -166,7 +167,8 @@ components/
     NoteForm.tsx         # shared create/edit form; owns useForm + useTagInput; reports formState.isDirty via onDirtyChange prop
     NoteShareModal.tsx   # note share settings modal (private note member management)
     MarkdownEditor.tsx   # Markdown editor wrapper
-    NewItemButton.tsx    # "新規作成" button that opens popover (note / folder)
+    NewItemButton.tsx    # "＋ ノート・フォルダー新規作成" row (pencil icon + text, w-full) rendered inside FolderSidebar; opens a dropdown ("ノート" navigates to notes/new, "フォルダー" opens FolderCreateModal via onCreateFolder)
+    NoteSearchModal.tsx  # keyword search + author filter + tag filter (flex-wrap chips), opened from FolderSidebar's "ノート検索 & 絞り込み" button; tag/author changes apply live, keyword confirms via the modal's 検索 submit
 lib/
   api.ts                 # authFetch — wraps fetch with JWT Bearer header and base URL
   folders.ts             # Folder type, buildFolderOptions (flat list → <select> options)
@@ -186,7 +188,11 @@ lib/
 
 **Folder navigation**: `NotesPage` tracks position with `currentFolderId` (null = root). All folders are fetched once on mount into `allFolders`; `currentLevelFolders` is derived client-side by filtering `parent_id === currentFolderId`. Breadcrumb is built by traversing `parent_id` upward from `currentFolderId`. Root view shows top-level folders + notes with no folder (sends `folder_id=null` string sentinel to API).
 
-**New item creation**: The "新規作成" button (`NewItemButton`) opens a popover menu. "ノート" navigates to `notes/new`; "フォルダー" opens a `Modal` for folder name input.
+**Sidebar navigation** (`FolderSidebar` / `HomeSidebar`): both render, top to bottom, an org section, `NewItemButton` (notes page only), a "ノート検索 & 絞り込み" button (notes page only, opens `NoteSearchModal`), a "⚙ 組織設定" link, then the group section — all styled as icon (inline SVG, `stroke="currentColor"`, 14×14) + text rows rather than emoji or a filled button, so they inherit hover/dark-mode color from their own `text-*` class. The org switch button (chevrons-up-down icon — visually "`<>`" rotated 90°) opens `OrgSwitchModal`; org creation happens from that modal's header, not the sidebar. The group section lists **all** groups, joined and unjoined, with no cap: joined groups link straight to their notes page and (on hover, or while its popover is open) show a `⋮` admin-menu button; unjoined groups render dimmed with a join control based on `policy.join_method` — `"open"` shows an immediate "参加" button, `"request"` shows "参加申請" (or, once requested, "参加申請済み ×" to cancel), `"invite_only"` shows a plain "招待制" badge. The join/request/cancel network calls and status-tracking (`joinStatusMap`/`joinErrorMap`) are duplicated directly in each sidebar component rather than shared, matching this codebase's per-component-owns-its-modal-state convention (see `GroupListModal.tsx` note above for the modal this replaced). `HomeSidebar`'s org section additionally branches on `selectedOrgId`: set → same single-org layout as `FolderSidebar`; unset (plain `/organizations`) → the full org list with per-row `⋮` menus, since there's no single org to collapse to there.
+
+**⋮ admin-menu popovers** (group menus in both sidebars, and `HomeSidebar`'s org menu on the unselected/list branch): unlike `Modal`/`ConfirmModal`'s centered-backdrop portal, these are small anchored dropdowns, so simple `relative`+`absolute` positioning would get clipped by the sidebar's `overflow-y-auto` (and by same reasoning that motivates the Modal/ConfirmModal portal — see below) whenever the menu needs to extend past the sidebar's right edge. The fix: on click, read the button's `getBoundingClientRect()`, store `{ top, left }` in state, and `createPortal` the menu (plus a `fixed inset-0` transparent overlay that closes it on outside click) into `document.body` with `position: fixed` using that stored offset — CSS layout math is replaced by a one-time JS coordinate read since the portaled node has no positioned ancestor to be `absolute` relative to.
+
+**Note search & filtering**: `NotesPage` owns `query`/`selectedTags`/`selectedAuthorIds` state and passes them down to `FolderSidebar`, which just forwards them into `NoteSearchModal` (see components tree above) — the page has no inline search UI of its own. Tag/author changes call their `on*` handlers immediately (each resets `currentPage` to 1, and the fetch `useEffect` re-runs since those are in its dependency array); the keyword `query` only takes effect once the modal's 検索 button calls `onSearch`, which sets `submittedQuery` (the actual fetch dependency) — this two-value split (`query` vs `submittedQuery`) avoids firing a request on every keystroke. The active-filter summary (submitted query text, tag pills, and now author-name pills) renders directly under the `<h1>` group name, above the breadcrumb, with a "すべてクリア" button (`handleClear`) on its trailing edge.
 
 **Note moving**: `NoteCard` uses a `"idle" | "menu" | "moving"` state machine. `mode === "moving"` opens a `Modal` with a folder `<select>`. After a successful PATCH, it calls `onMoved()`, which increments `refreshKey` in `NotesPage` to trigger a re-fetch.
 
@@ -195,6 +201,8 @@ lib/
 **Unsaved-changes guard on note create/edit**: `NoteForm` reports `formState.isDirty` up to the page via `onDirtyChange` (note `content_md`/`tags` are set via `setValue(..., { shouldDirty: true })` since they bypass `register()` and wouldn't otherwise count toward `isDirty`). The page holds that in its own `isDirty` state, resets it to `false` right before the post-save `router.push` (so the save's own navigation isn't blocked), and passes it to `useUnsavedChangesGuard(isDirty)`, which returns a `confirmBeforeLeave` function. That function is passed to `AppHeader`, which calls it from every internal `<Link>`'s `onNavigate` (via a shared `guardNavigate` helper) and from the logout button, prompting via `window.confirm` and cancelling navigation if declined. The same hook also registers a `beforeunload` listener for tab-close/reload/URL-bar navigation, reading the latest `isDirty` through a ref (registering the listener once and mutating the ref avoids a stale-closure read). The browser back/forward button is intentionally not covered — App Router's client-side history navigation doesn't fire `beforeunload`.
 
 **Org/group admin access**: `admin/layout.tsx` (org) and `groups/[groupId]/admin/layout.tsx` (group) no longer redirect non-admin members away entirely — they compute `isAdmin` from the caller's role and expose it via context (`AdminContext` for org, the group layout's existing `PendingCountContext` for group) so `members/page.tsx` can render a read-only member list + self-leave button for non-admins, while confining them to the members sub-route (redirecting away from other admin pages) and hiding admin-only controls (invite/add, role edit, remove, join requests). Self-leave posts to `.../leave`; the backend blocks an org owner (must transfer ownership first) and a group's sole remaining admin.
+
+**Last-visited-org redirect**: the groups list page and notes page each write their `orgId` to `localStorage["last_org_id"]` on mount. `/organizations` reads it back after fetching the caller's org list; if the id is still present there, it `router.replace`s straight to `/organizations/<id>/groups` before rendering the picker UI, so `/organizations` itself is only seen on first login (no recorded org) or after leaving/losing access to the last-recorded org. This mirrors the pre-existing `last_notes_url` key (read by `settings/layout.tsx` for its back-link) but is deliberately not merged with it — `last_notes_url` should keep pointing at a specific note-list URL even if that group changes, while `last_org_id` only needs an org id.
 
 **Layout**: Notes page uses `h-screen overflow-hidden` on the root `<main>` with `overflow-y-auto` on each column so the sidebar and content area scroll independently.
 
