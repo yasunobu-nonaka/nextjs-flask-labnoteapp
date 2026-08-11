@@ -9,7 +9,6 @@ import FolderSidebar from "@/components/folder/FolderSidebar";
 import FolderCard from "@/components/folder/FolderCard";
 import NoteCard, { type Note } from "@/components/note/NoteCard";
 import FolderCreateModal from "@/components/folder/FolderCreateModal";
-import NewItemButton from "@/components/note/NewItemButton";
 import FolderBreadcrumb from "@/components/folder/FolderBreadcrumb";
 import { type Folder } from "@/lib/folders";
 
@@ -77,11 +76,13 @@ export default function NotesPage() {
   const router = useRouter();
 
   // このページを訪れたことを記録し、設定画面などから戻れるようにする
+  // last_org_id は /organizations アクセス時に最後にいた組織へ自動で戻すために使う
   useEffect(() => {
     localStorage.setItem(
       "last_notes_url",
       `/organizations/${orgId}/groups/${groupId}/notes`,
     );
+    localStorage.setItem("last_org_id", orgId);
   }, [orgId, groupId]);
 
   // グループ情報を取得してグループ名をセットする
@@ -298,6 +299,9 @@ export default function NotesPage() {
         availableAuthors={availableAuthors}
         onAuthorAdd={handleAuthorAdd}
         onAuthorRemove={handleAuthorRemove}
+        currentFolderId={currentFolderId}
+        notesBase={notesBase}
+        onCreateFolder={() => setIsFolderModalOpen(true)}
       />
 
       {/* 右カラム: ヘッダー＋メインコンテンツ */}
@@ -307,21 +311,56 @@ export default function NotesPage() {
         {/* メインコンテンツ */}
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="max-w-6xl mx-auto flex flex-col gap-6">
-            {/* ページヘッダー: タイトル・新規作成 */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-3xl font-bold">
-                  {groupName ? `${groupName}` : "ノート一覧"}
-                </h1>
-              </div>
-              <div className="flex gap-2">
-                {/* 新規作成ポップオーバー: ノート or フォルダーを選択する */}
-                <NewItemButton
-                  currentFolderId={currentFolderId}
-                  notesBase={notesBase}
-                  onCreateFolder={() => setIsFolderModalOpen(true)}
-                />
-              </div>
+            {/* ページヘッダー: タイトル（新規作成ボタンはサイドバーに移設済み） */}
+            <div className="flex flex-col gap-1">
+              <h1 className="text-3xl font-bold">
+                {groupName ? `${groupName}` : "ノート一覧"}
+              </h1>
+              {/* 検索条件バナー: グループ名の直下に現在の検索・絞り込み条件を表示する */}
+              {isFiltering && (
+                <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
+                  {submittedQuery && (
+                    <span>「{submittedQuery}」の検索結果</span>
+                  )}
+                  {selectedTags.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span>タグ:</span>
+                      {selectedTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {selectedAuthorIds.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span>著者:</span>
+                      {selectedAuthorIds.map((id) => {
+                        const author = availableAuthors.find(
+                          (a) => a.id === id,
+                        );
+                        return (
+                          <span
+                            key={id}
+                            className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                          >
+                            {author?.username ?? id}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleClear}
+                    className="underline hover:text-foreground transition-colors ml-auto"
+                  >
+                    すべてクリア
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ブレッドクラム */}
@@ -329,32 +368,6 @@ export default function NotesPage() {
               breadcrumb={breadcrumb}
               onNavigate={handleNavigate}
             />
-
-            {/* フィルター中バナー */}
-            {isFiltering && (
-              <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
-                {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
-                {selectedTags.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span>タグ:</span>
-                    {selectedTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={handleClear}
-                  className="underline hover:text-foreground transition-colors ml-auto"
-                >
-                  すべてクリア
-                </button>
-              </div>
-            )}
 
             {/* コンテンツ一覧: フォルダー → ノートの順に表示 */}
             <div className="flex flex-col gap-4">

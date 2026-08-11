@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 type Props = {
   /** モーダルのタイトル */
   title: string;
+  /** タイトル行の右端に表示する操作（作成ボタンなど）。省略可 */
+  headerAction?: ReactNode;
   /** バックドロップクリックや「キャンセル」ボタンで呼ばれる閉じるハンドラ */
   onClose: () => void;
   /** タイトル下に表示するコンテンツ */
@@ -17,7 +19,12 @@ type Props = {
  * 固定位置のバックドロップとダイアログボックスを提供する汎用モーダル。
  * バックドロップのクリックで onClose が呼ばれ、ダイアログ内クリックはバックドロップに伝播しない。
  */
-export default function Modal({ title, onClose, children }: Props) {
+export default function Modal({
+  title,
+  headerAction,
+  onClose,
+  children,
+}: Props) {
   return createPortal(
     /* バックドロップ: クリックでモーダルを閉じる。
        document.body 直下に portal で描画し、呼び出し元の祖先要素が isolate 等で
@@ -32,7 +39,10 @@ export default function Modal({ title, onClose, children }: Props) {
         className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-4 [scrollbar-width:thin] [scrollbar-color:#9ca3af_transparent] dark:[scrollbar-color:#4b5563_transparent]"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          {headerAction}
+        </div>
         {children}
       </div>
     </div>,

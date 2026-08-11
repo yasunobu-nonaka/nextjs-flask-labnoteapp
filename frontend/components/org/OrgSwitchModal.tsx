@@ -66,9 +66,12 @@ export function OrgList({
 export default function OrgSwitchModal({
   isOpen,
   onClose,
+  onCreateClick,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  /** ヘッダーの「作成」ボタン押下時に呼ばれる（組織作成モーダルを開く） */
+  onCreateClick: () => void;
 }) {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +103,18 @@ export default function OrgSwitchModal({
   if (!isOpen) return null;
 
   return (
-    <Modal title="組織を選択" onClose={onClose}>
+    <Modal
+      title="組織を選択"
+      onClose={onClose}
+      headerAction={
+        <button
+          onClick={onCreateClick}
+          className="text-base font-semibold text-background bg-foreground hover:opacity-80 transition-opacity px-4 py-2 rounded-lg shrink-0"
+        >
+          組織を作成
+        </button>
+      }
+    >
       <section className="flex flex-col gap-3">
         <OrgList
           orgs={orgs}

@@ -9,8 +9,10 @@ import OrgCreateModal from "@/components/org/OrgCreateModal";
 
 /**
  * 組織一覧ページ。
- * 組織がない場合は作成を促す空状態を表示する。
- * 組織がある場合は HomeSidebar から選択するよう案内する。
+ * 最後に訪れた組織（localStorage の last_org_id）が現在も所属先に含まれていれば、
+ * そのままそのグループ一覧ページへ自動的にリダイレクトする。
+ * 該当がない場合（初回ログイン・最後の組織を脱退済みなど）はこのページ自身を表示し、
+ * 組織がなければ作成を促す空状態、組織があれば HomeSidebar から選択するよう案内する。
  */
 export default function OrganizationsPage() {
   const router = useRouter();
@@ -43,8 +45,18 @@ export default function OrganizationsPage() {
           return;
         }
         if (res.ok) {
-          const orgs = await res.json();
+          const orgs: { id: number }[] = await res.json();
           setHasOrgs(orgs.length > 0);
+
+          // 最後に訪れた組織が今も所属先に含まれていれば、そのグループ一覧へ自動的に戻す
+          const lastOrgId = localStorage.getItem("last_org_id");
+          if (
+            lastOrgId &&
+            orgs.some((org) => String(org.id) === lastOrgId)
+          ) {
+            router.replace(`/organizations/${lastOrgId}/groups`);
+            return;
+          }
         }
       } catch {
         // エラーは空状態として扱う

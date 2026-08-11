@@ -2,13 +2,16 @@
 
 import { authFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
 import OrgSwitchModal from "@/components/org/OrgSwitchModal";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
-import GroupListModal, { type Group } from "@/components/group/GroupListModal";
+import { type Group } from "@/components/group/GroupListModal";
+import NewItemButton from "@/components/note/NewItemButton";
+import NoteSearchModal from "@/components/note/NoteSearchModal";
 import { type OrgPolicy } from "@/lib/types";
 
 type Props = {
@@ -30,14 +33,23 @@ type Props = {
   availableAuthors: { id: number; username: string }[];
   onAuthorAdd: (authorId: number) => void;
   onAuthorRemove: (authorId: number) => void;
+  /** 新規作成ボタン用: 現在のフォルダー ID（ノート作成時の folder_id クエリに使う） */
+  currentFolderId: number | null;
+  /** 新規作成ボタン用: ノート一覧ページのベース URL */
+  notesBase: string;
+  /** 新規作成ボタン用: フォルダー作成モーダルを開くハンドラ */
+  onCreateFolder: () => void;
 };
 
 /**
  * FolderSidebar コンポーネント
- * 現在の組織名・グループ一覧、キーワード検索フォーム、タグフィルターを表示する左サイドバー。
- * 「作成」ボタンで組織・グループの作成モーダルを開く。
- * 「切り替え」ボタンで組織一覧モーダル、「一覧」ボタンでグループ一覧モーダルを開く。
- * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal / GroupListModal）に委任する。
+ * 現在の組織名・新規作成ボタン・ノート検索 & 絞り込みボタン・組織設定リンク・グループ一覧を表示する左サイドバー。
+ * キーワード検索・著者フィルター・タグフィルターは NoteSearchModal に集約している。
+ * グループ一覧は所属・未所属を問わず全件表示する（別モーダルへの切り出しは廃止）。
+ * 未所属グループは join_method に応じて参加ボタン（即時参加/申請）または「招待制」バッジを出し分ける。
+ * 組織名右の切り替えアイコンで組織一覧モーダルを開く
+ * （組織・グループの作成モーダルは、それぞれのモーダル自身のヘッダーから開く）。
+ * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal）に委任する。
  */
 export default function FolderSidebar({
   orgId,
@@ -52,6 +64,9 @@ export default function FolderSidebar({
   availableAuthors,
   onAuthorAdd,
   onAuthorRemove,
+  currentFolderId,
+  notesBase,
+  onCreateFolder,
 }: Props) {
   const [orgName, setOrgName] = useState("");
   const [orgRole, setOrgRole] = useState<string | null>(null);
@@ -59,12 +74,29 @@ export default function FolderSidebar({
   const [orgPolicy, setOrgPolicy] = useState<OrgPolicy | null>(null);
   // 全グループ（所属・未所属）を保持し、描画時にフィルターする
   const [groups, setGroups] = useState<Group[]>([]);
+  // ⋮ 管理メニューポップオーバーを開いているグループの ID（null なら全て閉じている）
+  const [openAdminMenuGroupId, setOpenAdminMenuGroupId] = useState<
+    number | null
+  >(null);
+  // 管理メニューポップオーバーの表示位置（⋮ ボタンの画面上の座標から算出する）
+  const [adminMenuPosition, setAdminMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // モーダルの開閉状態
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
   const [isOrgSwitchModalOpen, setIsOrgSwitchModalOpen] = useState(false);
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
-  const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+
+  // 未所属グループの参加処理状態（グループ ID ごと）
+  const [joinStatusMap, setJoinStatusMap] = useState<
+    Map<number, "idle" | "requesting" | "requested" | "canceling">
+  >(new Map());
+  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(
+    new Map(),
+  );
 
   const router = useRouter();
 
@@ -122,9 +154,88 @@ export default function FolderSidebar({
     return false;
   }
 
-  // サイドバーには所属グループのみ表示する（最大5件）
+  // グループへの参加申請または即時参加を行う
+  async function handleJoinGroup(targetGroupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requesting"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(targetGroupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${targetGroupId}/join`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(targetGroupId, data.message ?? "参加に失敗しました"),
+        );
+        return;
+      }
+      if (data.result === "joined") {
+        // 即時参加: 一覧を更新してそのグループのノート一覧へ遷移する
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === targetGroupId
+              ? { ...g, role: "editor", join_status: "active" }
+              : g,
+          ),
+        );
+        router.push(`/organizations/${orgId}/groups/${targetGroupId}/notes`);
+      } else {
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+      }
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(targetGroupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  // グループへの参加申請をキャンセルする
+  async function handleCancelJoinGroup(targetGroupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "canceling"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(targetGroupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${targetGroupId}/join`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(
+            targetGroupId,
+            data.message ?? "キャンセルに失敗しました",
+          ),
+        );
+        return;
+      }
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === targetGroupId ? { ...g, join_status: null } : g,
+        ),
+      );
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(targetGroupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  // 所属・未所属を問わず全グループを表示する
   const joinedGroups = groups.filter((g) => g.role !== null);
-  // グループ一覧モーダル用に所属・未所属を分ける
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
   return (
@@ -141,90 +252,130 @@ export default function FolderSidebar({
 
       {/* 現在の組織名と操作ボタン */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between px-2">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            組織
-          </span>
-          <div className="flex items-center gap-1">
-            {/* 組織作成ボタン: ログイン済みの全ユーザーに表示する */}
-            {orgRole !== null && (
-              <button
-                onClick={() => setIsOrgCreateModalOpen(true)}
-                className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              >
-                作成
-              </button>
-            )}
-            {/* 組織切り替えボタン */}
-            <button
-              onClick={() => setIsOrgSwitchModalOpen(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-            >
-              切り替え
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800">
-          <span className="text-base text-gray-700 dark:text-gray-300">
+        <div className="flex items-center justify-between px-2 py-3">
+          <span className="text-lg font-bold text-gray-700 dark:text-gray-300 truncate">
             {orgName}
           </span>
-          {/* 組織メンバー全員に表示する */}
-          {orgRole && (
-            <Link
-              href={`/organizations/${orgId}/admin`}
-              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              title="組織管理"
+          {/* 組織切り替えボタン: 「<>」を 90 度回転させた形（上下のシェブロン）のアイコン */}
+          <button
+            onClick={() => setIsOrgSwitchModalOpen(true)}
+            className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded"
+            title="組織を切り替え"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              ⚙
-            </Link>
-          )}
+              <path d="m7 15 5 5 5-5" />
+              <path d="m7 9 5-5 5 5" />
+            </svg>
+          </button>
         </div>
+        {/* 新規作成ボタン: ノート・フォルダーの作成ポップオーバー */}
+        <NewItemButton
+          currentFolderId={currentFolderId}
+          notesBase={notesBase}
+          onCreateFolder={onCreateFolder}
+        />
+        {/* ノート検索 & 絞り込みボタン: キーワード・タグ・著者の条件設定モーダルを開く */}
+        <button
+          onClick={() => setIsSearchModalOpen(true)}
+          className="flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          ノート検索 & 絞り込み
+        </button>
+        {/* 組織設定リンク: 組織メンバーに表示する */}
+        {orgRole && (
+          <Link
+            href={`/organizations/${orgId}/admin`}
+            className="flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            組織設定
+          </Link>
+        )}
       </div>
 
-      {/* グループ一覧: 所属グループを最大5件表示し、作成・一覧ボタンを提供する */}
-      <div className="flex flex-col gap-1">
+      {/* グループ一覧: 所属・未所属を含む全グループを表示し、作成ボタンを提供する */}
+      <div className="flex flex-col gap-1 mt-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             グループ
           </span>
-          <div className="flex items-center gap-1">
-            {/* グループ作成ボタン: 権限があるユーザーのみ表示する */}
-            {canCreateGroup() && (
-              <button
-                onClick={() => setIsGroupCreateModalOpen(true)}
-                className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              >
-                作成
-              </button>
-            )}
-            {/* グループ一覧モーダルを開くボタン */}
+          {/* グループ作成ボタン: 権限があるユーザーのみ表示する */}
+          {canCreateGroup() && (
             <button
-              onClick={() => setIsGroupListModalOpen(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              onClick={() => setIsGroupCreateModalOpen(true)}
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors p-1 rounded"
+              title="グループを作成"
             >
-              一覧
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
             </button>
-          </div>
+          )}
         </div>
         {joinedGroups.length > 0 && (
           <div className="flex flex-col gap-1.5 px-2">
-            {joinedGroups.slice(0, 5).map((group) => {
+            {joinedGroups.map((group) => {
               const isActive = String(group.id) === groupId;
               return (
                 <div
                   key={group.id}
                   className={clsx(
-                    "flex items-center gap-0.5 rounded transition-colors py-0.5",
+                    "group flex items-center gap-0.5 rounded transition-colors py-0.5",
                     isActive
                       ? "bg-gray-300 dark:bg-gray-600"
-                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                      : "hover:bg-gray-200 dark:hover:bg-gray-700",
                   )}
                 >
                   {/* グループ名: ノート一覧ページへのリンク */}
                   <Link
                     href={`/organizations/${orgId}/groups/${group.id}/notes`}
                     className={clsx(
-                      "flex-1 flex items-center gap-1.5 px-2 py-1.5 min-w-0",
+                      "flex-1 flex items-center gap-1.5 px-2 py-1 min-w-0",
                       isActive && "font-semibold",
                     )}
                   >
@@ -236,122 +387,148 @@ export default function FolderSidebar({
                       </span>
                     )}
                   </Link>
-                  {/* ⚙ アイコン: 全員に表示する */}
-                  {
-                    <Link
-                      href={`/organizations/${orgId}/groups/${group.id}/admin`}
-                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
-                      title={`${group.name} の管理`}
-                    >
-                      ⚙
-                    </Link>
-                  }
+                  {/* ⋮ 管理メニュー: 行にホバーしたとき、またはメニューが開いているときに表示する */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (openAdminMenuGroupId === group.id) {
+                        setOpenAdminMenuGroupId(null);
+                        return;
+                      }
+                      // ⋮ ボタンの画面上の座標からポップオーバーの表示位置を算出する
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setAdminMenuPosition({
+                        top: rect.top,
+                        left: rect.right + 4,
+                      });
+                      setOpenAdminMenuGroupId(group.id);
+                    }}
+                    className={clsx(
+                      "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
+                      openAdminMenuGroupId === group.id
+                        ? "opacity-100"
+                        : "opacity-0",
+                    )}
+                    title={`${group.name} の管理`}
+                  >
+                    ⋮
+                  </button>
+
+                  {/*
+                   * 管理メニューポップオーバー: <aside> の overflow-y-auto によるクリッピングや
+                   * 右カラム側の要素との重なりを避けるため、document.body に直接ポータルする
+                   * （Modal / ConfirmModal と同じ考え方。詳細は CLAUDE.md 参照）。
+                   * 通常の absolute 配置ではなく、ボタンの座標を基準にした fixed 配置になる。
+                   */}
+                  {openAdminMenuGroupId === group.id &&
+                    adminMenuPosition &&
+                    createPortal(
+                      <>
+                        {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setOpenAdminMenuGroupId(null)}
+                        />
+                        {/* 管理ページへのリンク一覧 */}
+                        <div
+                          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                          style={{
+                            top: adminMenuPosition.top,
+                            left: adminMenuPosition.left,
+                          }}
+                        >
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            基本設定
+                          </Link>
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin/members`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            メンバー管理
+                          </Link>
+                          <Link
+                            href={`/organizations/${orgId}/groups/${group.id}/admin/policy`}
+                            onClick={() => setOpenAdminMenuGroupId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            ポリシー管理
+                          </Link>
+                        </div>
+                      </>,
+                      document.body,
+                    )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {/* 未所属グループ: join_method に応じて参加ボタン/招待制バッジを出し分ける */}
+        {unjoinedGroups.length > 0 && (
+          <div className="flex flex-col gap-1.5 px-2 mt-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              未参加のグループ
+            </span>
+            {unjoinedGroups.map((group) => {
+              const joinMethod = group.policy?.join_method ?? "invite_only";
+              const status =
+                joinStatusMap.get(group.id) ??
+                (group.join_status === "pending" ? "requested" : "idle");
+              const error = joinErrorMap.get(group.id);
+              return (
+                <div key={group.id} className="flex flex-col gap-0.5 py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center gap-1.5 px-2 py-1 min-w-0">
+                      <span className="truncate text-gray-500 dark:text-gray-400">
+                        {group.name}
+                      </span>
+                      {group.is_private && (
+                        <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                          非公開
+                        </span>
+                      )}
+                    </div>
+                    {joinMethod === "invite_only" ? (
+                      <span className="shrink-0 text-xs text-gray-400 pr-2">
+                        招待制
+                      </span>
+                    ) : status === "requested" || status === "canceling" ? (
+                      <button
+                        type="button"
+                        disabled={status === "canceling"}
+                        onClick={() => handleCancelJoinGroup(group.id)}
+                        className="shrink-0 text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors pr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {status === "canceling" ? "キャンセル中..." : "参加申請済み ×"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={status === "requesting"}
+                        onClick={() => handleJoinGroup(group.id)}
+                        className="shrink-0 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors pr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {status === "requesting"
+                          ? "処理中..."
+                          : joinMethod === "open"
+                            ? "参加"
+                            : "参加申請"}
+                      </button>
+                    )}
+                  </div>
+                  {error && (
+                    <p className="px-2 text-xs text-red-500">{error}</p>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
-
-      {/* キーワード検索フォーム */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSearch();
-        }}
-        className="flex flex-col gap-1.5"
-      >
-        <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-          ノート検索
-        </span>
-        <div className="flex gap-1">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="タイトルで検索..."
-            className="flex-1 min-w-0 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-          />
-          <button
-            type="submit"
-            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
-          >
-            検索
-          </button>
-        </div>
-      </form>
-
-      {/* 著者フィルター: ドロップダウンで選択したメンバーをチップとして下に追加していく */}
-      {availableAuthors.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-            著者で絞り込み
-          </span>
-          <div className="px-2">
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  onAuthorAdd(Number(e.target.value));
-                }
-              }}
-              className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-            >
-              <option value="">著者を選択...</option>
-              {availableAuthors
-                .filter((author) => !selectedAuthorIds.includes(author.id))
-                .map((author) => (
-                  <option key={author.id} value={author.id}>
-                    {author.username}
-                  </option>
-                ))}
-            </select>
-          </div>
-          {selectedAuthorIds.length > 0 && (
-            <div className="flex flex-wrap gap-1 px-2">
-              {selectedAuthorIds.map((id) => {
-                const author = availableAuthors.find((a) => a.id === id);
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => onAuthorRemove(id)}
-                    title="クリックで除外"
-                    className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
-                  >
-                    {author?.username ?? id} ×
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* タグフィルター: チェックボックス一覧 */}
-      {availableTags.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-            タグで絞り込み
-          </span>
-          <div className="flex flex-col gap-1 px-2">
-            {availableTags.map((tag) => (
-              <label
-                key={tag}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTags.includes(tag)}
-                  onChange={() => onTagToggle(tag)}
-                  className="rounded border-gray-300 dark:border-gray-700"
-                />
-                <span className="text-base truncate">{tag}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 組織作成モーダル */}
       <OrgCreateModal
@@ -364,6 +541,10 @@ export default function FolderSidebar({
       <OrgSwitchModal
         isOpen={isOrgSwitchModalOpen}
         onClose={() => setIsOrgSwitchModalOpen(false)}
+        onCreateClick={() => {
+          setIsOrgSwitchModalOpen(false);
+          setIsOrgCreateModalOpen(true);
+        }}
       />
 
       {/* グループ作成モーダル */}
@@ -389,33 +570,20 @@ export default function FolderSidebar({
         }}
       />
 
-      {/* グループ一覧モーダル */}
-      <GroupListModal
-        orgId={orgId}
-        isOpen={isGroupListModalOpen}
-        onClose={() => setIsGroupListModalOpen(false)}
-        joinedGroups={joinedGroups}
-        unjoinedGroups={unjoinedGroups}
-        onImmediateJoin={(joinedGroupId) => {
-          // 即時参加: グループリストを更新してモーダルを閉じ、グループページへ遷移する
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === joinedGroupId
-                ? { ...g, role: "editor", join_status: "active" }
-                : g,
-            ),
-          );
-          setIsGroupListModalOpen(false);
-          router.push(`/organizations/${orgId}/groups/${joinedGroupId}/notes`);
-        }}
-        onCancelledRequest={(cancelledGroupId) => {
-          // 申請キャンセル: join_status を null にリセットする
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === cancelledGroupId ? { ...g, join_status: null } : g,
-            ),
-          );
-        }}
+      {/* ノート検索 & 絞り込みモーダル */}
+      <NoteSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        query={query}
+        onQueryChange={onQueryChange}
+        onSearch={onSearch}
+        selectedTags={selectedTags}
+        availableTags={availableTags}
+        onTagToggle={onTagToggle}
+        selectedAuthorIds={selectedAuthorIds}
+        availableAuthors={availableAuthors}
+        onAuthorAdd={onAuthorAdd}
+        onAuthorRemove={onAuthorRemove}
       />
     </aside>
   );
