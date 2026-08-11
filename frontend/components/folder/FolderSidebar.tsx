@@ -162,16 +162,7 @@ export default function FolderSidebar({
             組織
           </span>
           <div className="flex items-center gap-1">
-            {/* 組織作成ボタン: ログイン済みの全ユーザーに表示する */}
-            {orgRole !== null && (
-              <button
-                onClick={() => setIsOrgCreateModalOpen(true)}
-                className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              >
-                作成
-              </button>
-            )}
-            {/* 組織切り替えボタン */}
+            {/* 組織切り替えボタン: 組織作成はこのモーダル右上の「作成」ボタンから行う */}
             <button
               onClick={() => setIsOrgSwitchModalOpen(true)}
               className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
@@ -512,6 +503,10 @@ export default function FolderSidebar({
       <OrgSwitchModal
         isOpen={isOrgSwitchModalOpen}
         onClose={() => setIsOrgSwitchModalOpen(false)}
+        onCreateClick={() => {
+          setIsOrgSwitchModalOpen(false);
+          setIsOrgCreateModalOpen(true);
+        }}
       />
 
       {/* グループ作成モーダル */}
