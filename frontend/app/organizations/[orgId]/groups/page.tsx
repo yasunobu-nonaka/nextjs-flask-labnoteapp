@@ -26,6 +26,11 @@ export default function GroupsPage() {
 
   const hasJoinedGroups = groups.some((g) => g.role !== null);
 
+  // この組織を訪れたことを記録し、/organizations アクセス時に自動で戻れるようにする
+  useEffect(() => {
+    localStorage.setItem("last_org_id", orgId);
+  }, [orgId]);
+
   useEffect(() => {
     async function fetchData() {
       try {

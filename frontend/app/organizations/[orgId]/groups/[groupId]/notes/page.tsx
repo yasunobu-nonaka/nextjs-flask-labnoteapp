@@ -76,11 +76,13 @@ export default function NotesPage() {
   const router = useRouter();
 
   // このページを訪れたことを記録し、設定画面などから戻れるようにする
+  // last_org_id は /organizations アクセス時に最後にいた組織へ自動で戻すために使う
   useEffect(() => {
     localStorage.setItem(
       "last_notes_url",
       `/organizations/${orgId}/groups/${groupId}/notes`,
     );
+    localStorage.setItem("last_org_id", orgId);
   }, [orgId, groupId]);
 
   // グループ情報を取得してグループ名をセットする
