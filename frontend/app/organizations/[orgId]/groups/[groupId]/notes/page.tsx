@@ -314,6 +314,51 @@ export default function NotesPage() {
               <h1 className="text-3xl font-bold">
                 {groupName ? `${groupName}` : "ノート一覧"}
               </h1>
+              {/* 検索条件バナー: グループ名の直下に現在の検索・絞り込み条件を表示する */}
+              {isFiltering && (
+                <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
+                  {submittedQuery && (
+                    <span>「{submittedQuery}」の検索結果</span>
+                  )}
+                  {selectedTags.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span>タグ:</span>
+                      {selectedTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {selectedAuthorIds.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span>著者:</span>
+                      {selectedAuthorIds.map((id) => {
+                        const author = availableAuthors.find(
+                          (a) => a.id === id,
+                        );
+                        return (
+                          <span
+                            key={id}
+                            className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
+                          >
+                            {author?.username ?? id}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleClear}
+                    className="underline hover:text-foreground transition-colors ml-auto"
+                  >
+                    すべてクリア
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ブレッドクラム */}
@@ -321,32 +366,6 @@ export default function NotesPage() {
               breadcrumb={breadcrumb}
               onNavigate={handleNavigate}
             />
-
-            {/* フィルター中バナー */}
-            {isFiltering && (
-              <div className="flex flex-wrap items-center gap-3 text-base text-gray-500">
-                {submittedQuery && <span>「{submittedQuery}」の検索結果</span>}
-                {selectedTags.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span>タグ:</span>
-                    {selectedTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={handleClear}
-                  className="underline hover:text-foreground transition-colors ml-auto"
-                >
-                  すべてクリア
-                </button>
-              </div>
-            )}
 
             {/* コンテンツ一覧: フォルダー → ノートの順に表示 */}
             <div className="flex flex-col gap-4">

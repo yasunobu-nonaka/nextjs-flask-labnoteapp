@@ -11,6 +11,7 @@ import OrgSwitchModal from "@/components/org/OrgSwitchModal";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
 import GroupListModal, { type Group } from "@/components/group/GroupListModal";
 import NewItemButton from "@/components/note/NewItemButton";
+import NoteSearchModal from "@/components/note/NoteSearchModal";
 import { type OrgPolicy } from "@/lib/types";
 
 type Props = {
@@ -42,7 +43,8 @@ type Props = {
 
 /**
  * FolderSidebar コンポーネント
- * 現在の組織名・新規作成ボタン・グループ一覧・キーワード検索フォーム・タグフィルターを表示する左サイドバー。
+ * 現在の組織名・新規作成ボタン・ノート検索 & 絞り込みボタン・組織設定リンク・グループ一覧を表示する左サイドバー。
+ * キーワード検索・著者フィルター・タグフィルターは NoteSearchModal に集約している。
  * 組織名右の切り替えアイコンで組織一覧モーダル、グループ欄の「一覧」ボタンでグループ一覧モーダルを開く
  * （組織・グループの作成モーダルは、それぞれのモーダル自身のヘッダーから開く）。
  * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal / GroupListModal）に委任する。
@@ -85,6 +87,7 @@ export default function FolderSidebar({
   const [isOrgSwitchModalOpen, setIsOrgSwitchModalOpen] = useState(false);
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
   const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   const router = useRouter();
 
@@ -192,6 +195,27 @@ export default function FolderSidebar({
           notesBase={notesBase}
           onCreateFolder={onCreateFolder}
         />
+        {/* ノート検索 & 絞り込みボタン: キーワード・タグ・著者の条件設定モーダルを開く */}
+        <button
+          onClick={() => setIsSearchModalOpen(true)}
+          className="flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          ノート検索 & 絞り込み
+        </button>
         {/* 組織設定リンク: 組織メンバーに表示する */}
         {orgRole && (
           <Link
@@ -354,106 +378,6 @@ export default function FolderSidebar({
         )}
       </div>
 
-      {/* キーワード検索フォーム */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSearch();
-        }}
-        className="flex flex-col gap-1.5 mt-4"
-      >
-        <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-          ノート検索
-        </span>
-        <div className="flex gap-1">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="タイトルで検索..."
-            className="flex-1 min-w-0 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-          />
-          <button
-            type="submit"
-            className="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
-          >
-            検索
-          </button>
-        </div>
-      </form>
-
-      {/* 著者フィルター: ドロップダウンで選択したメンバーをチップとして下に追加していく */}
-      {availableAuthors.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-            著者で絞り込み
-          </span>
-          <div className="px-2">
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  onAuthorAdd(Number(e.target.value));
-                }
-              }}
-              className="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-1 focus:ring-foreground text-base"
-            >
-              <option value="">著者を選択...</option>
-              {availableAuthors
-                .filter((author) => !selectedAuthorIds.includes(author.id))
-                .map((author) => (
-                  <option key={author.id} value={author.id}>
-                    {author.username}
-                  </option>
-                ))}
-            </select>
-          </div>
-          {selectedAuthorIds.length > 0 && (
-            <div className="flex flex-wrap gap-1 px-2">
-              {selectedAuthorIds.map((id) => {
-                const author = availableAuthors.find((a) => a.id === id);
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => onAuthorRemove(id)}
-                    title="クリックで除外"
-                    className="px-2 py-0.5 rounded-full bg-foreground text-background text-sm"
-                  >
-                    {author?.username ?? id} ×
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* タグフィルター: チェックボックス一覧 */}
-      {availableTags.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
-            タグで絞り込み
-          </span>
-          <div className="flex flex-col gap-1 px-2">
-            {availableTags.map((tag) => (
-              <label
-                key={tag}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTags.includes(tag)}
-                  onChange={() => onTagToggle(tag)}
-                  className="rounded border-gray-300 dark:border-gray-700"
-                />
-                <span className="text-base truncate">{tag}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* 組織作成モーダル */}
       <OrgCreateModal
         isOpen={isOrgCreateModalOpen}
@@ -521,6 +445,22 @@ export default function FolderSidebar({
             ),
           );
         }}
+      />
+
+      {/* ノート検索 & 絞り込みモーダル */}
+      <NoteSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        query={query}
+        onQueryChange={onQueryChange}
+        onSearch={onSearch}
+        selectedTags={selectedTags}
+        availableTags={availableTags}
+        onTagToggle={onTagToggle}
+        selectedAuthorIds={selectedAuthorIds}
+        availableAuthors={availableAuthors}
+        onAuthorAdd={onAuthorAdd}
+        onAuthorRemove={onAuthorRemove}
       />
     </aside>
   );
