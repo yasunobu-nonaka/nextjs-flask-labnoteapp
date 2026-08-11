@@ -25,7 +25,11 @@ type Props = {
 /**
  * HomeSidebar コンポーネント
  * ホーム・組織・グループページ共通の左サイドバー。
- * 所属組織の一覧を表示し、組織が選択されている場合はそのグループ一覧（所属・未所属を問わず全件）も表示する。
+ * 組織セクションは selectedOrgId の有無で表示を切り替える:
+ *   - 未選択（/organizations 直下）: 所属組織の一覧を、行ごとの ⋮ 管理メニューとともに表示する
+ *   - 選択中（/organizations/<id>/groups など）: FolderSidebar と同じ単体表示
+ *     （組織名 + 切り替えアイコン + 「⚙ 組織設定」リンク）に切り替わる
+ * 組織が選択されている場合はそのグループ一覧（所属・未所属を問わず全件）も表示する。
  * 未所属グループは join_method に応じて参加ボタン（即時参加/申請）または「招待制」バッジを出し分ける。
  * グループ作成は「作成」ボタンから行う（一覧モーダルは廃止）。
  */
@@ -183,8 +187,9 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
   const joinedGroups = groups.filter((g) => g.role !== null);
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
-  // 選択中の組織ロール（グループ管理リンクの表示判定に使う）
-  const selectedOrgRole = orgs.find((o) => String(o.id) === selectedOrgId)?.role ?? null;
+  // 選択中の組織（組織セクションの単体表示・グループ管理リンクの表示判定に使う）
+  const selectedOrg = orgs.find((o) => String(o.id) === selectedOrgId);
+  const selectedOrgRole = selectedOrg?.role ?? null;
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 pt-4 pb-6 px-3 flex flex-col gap-4">
@@ -198,134 +203,188 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
         </Link>
       </div>
 
-      {/* 組織一覧セクション */}
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between px-2">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            組織
-          </span>
-          <div className="flex items-center gap-1">
-            {/* 組織切り替えボタン: 組織作成はこのモーダル右上の「作成」ボタンから行う */}
+      {/* 組織セクション: 組織が選択されている場合は FolderSidebar と同じ単体表示、
+          未選択（/organizations 直下）の場合は所属組織の一覧を表示する */}
+      {selectedOrgId ? (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between px-2 py-3">
+            <span className="text-lg font-bold text-gray-700 dark:text-gray-300 truncate">
+              {selectedOrg?.name}
+            </span>
+            {/* 組織切り替えボタン: 「<>」を 90 度回転させた形（上下のシェブロン）のアイコン */}
             <button
               onClick={() => setIsOrgSwitchModalOpen(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded"
+              title="組織を切り替え"
             >
-              切り替え
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m7 15 5 5 5-5" />
+                <path d="m7 9 5-5 5 5" />
+              </svg>
             </button>
           </div>
+          {/* 組織設定リンク: 組織メンバーに表示する */}
+          {selectedOrgRole && (
+            <Link
+              href={`/organizations/${selectedOrgId}/admin`}
+              className="flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              組織設定
+            </Link>
+          )}
         </div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between px-2">
+            <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              組織
+            </span>
+            <div className="flex items-center gap-1">
+              {/* 組織切り替えボタン: 組織作成はこのモーダル右上の「作成」ボタンから行う */}
+              <button
+                onClick={() => setIsOrgSwitchModalOpen(true)}
+                className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              >
+                切り替え
+              </button>
+            </div>
+          </div>
 
-        {orgs.length > 0 ? (
-          <div className="flex flex-col gap-1.5 px-2">
-            {orgs.map((org) => {
-              const isSelected = String(org.id) === selectedOrgId;
-              const canManageOrg = ["owner", "sys_admin", "user_admin"].includes(org.role);
-              return (
-                <div
-                  key={org.id}
-                  className={clsx(
-                    "group flex items-center gap-0.5 rounded-lg transition-colors",
-                    isSelected
-                      ? "bg-gray-300 dark:bg-gray-600"
-                      : "hover:bg-gray-200 dark:hover:bg-gray-700",
-                  )}
-                >
-                  {/* 組織名: グループ一覧ページへのリンク */}
-                  <Link
-                    href={`/organizations/${org.id}/groups`}
+          {orgs.length > 0 ? (
+            <div className="flex flex-col gap-1.5 px-2">
+              {orgs.map((org) => {
+                const isSelected = String(org.id) === selectedOrgId;
+                const canManageOrg = ["owner", "sys_admin", "user_admin"].includes(org.role);
+                return (
+                  <div
+                    key={org.id}
                     className={clsx(
-                      "flex-1 flex items-center px-2 py-1.5 min-w-0",
-                      isSelected && "font-semibold",
+                      "group flex items-center gap-0.5 rounded-lg transition-colors",
+                      isSelected
+                        ? "bg-gray-300 dark:bg-gray-600"
+                        : "hover:bg-gray-200 dark:hover:bg-gray-700",
                     )}
                   >
-                    <span className="truncate text-base">{org.name}</span>
-                  </Link>
-                  {/* ⋮ 管理メニュー: owner / sys_admin / user_admin のみ、行にホバーしたときだけ表示する */}
-                  {canManageOrg && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (openOrgAdminMenuId === org.id) {
-                          setOpenOrgAdminMenuId(null);
-                          return;
-                        }
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setOrgAdminMenuPosition({
-                          top: rect.top,
-                          left: rect.right + 4,
-                        });
-                        setOpenOrgAdminMenuId(org.id);
-                      }}
+                    {/* 組織名: グループ一覧ページへのリンク */}
+                    <Link
+                      href={`/organizations/${org.id}/groups`}
                       className={clsx(
-                        "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
-                        openOrgAdminMenuId === org.id
-                          ? "opacity-100"
-                          : "opacity-0",
+                        "flex-1 flex items-center px-2 py-1.5 min-w-0",
+                        isSelected && "font-semibold",
                       )}
-                      title={`${org.name} の管理`}
                     >
-                      ⋮
-                    </button>
-                  )}
-
-                  {/* 組織管理メニューポップオーバー: <aside> の overflow-y-auto によるクリッピングを避けるため document.body にポータルする */}
-                  {openOrgAdminMenuId === org.id &&
-                    orgAdminMenuPosition &&
-                    createPortal(
-                      <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setOpenOrgAdminMenuId(null)}
-                        />
-                        <div
-                          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
-                          style={{
-                            top: orgAdminMenuPosition.top,
-                            left: orgAdminMenuPosition.left,
-                          }}
-                        >
-                          <Link
-                            href={`/organizations/${org.id}/admin`}
-                            onClick={() => setOpenOrgAdminMenuId(null)}
-                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                          >
-                            基本設定
-                          </Link>
-                          <Link
-                            href={`/organizations/${org.id}/admin/groups`}
-                            onClick={() => setOpenOrgAdminMenuId(null)}
-                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                          >
-                            グループ管理
-                          </Link>
-                          <Link
-                            href={`/organizations/${org.id}/admin/members`}
-                            onClick={() => setOpenOrgAdminMenuId(null)}
-                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                          >
-                            メンバー管理
-                          </Link>
-                          <Link
-                            href={`/organizations/${org.id}/admin/policy`}
-                            onClick={() => setOpenOrgAdminMenuId(null)}
-                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                          >
-                            ポリシー管理
-                          </Link>
-                        </div>
-                      </>,
-                      document.body,
+                      <span className="truncate text-base">{org.name}</span>
+                    </Link>
+                    {/* ⋮ 管理メニュー: owner / sys_admin / user_admin のみ、行にホバーしたときだけ表示する */}
+                    {canManageOrg && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (openOrgAdminMenuId === org.id) {
+                            setOpenOrgAdminMenuId(null);
+                            return;
+                          }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setOrgAdminMenuPosition({
+                            top: rect.top,
+                            left: rect.right + 4,
+                          });
+                          setOpenOrgAdminMenuId(org.id);
+                        }}
+                        className={clsx(
+                          "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
+                          openOrgAdminMenuId === org.id
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                        title={`${org.name} の管理`}
+                      >
+                        ⋮
+                      </button>
                     )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="px-2 text-sm text-gray-400 dark:text-gray-500">
-            まだ組織に所属していません
-          </p>
-        )}
-      </div>
+
+                    {/* 組織管理メニューポップオーバー: <aside> の overflow-y-auto によるクリッピングを避けるため document.body にポータルする */}
+                    {openOrgAdminMenuId === org.id &&
+                      orgAdminMenuPosition &&
+                      createPortal(
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setOpenOrgAdminMenuId(null)}
+                          />
+                          <div
+                            className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                            style={{
+                              top: orgAdminMenuPosition.top,
+                              left: orgAdminMenuPosition.left,
+                            }}
+                          >
+                            <Link
+                              href={`/organizations/${org.id}/admin`}
+                              onClick={() => setOpenOrgAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              基本設定
+                            </Link>
+                            <Link
+                              href={`/organizations/${org.id}/admin/groups`}
+                              onClick={() => setOpenOrgAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              グループ管理
+                            </Link>
+                            <Link
+                              href={`/organizations/${org.id}/admin/members`}
+                              onClick={() => setOpenOrgAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              メンバー管理
+                            </Link>
+                            <Link
+                              href={`/organizations/${org.id}/admin/policy`}
+                              onClick={() => setOpenOrgAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              ポリシー管理
+                            </Link>
+                          </div>
+                        </>,
+                        document.body,
+                      )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="px-2 text-sm text-gray-400 dark:text-gray-500">
+              まだ組織に所属していません
+            </p>
+          )}
+        </div>
+      )}
 
       {/* グループ一覧セクション: 組織が選択されている場合のみ表示する */}
       {selectedOrgId && (
