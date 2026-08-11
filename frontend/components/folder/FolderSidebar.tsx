@@ -339,9 +339,21 @@ export default function FolderSidebar({
           {canCreateGroup() && (
             <button
               onClick={() => setIsGroupCreateModalOpen(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors p-1 rounded"
+              title="グループを作成"
             >
-              作成
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
             </button>
           )}
         </div>
