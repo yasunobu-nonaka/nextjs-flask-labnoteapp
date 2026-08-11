@@ -69,12 +69,6 @@ export default function FolderSidebar({
     top: number;
     left: number;
   } | null>(null);
-  // 組織の ⋮ 管理メニューポップオーバーの開閉と表示位置
-  const [isOrgAdminMenuOpen, setIsOrgAdminMenuOpen] = useState(false);
-  const [orgAdminMenuPosition, setOrgAdminMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
 
   // モーダルの開閉状態
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
@@ -157,102 +151,54 @@ export default function FolderSidebar({
 
       {/* 現在の組織名と操作ボタン */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between px-2">
-          <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            組織
-          </span>
-          <div className="flex items-center gap-1">
-            {/* 組織切り替えボタン: 組織作成はこのモーダル右上の「作成」ボタンから行う */}
-            <button
-              onClick={() => setIsOrgSwitchModalOpen(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-            >
-              切り替え
-            </button>
-          </div>
-        </div>
-        <div className="group flex items-center justify-between px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800">
-          <span className="text-base text-gray-700 dark:text-gray-300">
+        <div className="flex items-center justify-between px-2 py-3">
+          <span className="text-lg font-bold text-gray-700 dark:text-gray-300 truncate">
             {orgName}
           </span>
-          {/* ⋮ 組織管理メニュー: 行にホバーしたとき、またはメニューが開いているときに表示する */}
-          {orgRole && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isOrgAdminMenuOpen) {
-                  setIsOrgAdminMenuOpen(false);
-                  return;
-                }
-                // ⋮ ボタンの画面上の座標からポップオーバーの表示位置を算出する
-                const rect = e.currentTarget.getBoundingClientRect();
-                setOrgAdminMenuPosition({
-                  top: rect.top,
-                  left: rect.right + 4,
-                });
-                setIsOrgAdminMenuOpen(true);
-              }}
-              className={clsx(
-                "text-lg leading-none text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded group-hover:opacity-100",
-                isOrgAdminMenuOpen ? "opacity-100" : "opacity-0",
-              )}
-              title="組織管理"
+          {/* 組織切り替えボタン: 「<>」を 90 度回転させた形（上下のシェブロン）のアイコン */}
+          <button
+            onClick={() => setIsOrgSwitchModalOpen(true)}
+            className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded"
+            title="組織を切り替え"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              ⋮
-            </button>
-          )}
-
-          {/* 組織管理メニューポップオーバー: グループの ⋮ メニューと同じ理由で document.body にポータルする */}
-          {isOrgAdminMenuOpen &&
-            orgAdminMenuPosition &&
-            createPortal(
-              <>
-                {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsOrgAdminMenuOpen(false)}
-                />
-                {/* 管理ページへのリンク一覧 */}
-                <div
-                  className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
-                  style={{
-                    top: orgAdminMenuPosition.top,
-                    left: orgAdminMenuPosition.left,
-                  }}
-                >
-                  <Link
-                    href={`/organizations/${orgId}/admin`}
-                    onClick={() => setIsOrgAdminMenuOpen(false)}
-                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    基本設定
-                  </Link>
-                  <Link
-                    href={`/organizations/${orgId}/admin/groups`}
-                    onClick={() => setIsOrgAdminMenuOpen(false)}
-                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    グループ管理
-                  </Link>
-                  <Link
-                    href={`/organizations/${orgId}/admin/members`}
-                    onClick={() => setIsOrgAdminMenuOpen(false)}
-                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    メンバー管理
-                  </Link>
-                  <Link
-                    href={`/organizations/${orgId}/admin/policy`}
-                    onClick={() => setIsOrgAdminMenuOpen(false)}
-                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    ポリシー管理
-                  </Link>
-                </div>
-              </>,
-              document.body,
-            )}
+              <path d="m7 15 5 5 5-5" />
+              <path d="m7 9 5-5 5 5" />
+            </svg>
+          </button>
         </div>
+        {/* 組織設定リンク: 組織メンバーに表示する */}
+        {orgRole && (
+          <Link
+            href={`/organizations/${orgId}/admin`}
+            className="flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            組織設定
+          </Link>
+        )}
       </div>
 
       {/* グループ一覧: 所属グループを最大5件表示し、作成・一覧ボタンを提供する */}
