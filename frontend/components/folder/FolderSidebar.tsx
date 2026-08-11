@@ -217,7 +217,7 @@ export default function FolderSidebar({
                     "flex items-center gap-0.5 rounded transition-colors py-0.5",
                     isActive
                       ? "bg-gray-300 dark:bg-gray-600"
-                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                      : "hover:bg-gray-200 dark:hover:bg-gray-700",
                   )}
                 >
                   {/* グループ名: ノート一覧ページへのリンク */}
