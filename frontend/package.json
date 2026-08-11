@@ -38,6 +38,7 @@
     "jest-environment-jsdom": "^30.4.1",
     "msw": "^2.15.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "undici": "^6.28.0"
   }
 }
