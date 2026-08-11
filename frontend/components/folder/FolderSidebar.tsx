@@ -202,7 +202,7 @@ export default function FolderSidebar({
       </div>
 
       {/* グループ一覧: 所属グループを最大5件表示し、作成・一覧ボタンを提供する */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 mt-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             グループ
@@ -344,7 +344,7 @@ export default function FolderSidebar({
           e.preventDefault();
           onSearch();
         }}
-        className="flex flex-col gap-1.5"
+        className="flex flex-col gap-1.5 mt-4"
       >
         <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
           ノート検索
