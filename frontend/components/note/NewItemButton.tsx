@@ -32,9 +32,22 @@ export default function NewItemButton({
       )}
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="px-4 py-2 rounded-lg bg-foreground text-background text-base font-semibold hover:opacity-80 transition-opacity"
+        className="w-full flex items-center gap-1.5 pl-4 pr-2 py-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
       >
-        新規作成
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="shrink-0"
+        >
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+        </svg>
+        ノート・フォルダー新規作成
       </button>
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32">

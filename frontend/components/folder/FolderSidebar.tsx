@@ -10,6 +10,7 @@ import OrgCreateModal from "@/components/org/OrgCreateModal";
 import OrgSwitchModal from "@/components/org/OrgSwitchModal";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
 import GroupListModal, { type Group } from "@/components/group/GroupListModal";
+import NewItemButton from "@/components/note/NewItemButton";
 import { type OrgPolicy } from "@/lib/types";
 
 type Props = {
@@ -31,13 +32,19 @@ type Props = {
   availableAuthors: { id: number; username: string }[];
   onAuthorAdd: (authorId: number) => void;
   onAuthorRemove: (authorId: number) => void;
+  /** 新規作成ボタン用: 現在のフォルダー ID（ノート作成時の folder_id クエリに使う） */
+  currentFolderId: number | null;
+  /** 新規作成ボタン用: ノート一覧ページのベース URL */
+  notesBase: string;
+  /** 新規作成ボタン用: フォルダー作成モーダルを開くハンドラ */
+  onCreateFolder: () => void;
 };
 
 /**
  * FolderSidebar コンポーネント
- * 現在の組織名・グループ一覧、キーワード検索フォーム、タグフィルターを表示する左サイドバー。
- * 「作成」ボタンで組織・グループの作成モーダルを開く。
- * 「切り替え」ボタンで組織一覧モーダル、「一覧」ボタンでグループ一覧モーダルを開く。
+ * 現在の組織名・新規作成ボタン・グループ一覧・キーワード検索フォーム・タグフィルターを表示する左サイドバー。
+ * 組織名右の切り替えアイコンで組織一覧モーダル、グループ欄の「一覧」ボタンでグループ一覧モーダルを開く
+ * （組織・グループの作成モーダルは、それぞれのモーダル自身のヘッダーから開く）。
  * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal / GroupListModal）に委任する。
  */
 export default function FolderSidebar({
@@ -53,6 +60,9 @@ export default function FolderSidebar({
   availableAuthors,
   onAuthorAdd,
   onAuthorRemove,
+  currentFolderId,
+  notesBase,
+  onCreateFolder,
 }: Props) {
   const [orgName, setOrgName] = useState("");
   const [orgRole, setOrgRole] = useState<string | null>(null);
@@ -176,6 +186,12 @@ export default function FolderSidebar({
             </svg>
           </button>
         </div>
+        {/* 新規作成ボタン: ノート・フォルダーの作成ポップオーバー */}
+        <NewItemButton
+          currentFolderId={currentFolderId}
+          notesBase={notesBase}
+          onCreateFolder={onCreateFolder}
+        />
         {/* 組織設定リンク: 組織メンバーに表示する */}
         {orgRole && (
           <Link

@@ -9,7 +9,6 @@ import FolderSidebar from "@/components/folder/FolderSidebar";
 import FolderCard from "@/components/folder/FolderCard";
 import NoteCard, { type Note } from "@/components/note/NoteCard";
 import FolderCreateModal from "@/components/folder/FolderCreateModal";
-import NewItemButton from "@/components/note/NewItemButton";
 import FolderBreadcrumb from "@/components/folder/FolderBreadcrumb";
 import { type Folder } from "@/lib/folders";
 
@@ -298,6 +297,9 @@ export default function NotesPage() {
         availableAuthors={availableAuthors}
         onAuthorAdd={handleAuthorAdd}
         onAuthorRemove={handleAuthorRemove}
+        currentFolderId={currentFolderId}
+        notesBase={notesBase}
+        onCreateFolder={() => setIsFolderModalOpen(true)}
       />
 
       {/* 右カラム: ヘッダー＋メインコンテンツ */}
@@ -307,21 +309,11 @@ export default function NotesPage() {
         {/* メインコンテンツ */}
         <div className="flex-1 overflow-y-auto px-6 py-10">
           <div className="max-w-6xl mx-auto flex flex-col gap-6">
-            {/* ページヘッダー: タイトル・新規作成 */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-3xl font-bold">
-                  {groupName ? `${groupName}` : "ノート一覧"}
-                </h1>
-              </div>
-              <div className="flex gap-2">
-                {/* 新規作成ポップオーバー: ノート or フォルダーを選択する */}
-                <NewItemButton
-                  currentFolderId={currentFolderId}
-                  notesBase={notesBase}
-                  onCreateFolder={() => setIsFolderModalOpen(true)}
-                />
-              </div>
+            {/* ページヘッダー: タイトル（新規作成ボタンはサイドバーに移設済み） */}
+            <div className="flex flex-col gap-1">
+              <h1 className="text-3xl font-bold">
+                {groupName ? `${groupName}` : "ノート一覧"}
+              </h1>
             </div>
 
             {/* ブレッドクラム */}
