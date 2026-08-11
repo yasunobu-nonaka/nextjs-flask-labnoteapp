@@ -214,7 +214,7 @@ export default function FolderSidebar({
                 <div
                   key={group.id}
                   className={clsx(
-                    "flex items-center gap-0.5 rounded transition-colors py-0.5",
+                    "group flex items-center gap-0.5 rounded transition-colors py-0.5",
                     isActive
                       ? "bg-gray-300 dark:bg-gray-600"
                       : "hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -236,16 +236,14 @@ export default function FolderSidebar({
                       </span>
                     )}
                   </Link>
-                  {/* ⚙ アイコン: 全員に表示する */}
-                  {
-                    <Link
-                      href={`/organizations/${orgId}/groups/${group.id}/admin`}
-                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
-                      title={`${group.name} の管理`}
-                    >
-                      ⚙
-                    </Link>
-                  }
+                  {/* ⋮ アイコン: 行にホバーしたときだけ表示する */}
+                  <Link
+                    href={`/organizations/${orgId}/groups/${group.id}/admin`}
+                    className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none opacity-0 group-hover:opacity-100"
+                    title={`${group.name} の管理`}
+                  >
+                    ⋮
+                  </Link>
                 </div>
               );
             })}
