@@ -503,7 +503,7 @@ export default function FolderSidebar({
                         onClick={() => handleCancelJoinGroup(group.id)}
                         className="shrink-0 text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors pr-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {status === "canceling" ? "キャンセル中..." : "申請済み ×"}
+                        {status === "canceling" ? "キャンセル中..." : "参加申請済み ×"}
                       </button>
                     ) : (
                       <button
@@ -516,7 +516,7 @@ export default function FolderSidebar({
                           ? "処理中..."
                           : joinMethod === "open"
                             ? "参加"
-                            : "申請"}
+                            : "参加申請"}
                       </button>
                     )}
                   </div>
