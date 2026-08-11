@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
@@ -34,6 +35,22 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
   const [isOrgSwitchModalOpen, setIsOrgSwitchModalOpen] = useState(false);
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
   const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
+  // 組織の ⋮ 管理メニューポップオーバーを開いている組織の ID とその表示位置
+  const [openOrgAdminMenuId, setOpenOrgAdminMenuId] = useState<number | null>(
+    null,
+  );
+  const [orgAdminMenuPosition, setOrgAdminMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  // グループの ⋮ 管理メニューポップオーバーを開いているグループの ID とその表示位置
+  const [openGroupAdminMenuId, setOpenGroupAdminMenuId] = useState<
+    number | null
+  >(null);
+  const [groupAdminMenuPosition, setGroupAdminMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -125,10 +142,10 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
                 <div
                   key={org.id}
                   className={clsx(
-                    "flex items-center gap-0.5 rounded-lg transition-colors",
+                    "group flex items-center gap-0.5 rounded-lg transition-colors",
                     isSelected
                       ? "bg-gray-300 dark:bg-gray-600"
-                      : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                      : "hover:bg-gray-200 dark:hover:bg-gray-700",
                   )}
                 >
                   {/* 組織名: グループ一覧ページへのリンク */}
@@ -141,16 +158,82 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
                   >
                     <span className="truncate text-base">{org.name}</span>
                   </Link>
-                  {/* ⚙ アイコン: owner / sys_admin / user_admin のみ表示する */}
+                  {/* ⋮ 管理メニュー: owner / sys_admin / user_admin のみ、行にホバーしたときだけ表示する */}
                   {canManageOrg && (
-                    <Link
-                      href={`/organizations/${org.id}/admin`}
-                      className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (openOrgAdminMenuId === org.id) {
+                          setOpenOrgAdminMenuId(null);
+                          return;
+                        }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setOrgAdminMenuPosition({
+                          top: rect.top,
+                          left: rect.right + 4,
+                        });
+                        setOpenOrgAdminMenuId(org.id);
+                      }}
+                      className={clsx(
+                        "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
+                        openOrgAdminMenuId === org.id
+                          ? "opacity-100"
+                          : "opacity-0",
+                      )}
                       title={`${org.name} の管理`}
                     >
-                      ⚙
-                    </Link>
+                      ⋮
+                    </button>
                   )}
+
+                  {/* 組織管理メニューポップオーバー: <aside> の overflow-y-auto によるクリッピングを避けるため document.body にポータルする */}
+                  {openOrgAdminMenuId === org.id &&
+                    orgAdminMenuPosition &&
+                    createPortal(
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setOpenOrgAdminMenuId(null)}
+                        />
+                        <div
+                          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                          style={{
+                            top: orgAdminMenuPosition.top,
+                            left: orgAdminMenuPosition.left,
+                          }}
+                        >
+                          <Link
+                            href={`/organizations/${org.id}/admin`}
+                            onClick={() => setOpenOrgAdminMenuId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            基本設定
+                          </Link>
+                          <Link
+                            href={`/organizations/${org.id}/admin/groups`}
+                            onClick={() => setOpenOrgAdminMenuId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            グループ管理
+                          </Link>
+                          <Link
+                            href={`/organizations/${org.id}/admin/members`}
+                            onClick={() => setOpenOrgAdminMenuId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            メンバー管理
+                          </Link>
+                          <Link
+                            href={`/organizations/${org.id}/admin/policy`}
+                            onClick={() => setOpenOrgAdminMenuId(null)}
+                            className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            ポリシー管理
+                          </Link>
+                        </div>
+                      </>,
+                      document.body,
+                    )}
                 </div>
               );
             })}
@@ -198,7 +281,7 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
                 return (
                   <div
                     key={group.id}
-                    className="flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    className="group flex items-center gap-0.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                   >
                     {/* グループ名: ノート一覧ページへのリンク */}
                     <Link
@@ -212,16 +295,75 @@ export default function HomeSidebar({ selectedOrgId }: Props = {}) {
                         </span>
                       )}
                     </Link>
-                    {/* ⚙ アイコン: グループ管理者または組織管理者のみ表示する */}
+                    {/* ⋮ 管理メニュー: グループ管理者または組織管理者のみ、行にホバーしたときだけ表示する */}
                     {canManageGroup && (
-                      <Link
-                        href={`/organizations/${selectedOrgId}/groups/${group.id}/admin`}
-                        className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg"
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (openGroupAdminMenuId === group.id) {
+                            setOpenGroupAdminMenuId(null);
+                            return;
+                          }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setGroupAdminMenuPosition({
+                            top: rect.top,
+                            left: rect.right + 4,
+                          });
+                          setOpenGroupAdminMenuId(group.id);
+                        }}
+                        className={clsx(
+                          "shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1.5 py-1 rounded text-lg leading-none group-hover:opacity-100",
+                          openGroupAdminMenuId === group.id
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
                         title={`${group.name} の管理`}
                       >
-                        ⚙
-                      </Link>
+                        ⋮
+                      </button>
                     )}
+
+                    {/* グループ管理メニューポップオーバー: document.body にポータルする */}
+                    {openGroupAdminMenuId === group.id &&
+                      groupAdminMenuPosition &&
+                      createPortal(
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setOpenGroupAdminMenuId(null)}
+                          />
+                          <div
+                            className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                            style={{
+                              top: groupAdminMenuPosition.top,
+                              left: groupAdminMenuPosition.left,
+                            }}
+                          >
+                            <Link
+                              href={`/organizations/${selectedOrgId}/groups/${group.id}/admin`}
+                              onClick={() => setOpenGroupAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              基本設定
+                            </Link>
+                            <Link
+                              href={`/organizations/${selectedOrgId}/groups/${group.id}/admin/members`}
+                              onClick={() => setOpenGroupAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              メンバー管理
+                            </Link>
+                            <Link
+                              href={`/organizations/${selectedOrgId}/groups/${group.id}/admin/policy`}
+                              onClick={() => setOpenGroupAdminMenuId(null)}
+                              className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              ポリシー管理
+                            </Link>
+                          </div>
+                        </>,
+                        document.body,
+                      )}
                   </div>
                 );
               })}
