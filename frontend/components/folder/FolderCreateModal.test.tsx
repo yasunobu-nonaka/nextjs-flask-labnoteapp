@@ -19,10 +19,13 @@ const server = setupServer(
   ),
 );
 
-// テストファイル全体で1回だけサーバーを起動し、各テストの後にハンドラーをリセットし、
-// 全テスト終了後に停止する（Jest の beforeAll/afterEach/afterAll フック）
+// テストファイル全体で1回だけサーバーを起動し、各テストの後にハンドラーとイベントリスナーを
+// リセットし、全テスト終了後に停止する（Jest の beforeAll/afterEach/afterAll フック）
 beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  server.events.removeAllListeners();
+});
 afterAll(() => server.close());
 
 describe("FolderCreateModal", () => {
@@ -53,5 +56,34 @@ describe("FolderCreateModal", () => {
       expect(onCreated).toHaveBeenCalledTimes(1);
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("フォルダー名が空のときは送信されない（リクエストが飛ばない）", async () => {
+    const user = userEvent.setup();
+    const onClose = jest.fn();
+    const onCreated = jest.fn();
+
+    // MSW のライフサイクルイベントを使って「実際にリクエストが飛んだか」を検知する。
+    // ハンドラーの戻り値ではなく、リクエストが送信された事実そのものを検証したいときに使う。
+    const requestListener = jest.fn();
+    server.events.on("request:start", requestListener);
+
+    render(
+      <FolderCreateModal
+        isOpen={true}
+        onClose={onClose}
+        orgId={1}
+        groupId={2}
+        currentFolderId={null}
+        onCreated={onCreated}
+      />,
+    );
+
+    // フォルダー名を入力せずにそのまま「作成」を押す
+    await user.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(requestListener).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
