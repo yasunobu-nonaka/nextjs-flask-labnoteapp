@@ -115,11 +115,11 @@ export default function NoteSearchModal({
         {availableTags.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold">タグで絞り込み</label>
-            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
               {availableTags.map((tag) => (
                 <label
                   key={tag}
-                  className="flex items-center gap-1.5 cursor-pointer"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full border border-gray-300 dark:border-gray-700 cursor-pointer whitespace-nowrap"
                 >
                   <input
                     type="checkbox"
@@ -127,7 +127,7 @@ export default function NoteSearchModal({
                     onChange={() => onTagToggle(tag)}
                     className="rounded border-gray-300 dark:border-gray-700"
                   />
-                  <span className="text-base truncate">{tag}</span>
+                  <span className="text-base">{tag}</span>
                 </label>
               ))}
             </div>

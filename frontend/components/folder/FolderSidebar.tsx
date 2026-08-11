@@ -9,7 +9,7 @@ import clsx from "clsx";
 import OrgCreateModal from "@/components/org/OrgCreateModal";
 import OrgSwitchModal from "@/components/org/OrgSwitchModal";
 import GroupCreateModal from "@/components/group/GroupCreateModal";
-import GroupListModal, { type Group } from "@/components/group/GroupListModal";
+import { type Group } from "@/components/group/GroupListModal";
 import NewItemButton from "@/components/note/NewItemButton";
 import NoteSearchModal from "@/components/note/NoteSearchModal";
 import { type OrgPolicy } from "@/lib/types";
@@ -45,9 +45,11 @@ type Props = {
  * FolderSidebar コンポーネント
  * 現在の組織名・新規作成ボタン・ノート検索 & 絞り込みボタン・組織設定リンク・グループ一覧を表示する左サイドバー。
  * キーワード検索・著者フィルター・タグフィルターは NoteSearchModal に集約している。
- * 組織名右の切り替えアイコンで組織一覧モーダル、グループ欄の「一覧」ボタンでグループ一覧モーダルを開く
+ * グループ一覧は所属・未所属を問わず全件表示する（別モーダルへの切り出しは廃止）。
+ * 未所属グループは join_method に応じて参加ボタン（即時参加/申請）または「招待制」バッジを出し分ける。
+ * 組織名右の切り替えアイコンで組織一覧モーダルを開く
  * （組織・グループの作成モーダルは、それぞれのモーダル自身のヘッダーから開く）。
- * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal / GroupListModal）に委任する。
+ * 各モーダルは専用コンポーネント（OrgCreateModal / OrgSwitchModal / GroupCreateModal）に委任する。
  */
 export default function FolderSidebar({
   orgId,
@@ -86,8 +88,15 @@ export default function FolderSidebar({
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
   const [isOrgSwitchModalOpen, setIsOrgSwitchModalOpen] = useState(false);
   const [isGroupCreateModalOpen, setIsGroupCreateModalOpen] = useState(false);
-  const [isGroupListModalOpen, setIsGroupListModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+
+  // 未所属グループの参加処理状態（グループ ID ごと）
+  const [joinStatusMap, setJoinStatusMap] = useState<
+    Map<number, "idle" | "requesting" | "requested" | "canceling">
+  >(new Map());
+  const [joinErrorMap, setJoinErrorMap] = useState<Map<number, string>>(
+    new Map(),
+  );
 
   const router = useRouter();
 
@@ -145,9 +154,88 @@ export default function FolderSidebar({
     return false;
   }
 
-  // サイドバーには所属グループのみ表示する（最大5件）
+  // グループへの参加申請または即時参加を行う
+  async function handleJoinGroup(targetGroupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requesting"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(targetGroupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${targetGroupId}/join`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(targetGroupId, data.message ?? "参加に失敗しました"),
+        );
+        return;
+      }
+      if (data.result === "joined") {
+        // 即時参加: 一覧を更新してそのグループのノート一覧へ遷移する
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === targetGroupId
+              ? { ...g, role: "editor", join_status: "active" }
+              : g,
+          ),
+        );
+        router.push(`/organizations/${orgId}/groups/${targetGroupId}/notes`);
+      } else {
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+      }
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(targetGroupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  // グループへの参加申請をキャンセルする
+  async function handleCancelJoinGroup(targetGroupId: number) {
+    setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "canceling"));
+    setJoinErrorMap((prev) => {
+      const m = new Map(prev);
+      m.delete(targetGroupId);
+      return m;
+    });
+    try {
+      const res = await authFetch(
+        `/api/organizations/${orgId}/groups/${targetGroupId}/join`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+        setJoinErrorMap((prev) =>
+          new Map(prev).set(
+            targetGroupId,
+            data.message ?? "キャンセルに失敗しました",
+          ),
+        );
+        return;
+      }
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "idle"));
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === targetGroupId ? { ...g, join_status: null } : g,
+        ),
+      );
+    } catch {
+      setJoinStatusMap((prev) => new Map(prev).set(targetGroupId, "requested"));
+      setJoinErrorMap((prev) =>
+        new Map(prev).set(targetGroupId, "サーバーへの接続に失敗しました"),
+      );
+    }
+  }
+
+  // 所属・未所属を問わず全グループを表示する
   const joinedGroups = groups.filter((g) => g.role !== null);
-  // グループ一覧モーダル用に所属・未所属を分ける
   const unjoinedGroups = groups.filter((g) => g.role === null);
 
   return (
@@ -241,34 +329,25 @@ export default function FolderSidebar({
         )}
       </div>
 
-      {/* グループ一覧: 所属グループを最大5件表示し、作成・一覧ボタンを提供する */}
+      {/* グループ一覧: 所属・未所属を含む全グループを表示し、作成ボタンを提供する */}
       <div className="flex flex-col gap-1 mt-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
             グループ
           </span>
-          <div className="flex items-center gap-1">
-            {/* グループ作成ボタン: 権限があるユーザーのみ表示する */}
-            {canCreateGroup() && (
-              <button
-                onClick={() => setIsGroupCreateModalOpen(true)}
-                className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
-              >
-                作成
-              </button>
-            )}
-            {/* グループ一覧モーダルを開くボタン */}
+          {/* グループ作成ボタン: 権限があるユーザーのみ表示する */}
+          {canCreateGroup() && (
             <button
-              onClick={() => setIsGroupListModalOpen(true)}
+              onClick={() => setIsGroupCreateModalOpen(true)}
               className="text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
             >
-              一覧
+              作成
             </button>
-          </div>
+          )}
         </div>
         {joinedGroups.length > 0 && (
           <div className="flex flex-col gap-1.5 px-2">
-            {joinedGroups.slice(0, 5).map((group) => {
+            {joinedGroups.map((group) => {
               const isActive = String(group.id) === groupId;
               return (
                 <div
@@ -376,6 +455,67 @@ export default function FolderSidebar({
             })}
           </div>
         )}
+        {/* 未所属グループ: join_method に応じて参加ボタン/招待制バッジを出し分ける */}
+        {unjoinedGroups.length > 0 && (
+          <div className="flex flex-col gap-1.5 px-2 mt-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              未参加のグループ
+            </span>
+            {unjoinedGroups.map((group) => {
+              const joinMethod = group.policy?.join_method ?? "invite_only";
+              const status =
+                joinStatusMap.get(group.id) ??
+                (group.join_status === "pending" ? "requested" : "idle");
+              const error = joinErrorMap.get(group.id);
+              return (
+                <div key={group.id} className="flex flex-col gap-0.5 py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center gap-1.5 px-2 py-1 min-w-0">
+                      <span className="truncate text-gray-500 dark:text-gray-400">
+                        {group.name}
+                      </span>
+                      {group.is_private && (
+                        <span className="shrink-0 text-xs text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-1">
+                          非公開
+                        </span>
+                      )}
+                    </div>
+                    {joinMethod === "invite_only" ? (
+                      <span className="shrink-0 text-xs text-gray-400 pr-2">
+                        招待制
+                      </span>
+                    ) : status === "requested" || status === "canceling" ? (
+                      <button
+                        type="button"
+                        disabled={status === "canceling"}
+                        onClick={() => handleCancelJoinGroup(group.id)}
+                        className="shrink-0 text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors pr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {status === "canceling" ? "キャンセル中..." : "申請済み ×"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={status === "requesting"}
+                        onClick={() => handleJoinGroup(group.id)}
+                        className="shrink-0 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors pr-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {status === "requesting"
+                          ? "処理中..."
+                          : joinMethod === "open"
+                            ? "参加"
+                            : "申請"}
+                      </button>
+                    )}
+                  </div>
+                  {error && (
+                    <p className="px-2 text-xs text-red-500">{error}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 組織作成モーダル */}
@@ -415,35 +555,6 @@ export default function FolderSidebar({
           ]);
           setIsGroupCreateModalOpen(false);
           router.push(`/organizations/${orgId}/groups/${group.id}/notes`);
-        }}
-      />
-
-      {/* グループ一覧モーダル */}
-      <GroupListModal
-        orgId={orgId}
-        isOpen={isGroupListModalOpen}
-        onClose={() => setIsGroupListModalOpen(false)}
-        joinedGroups={joinedGroups}
-        unjoinedGroups={unjoinedGroups}
-        onImmediateJoin={(joinedGroupId) => {
-          // 即時参加: グループリストを更新してモーダルを閉じ、グループページへ遷移する
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === joinedGroupId
-                ? { ...g, role: "editor", join_status: "active" }
-                : g,
-            ),
-          );
-          setIsGroupListModalOpen(false);
-          router.push(`/organizations/${orgId}/groups/${joinedGroupId}/notes`);
-        }}
-        onCancelledRequest={(cancelledGroupId) => {
-          // 申請キャンセル: join_status を null にリセットする
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === cancelledGroupId ? { ...g, join_status: null } : g,
-            ),
-          );
         }}
       />
 
