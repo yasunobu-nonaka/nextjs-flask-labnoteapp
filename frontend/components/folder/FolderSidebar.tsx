@@ -69,6 +69,12 @@ export default function FolderSidebar({
     top: number;
     left: number;
   } | null>(null);
+  // 組織の ⋮ 管理メニューポップオーバーの開閉と表示位置
+  const [isOrgAdminMenuOpen, setIsOrgAdminMenuOpen] = useState(false);
+  const [orgAdminMenuPosition, setOrgAdminMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // モーダルの開閉状態
   const [isOrgCreateModalOpen, setIsOrgCreateModalOpen] = useState(false);
@@ -174,20 +180,87 @@ export default function FolderSidebar({
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800">
+        <div className="group flex items-center justify-between px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800">
           <span className="text-base text-gray-700 dark:text-gray-300">
             {orgName}
           </span>
-          {/* 組織メンバー全員に表示する */}
+          {/* ⋮ 組織管理メニュー: 行にホバーしたとき、またはメニューが開いているときに表示する */}
           {orgRole && (
-            <Link
-              href={`/organizations/${orgId}/admin`}
-              className="text-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded"
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isOrgAdminMenuOpen) {
+                  setIsOrgAdminMenuOpen(false);
+                  return;
+                }
+                // ⋮ ボタンの画面上の座標からポップオーバーの表示位置を算出する
+                const rect = e.currentTarget.getBoundingClientRect();
+                setOrgAdminMenuPosition({
+                  top: rect.top,
+                  left: rect.right + 4,
+                });
+                setIsOrgAdminMenuOpen(true);
+              }}
+              className={clsx(
+                "text-lg leading-none text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-colors px-2 py-1 rounded group-hover:opacity-100",
+                isOrgAdminMenuOpen ? "opacity-100" : "opacity-0",
+              )}
               title="組織管理"
             >
-              ⚙
-            </Link>
+              ⋮
+            </button>
           )}
+
+          {/* 組織管理メニューポップオーバー: グループの ⋮ メニューと同じ理由で document.body にポータルする */}
+          {isOrgAdminMenuOpen &&
+            orgAdminMenuPosition &&
+            createPortal(
+              <>
+                {/* 透明オーバーレイ: メニュー外のクリックを検知して閉じる */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsOrgAdminMenuOpen(false)}
+                />
+                {/* 管理ページへのリンク一覧 */}
+                <div
+                  className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-max"
+                  style={{
+                    top: orgAdminMenuPosition.top,
+                    left: orgAdminMenuPosition.left,
+                  }}
+                >
+                  <Link
+                    href={`/organizations/${orgId}/admin`}
+                    onClick={() => setIsOrgAdminMenuOpen(false)}
+                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    基本設定
+                  </Link>
+                  <Link
+                    href={`/organizations/${orgId}/admin/groups`}
+                    onClick={() => setIsOrgAdminMenuOpen(false)}
+                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    グループ管理
+                  </Link>
+                  <Link
+                    href={`/organizations/${orgId}/admin/members`}
+                    onClick={() => setIsOrgAdminMenuOpen(false)}
+                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    メンバー管理
+                  </Link>
+                  <Link
+                    href={`/organizations/${orgId}/admin/policy`}
+                    onClick={() => setIsOrgAdminMenuOpen(false)}
+                    className="block px-4 py-2 text-base whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    ポリシー管理
+                  </Link>
+                </div>
+              </>,
+              document.body,
+            )}
         </div>
       </div>
 
