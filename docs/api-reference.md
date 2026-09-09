@@ -92,7 +92,7 @@
 | GET | `.../notes` | `note:read` | ノート一覧（検索・タグ・フォルダー・ページネーション対応） |
 | POST | `.../notes` | `note:create` | ノート作成。`is_private=true`なら作成者を`owner`として登録 |
 | GET | `.../notes/<nid>` | `note:read` | ノート詳細 |
-| PATCH | `.../notes/<nid>` | `note:edit`（非公開ノートは owner/editor） | ノート更新 |
+| PATCH | `.../notes/<nid>` | `note:edit`（非公開ノートは owner/editor） | ノート更新。ただし`is_private`の切替は例外で、公開→非公開は作成者のみ、非公開→公開はownerのみ（editorは403） |
 | DELETE | `.../notes/<nid>` | `note:delete`（非公開ノートは owner） | ノート削除 |
 | GET | `.../notes/<nid>/members` | `note:read` | 非公開ノートの共有メンバー一覧（owner限定） |
 | POST | `.../notes/<nid>/members` | note owner | 共有メンバーを招待（通知を送信） |
