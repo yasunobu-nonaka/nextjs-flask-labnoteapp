@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Human-oriented documentation lives in [docs/](docs/) — overview, architecture, domain model, database schema (with ER diagrams), API reference, development setup, and roadmap. This file stays focused on conventions and implementation guidance for AI-assisted coding; when changing something documented in both places (e.g. an API route, a DB table), update `docs/` too so the two don't drift apart.
+
 ## Coding Conventions
 
 - Prefer clarity over brevity. Slightly verbose code is acceptable if it makes the logic easier to follow.
@@ -275,106 +277,18 @@ Folder               — group_id (FK → groups.id), created_by_user_id (FK →
 
 Invitation           — organization_id, email, token (unique), invited_by_user_id,
                        status ('pending' | 'accepted' | 'expired'), expires_at
-Notification         — user_id, type, payload (JSON), is_read, created_at
+Notification         — user_id, message, link_url, is_read, created_at
 ```
+
+Full column lists, constraints, cascade behavior, and ER diagrams are in [docs/database.md](docs/database.md).
 
 RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()` in `conftest.py` after `db.create_all()`. Production uses Alembic migrations; key ones are `e006c8e3c75a` (Phase 2 RBAC) and `a1b2c3d4e5f6` (Phase 3 group ownership).
 
 ### API Routes
 
-#### Auth routes (`/api/auth`)
+Full route tables (method, path, auth/permission requirements, and behavior notes such as 403/409 guard conditions) are documented in [docs/api-reference.md](docs/api-reference.md), kept in sync with the route code by direct cross-check. **Don't duplicate those tables here — update docs/api-reference.md instead when routes change**, to avoid the two drifting apart.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/auth/register` | — | Register new user |
-| GET | `/api/auth/verify/<token>` | — | Verify email on registration |
-| POST | `/api/auth/resend-verification` | — | Resend verification email |
-| GET | `/api/auth/user/status` | — | Check email verification status |
-| POST | `/api/auth/login` | — | Login; returns access + refresh tokens |
-| POST | `/api/auth/refresh` | refresh JWT | Rotate access token |
-| GET | `/api/auth/me` | JWT | Get current user profile; includes `needs_onboarding` (true when the user has zero org memberships — drives the Phase 7 onboarding redirect) |
-| DELETE | `/api/auth/me` | JWT | Delete account |
-| PATCH | `/api/auth/me/username` | JWT | Change username |
-| POST | `/api/auth/me/password/verify` | JWT | Verify current password (pre-change step) |
-| PATCH | `/api/auth/me/password` | JWT | Change password |
-| PATCH | `/api/auth/me/email` | JWT | Request email change (sends confirmation email) |
-| GET | `/api/auth/verify-email-change/<token>` | — | Confirm email change via token |
-| POST | `/api/auth/forgot-password` | — | Send password reset email |
-| GET | `/api/auth/reset-password/<token>` | — | Validate reset token |
-| POST | `/api/auth/reset-password/validate-token` | — | Validate reset token (JSON body) |
-| POST | `/api/auth/reset-password` | — | Set new password using reset token |
-
-#### Invitation routes (`/api/invitations`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/invitations/<token>` | — | Get invitation details by token |
-| POST | `/api/invitations/<token>/accept` | JWT | Accept invitation and join org |
-
-#### Notification routes (`/api/notifications`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/notifications` | JWT | List unread notifications for current user |
-| PATCH | `/api/notifications/<id>/read` | JWT | Mark notification as read |
-| DELETE | `/api/notifications/rejected` | JWT | Clear all rejected-request notifications |
-
-#### Organization & Group routes (`/api/organizations`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/organizations` | JWT | List orgs the current user belongs to |
-| POST | `/api/organizations` | JWT | Create org (caller becomes `owner`) |
-| GET | `/api/organizations/<id>` | member | Org detail + policy |
-| PATCH | `/api/organizations/<id>` | owner/sys_admin | Update org name or policy |
-| DELETE | `/api/organizations/<id>` | owner | Delete org (blocked if any groups exist) |
-| POST | `/api/organizations/<id>/transfer-ownership` | owner | Transfer owner role to another member (caller demoted to member) |
-| GET | `/api/organizations/<id>/members` | member | List members |
-| POST | `/api/organizations/<id>/members` | owner/sys_admin/user_admin | Add member |
-| PATCH | `/api/organizations/<id>/members/<uid>` | owner/sys_admin | Change member role |
-| DELETE | `/api/organizations/<id>/members/<uid>` | owner/sys_admin/user_admin | Remove member |
-| POST | `/api/organizations/<id>/leave` | member | Leave org (self); blocked if caller is `owner` (transfer ownership first) |
-| POST | `/api/organizations/<id>/invitations` | owner/sys_admin/user_admin | Send email invitation to join org |
-| GET | `/api/organizations/<id>/groups` | member | List accessible groups |
-| POST | `/api/organizations/<id>/groups` | policy-dependent | Create group (caller becomes `admin`) |
-| GET | `/api/organizations/<id>/groups/<gid>` | member (private: group member only) | Group detail + policy |
-| PATCH | `/api/organizations/<id>/groups/<gid>` | group admin / org sys_admin | Update group name, visibility, policy |
-| DELETE | `/api/organizations/<id>/groups/<gid>` | group admin / org sys_admin | Delete group |
-| POST | `/api/organizations/<id>/groups/<gid>/join` | org member | Request to join group (sets status=pending) |
-| DELETE | `/api/organizations/<id>/groups/<gid>/join` | pending member | Cancel own join request |
-| GET | `/api/organizations/<id>/groups/<gid>/join-requests` | group admin | List pending join requests |
-| GET | `/api/organizations/<id>/groups/<gid>/join-requests/count` | group admin | Count pending join requests |
-| PATCH | `/api/organizations/<id>/groups/<gid>/join-requests/<uid>` | group admin | Approve or reject join request |
-| GET | `/api/organizations/<id>/groups/<gid>/members` | group member | List group members |
-| POST | `/api/organizations/<id>/groups/<gid>/members` | group admin / org sys_admin | Add org member to group |
-| PATCH | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Change group member role; blocked if demoting the sole active `admin` away from `admin` (re-submitting `admin` is a no-op and always allowed) |
-| DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group; blocked if target is the sole active `admin`, or owns private notes in the group (no note titles returned — remover may lack visibility into them) |
-| POST | `/api/organizations/<id>/groups/<gid>/leave` | group member | Leave group (self); blocked if caller is the sole active `admin`, or owns private notes (titles included — it's the caller's own data) |
-
-Service functions live in `organization/service.py`, `group/service.py`, and `invitation/service.py` inside `app/api/organizations/`.
-
-#### Note & Folder routes (`/api/organizations/<id>/groups/<gid>/...`)
-
-All routes require `org:read` org-level permission plus the group-level permission shown below.
-
-| Method | Path | Permission | Description |
-|--------|------|------------|-------------|
-| GET | `.../notes` | `note:read` | List notes in group |
-| POST | `.../notes` | `note:create` | Create note in group |
-| GET | `.../notes/tags` | `note:read` | List tags in group |
-| GET | `.../notes/<nid>` | `note:read` | Get note |
-| PATCH | `.../notes/<nid>` | `note:edit` | Update note (incl. `is_private` flag) |
-| DELETE | `.../notes/<nid>` | `note:delete` | Delete note |
-| GET | `.../notes/<nid>/members` | `note:read` | List private note members |
-| POST | `.../notes/<nid>/members` | note owner | Add member to private note |
-| PATCH | `.../notes/<nid>/members/<uid>` | note owner | Change private note member role |
-| DELETE | `.../notes/<nid>/members/<uid>` | note owner | Remove private note member |
-| GET | `.../folders` | `note:read` | List folders in group |
-| POST | `.../folders` | `note:create` | Create folder in group |
-| PATCH | `.../folders/<fid>` | `note:edit` | Rename folder |
-| DELETE | `.../folders/<fid>` | `note:delete` | Delete folder |
-
-Route implementations live in `note/routes.py` and `folder/routes.py` inside `app/api/organizations/`.
+Route/service implementations live in `app/api/organizations/`, split by resource into subpackages (`organization/`, `group/`, `note/`, `folder/`, `invitation/`, each with `routes.py` + `service.py`), with shared org/group permission-check helpers in `permissions.py`. Auth routes are in `app/api/auth/routes.py`, invitation-acceptance in `app/api/invitations/routes.py`, notifications in `app/api/notifications/routes.py`.
 
 ## Phase 7: Onboarding Setup Wizard (done) / Audit Log & Advanced Policies (pending)
 
