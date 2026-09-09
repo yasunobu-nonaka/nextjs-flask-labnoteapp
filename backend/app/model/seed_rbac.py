@@ -7,7 +7,7 @@ RBACの初期データ（権限・ロール）のシード関数。
 """
 
 from app.extensions import db
-from app.model.rbac import Permission, OrganizationRole, RoleLocal
+from app.model.rbac import Permission, OrganizationRole, GroupRole
 
 # --- 権限定義 ---
 
@@ -23,7 +23,7 @@ ORG_PERMISSIONS = [
     ("org:group_manage_any",   "任意グループの管理（組織管理者権限）"),
 ]
 
-# グループレベルの権限（RoleLocal で使用）
+# グループレベルの権限（GroupRole で使用）
 GROUP_PERMISSIONS = [
     ("group:read",               "グループ情報の閲覧"),
     ("group:edit",               "グループ名・ポリシーの変更"),
@@ -74,7 +74,7 @@ ORG_ROLE_DEFINITIONS = {
     },
 }
 
-# グループロール（RoleLocal）と付与する権限コードのマッピング
+# グループロール（GroupRole）と付与する権限コードのマッピング
 GROUP_ROLE_DEFINITIONS = {
     "admin": {
         "description": "グループ管理者。グループ設定・メンバー管理・ノート全操作が可能。",
@@ -132,13 +132,13 @@ def seed_rbac() -> None:
             )
             db.session.add(role)
 
-    # --- Step 3: グループロール（RoleLocal）の作成 ---
+    # --- Step 3: グループロール（GroupRole）の作成 ---
     for role_name, defn in GROUP_ROLE_DEFINITIONS.items():
         role = db.session.execute(
-            db.select(RoleLocal).filter_by(name=role_name)
+            db.select(GroupRole).filter_by(name=role_name)
         ).scalar_one_or_none()
         if not role:
-            role = RoleLocal(
+            role = GroupRole(
                 name=role_name,
                 description=defn["description"],
                 permissions=[perm_by_code[c] for c in defn["permissions"]],

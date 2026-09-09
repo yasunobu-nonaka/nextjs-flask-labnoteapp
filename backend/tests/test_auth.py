@@ -20,7 +20,7 @@ from app.model import (
     Note,
     Folder,
     OrganizationRole,
-    RoleLocal,
+    GroupRole,
 )
 
 #############################################
@@ -1106,7 +1106,7 @@ class TestDeleteMe:
         db.session.add(group)
         db.session.flush()
 
-        role = db.session.query(RoleLocal).filter_by(name=role_name).first()
+        role = db.session.query(GroupRole).filter_by(name=role_name).first()
         db.session.add(GroupMember(user_id=user_id, group_id=group.id, role_id=role.id))
         db.session.flush()
         return group

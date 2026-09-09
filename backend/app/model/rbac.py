@@ -1,9 +1,9 @@
 """
-RBACモデル。Permission（権限）・OrganizationRole（組織レベルロール）・RoleLocal（グループレベルロール）を定義する。
+RBACモデル。Permission（権限）・OrganizationRole（組織レベルロール）・GroupRole（グループレベルロール）を定義する。
 
 Permission はシステム内のアトミックな操作権限を表す。
 OrganizationRole は組織レベルのロール（owner / sys_admin / user_admin / member）。
-RoleLocal はグループレベルのロール（admin / editor / viewer）。
+GroupRole はグループレベルのロール（admin / editor / viewer）。
 各ロールは複数の Permission を束ねたテンプレートとして機能する。
 """
 
@@ -27,10 +27,10 @@ organization_role_permissions = Table(
 )
 
 # グループロールと権限の中間テーブル（多対多）
-role_local_permissions = Table(
-    "role_local_permissions",
+group_role_permissions = Table(
+    "group_role_permissions",
     db.metadata,
-    Column("role_local_id", Integer, ForeignKey("roles_local.id"), primary_key=True),
+    Column("group_role_id", Integer, ForeignKey("group_roles.id"), primary_key=True),
     Column("permission_id", Integer, ForeignKey("permissions.id"), primary_key=True),
 )
 
@@ -82,7 +82,7 @@ class OrganizationRole(db.Model):
         return any(p.code == code for p in self.permissions)
 
 
-class RoleLocal(db.Model):
+class GroupRole(db.Model):
     """グループレベルのロール定義。
 
     グループ内でのユーザーの役割と権限を束ねたテンプレート。
@@ -90,7 +90,7 @@ class RoleLocal(db.Model):
     定義済みロール: admin / editor / viewer
     """
 
-    __tablename__ = "roles_local"
+    __tablename__ = "group_roles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # 例: 'admin', 'editor', 'viewer'
@@ -99,11 +99,11 @@ class RoleLocal(db.Model):
 
     # このロールが持つ権限一覧（多対多）
     permissions: Mapped[List["Permission"]] = relationship(
-        secondary=role_local_permissions, lazy="selectin"
+        secondary=group_role_permissions, lazy="selectin"
     )
 
     def __repr__(self):
-        return f"<RoleLocal {self.name}>"
+        return f"<GroupRole {self.name}>"
 
     def has_permission(self, code: str) -> bool:
         """指定パーミッションコードを持つか確認する。"""

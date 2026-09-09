@@ -128,7 +128,7 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 |--------|-----|------|
 | user_id | Integer | PK, FK → users.id |
 | group_id | Integer | PK, FK → groups.id |
-| role_id | Integer | FK → roles_local.id, not null |
+| role_id | Integer | FK → group_roles.id, not null |
 | joined_at | DateTime(tz) | default now |
 | status | String(20) | default `"active"`（`active` \| `pending` \| `rejected`） |
 | approved_at | DateTime(tz) | nullable（申請フロー経由の承認時のみセット） |
@@ -213,9 +213,9 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 | name | String(100) | unique, not null |
 | description | String(500) | nullable |
 
-### roles_local
+### group_roles
 
-グループレベルのロール定義（`admin` / `editor` / `viewer`）。`permissions` は `role_local_permissions` 中間テーブル経由で多対多。カラム構成は `organization_roles` と同じ。
+グループレベルのロール定義（`admin` / `editor` / `viewer`）。`permissions` は `group_role_permissions` 中間テーブル経由で多対多。カラム構成は `organization_roles` と同じ。
 
 ### invitations
 
@@ -251,4 +251,4 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 - `organization_members` / `group_members` / `notes_tags` / `private_note_members` は複合主キー（中間テーブル）。
 - `tags` は `(group_id, tagname)` でユニーク制約。
 - 組織削除 → メンバー・ポリシー・グループを cascade 削除。グループ削除 → メンバー・ポリシー・ノート・フォルダー・タグを cascade 削除。フォルダー削除 → 子フォルダーとその直下のノートを cascade 削除。
-- ロールと権限は `Permission` を中心に `organization_role_permissions` / `role_local_permissions` の2つの多対多テーブルで束ねられる（RBACの詳細は [domain-model.md](./domain-model.md) を参照）。
+- ロールと権限は `Permission` を中心に `organization_role_permissions` / `group_role_permissions` の2つの多対多テーブルで束ねられる（RBACの詳細は [domain-model.md](./domain-model.md) を参照）。

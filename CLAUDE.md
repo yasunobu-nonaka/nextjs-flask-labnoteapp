@@ -214,7 +214,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 | Phase | Status | PR(s) | Content |
 |-------|--------|-------|---------|
 | 1 | ✅ Done | #19 | Organization & Group models, membership, basic API |
-| 2 | ✅ Done | #19 | Full RBAC (Permission / OrganizationRole / RoleLocal models) |
+| 2 | ✅ Done | #19 | Full RBAC (Permission / OrganizationRole / GroupRole models) |
 | 3 | ✅ Done | #19 | Migrate Note / Tag / Folder ownership from User → Group |
 | 4 | ✅ Done | #19 #20 #26 | Frontend — org/group navigation, group-scoped note pages, group creation wizard, org/group list pages |
 | 5 | ✅ Done | #19 #21 #22 #24 | Access control & sharing — email invitations, group join requests & approval, 404 hardening for non-members, private notes |
@@ -234,7 +234,7 @@ The app is being extended from a personal note tool to an organization/group-bas
 **Organization-level roles** (`OrganizationMember.role_id → OrganizationRole`):
 `owner` | `sys_admin` | `user_admin` | `member`
 
-**Group-level roles** (`GroupMember.role_id → RoleLocal`):
+**Group-level roles** (`GroupMember.role_id → GroupRole`):
 `admin` | `editor` | `viewer`
 
 Roles store their permissions in `Permission` objects (code strings like `org:edit`, `note:read`).
@@ -254,14 +254,14 @@ Helper functions `check_org_permission()` and `check_group_permission()` are ava
 ```
 Permission           — code (unique), description
 OrganizationRole     — name (unique), permissions (M2M via organization_role_permissions)
-RoleLocal            — name (unique), permissions (M2M via role_local_permissions)
+GroupRole            — name (unique), permissions (M2M via group_role_permissions)
 
 Organization         — name, created_by_user_id
 OrganizationMember   — user_id + organization_id (composite PK), role_id → OrganizationRole, joined_at
 OrganizationPolicy   — organization_id (unique FK), allow_private_groups,
                        allow_private_notes, who_can_create_groups, default_join_method
 Group                — organization_id, name, is_private, created_by_user_id
-GroupMember          — user_id + group_id (composite PK), role_id → RoleLocal, joined_at,
+GroupMember          — user_id + group_id (composite PK), role_id → GroupRole, joined_at,
                        status ('active' | 'pending' | 'rejected') — 'pending' = join request awaiting approval
 GroupPolicy          — group_id (unique FK), allow_private_notes,
                        join_method, is_notes_visible_to_org

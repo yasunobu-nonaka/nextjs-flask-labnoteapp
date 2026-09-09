@@ -21,7 +21,7 @@
 | `user_admin` | メンバー管理中心 |
 | `member` | 一般メンバー |
 
-### グループレベルのロール（`GroupMember.role_id → RoleLocal`）
+### グループレベルのロール（`GroupMember.role_id → GroupRole`）
 
 | ロール | 想定される役割 |
 |--------|----------------|
