@@ -6,7 +6,7 @@
 - `JWT` : `@jwt_required()` のみ（ログイン済みであれば誰でも可）
 - それ以外: 必要なロール・権限
 
-ノート/フォルダーの各ルートは、実装上は `note_service.py` / `folder_service.py` を呼び出すが、URLとしては `/api/organizations/<org_id>/groups/<group_id>/...` 配下にマウントされている（`backend/app/api/notes/routes.py` と `folders/routes.py` にも同名のルート定義が残っているが、どちらのBlueprintも `api_bp` に登録されていないため実際には呼び出されない未使用コード）。
+ノート/フォルダーの各ルートは、実装上は `note_service.py` / `folder_service.py` を呼び出すが、URLとしては `/api/organizations/<org_id>/groups/<group_id>/...` 配下にマウントされている（Phase 3以前の個人ノート仕様だった `notes/routes.py` / `folders/routes.py` は、`notes_bp` / `folders_bp` が既に削除されimportすら失敗する壊れたデッドコードだったため削除済み）。
 
 ## 認証 (`/api/auth`)
 
@@ -19,7 +19,7 @@
 | POST | `/api/auth/login` | — | ログイン。アクセストークン＋リフレッシュトークンを返す |
 | POST | `/api/auth/refresh` | refresh JWT | アクセストークンを再発行 |
 | GET | `/api/auth/me` | JWT | 現在のユーザー情報を取得。`needs_onboarding`（組織未所属なら true）を含む |
-| DELETE | `/api/auth/me` | JWT | アカウント削除 |
+| DELETE | `/api/auth/me` | JWT | アカウント削除。組織で`owner`/`member`以外のロールを持つ、グループの`admin`である、非公開ノートのオーナーである、作成したノート/フォルダが残っている、のいずれかに該当すると409を返しブロックする |
 | PATCH | `/api/auth/me/username` | JWT | ユーザー名変更 |
 | POST | `/api/auth/me/password/verify` | JWT | 現在のパスワードを検証（変更前の事前確認） |
 | PATCH | `/api/auth/me/password` | JWT | パスワード変更 |
@@ -35,14 +35,14 @@
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
 | GET | `/api/invitations/<token>` | — | トークンから招待詳細を取得 |
-| POST | `/api/invitations/<token>/accept` | JWT | 招待を承諾して組織に参加 |
+| POST | `/api/invitations/<token>/accept` | JWT | 招待を承諾して組織に参加。招待先メールアドレスとログインユーザーのメールアドレスが一致しない場合は403 |
 
 ## 通知 (`/api/notifications`)
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| GET | `/api/notifications` | JWT | 未読通知一覧を取得 |
-| PATCH | `/api/notifications/<id>/read` | JWT | 通知を既読にする |
+| GET | `/api/notifications` | JWT | 未読通知一覧を取得（参加申請・申請結果・プライベートノート招待をまとめて返す。既読管理があるのはプライベートノート招待のみ） |
+| PATCH | `/api/notifications/<id>/read` | JWT | プライベートノート招待通知を既読にする（他の通知タイプは対象外） |
 | DELETE | `/api/notifications/rejected` | JWT | 拒否通知をまとめて削除 |
 
 ## 組織 (`/api/organizations`)
@@ -69,17 +69,17 @@
 | GET | `.../groups` | member | アクセス可能なグループ一覧 |
 | POST | `.../groups` | ポリシー依存 | グループ作成（作成者が `admin` になる） |
 | GET | `.../groups/<gid>` | member（非公開グループはメンバーのみ） | グループ詳細＋ポリシー |
-| PATCH | `.../groups/<gid>` | グループadmin / 組織sys_admin | グループ名・可視性・ポリシーの更新 |
-| DELETE | `.../groups/<gid>` | グループadmin / 組織sys_admin | グループ削除 |
+| PATCH | `.../groups/<gid>` | グループadmin / 組織owner・sys_admin | グループ名・可視性・ポリシーの更新 |
+| DELETE | `.../groups/<gid>` | グループadmin / 組織owner・sys_admin | グループ削除 |
 | POST | `.../groups/<gid>/join` | 組織メンバー | 参加申請または即時参加（`join_method`次第） |
 | DELETE | `.../groups/<gid>/join` | 申請中の本人 | 自分の参加申請をキャンセル |
-| GET | `.../groups/<gid>/join-requests` | グループadmin | 参加申請一覧 |
-| GET | `.../groups/<gid>/join-requests/count` | グループadmin | 参加申請数（バッジ表示用） |
-| PATCH | `.../groups/<gid>/join-requests/<uid>` | グループadmin | 参加申請の承認/拒否 |
-| GET | `.../groups/<gid>/members` | グループメンバー | グループメンバー一覧（`status=active`のみ） |
-| POST | `.../groups/<gid>/members` | グループadmin / 組織sys_admin | 組織メンバーをグループに追加 |
-| PATCH | `.../groups/<gid>/members/<uid>` | グループadmin / 組織sys_admin | グループメンバーのロール変更。唯一の`admin`を降格しようとすると409（`admin`への再送信は常に許可） |
-| DELETE | `.../groups/<gid>/members/<uid>` | グループadmin / 組織sys_admin | グループメンバー削除。対象が唯一の`admin`、または非公開ノートのオーナーだと409（ノートタイトルは返さない） |
+| GET | `.../groups/<gid>/join-requests` | グループadmin / 組織owner・sys_admin | 参加申請一覧 |
+| GET | `.../groups/<gid>/join-requests/count` | グループadmin / 組織owner・sys_admin | 参加申請数（バッジ表示用） |
+| PATCH | `.../groups/<gid>/join-requests/<uid>` | グループadmin / 組織owner・sys_admin | 参加申請の承認/拒否 |
+| GET | `.../groups/<gid>/members` | member（非公開グループはメンバーのみ） | グループメンバー一覧（`status=active`のみ）。公開グループなら組織メンバーは誰でも閲覧可 |
+| POST | `.../groups/<gid>/members` | グループadmin / 組織owner・sys_admin | 組織メンバーをグループに追加 |
+| PATCH | `.../groups/<gid>/members/<uid>` | グループadmin / 組織owner・sys_admin | グループメンバーのロール変更。唯一の`admin`を降格しようとすると409（`admin`への再送信は常に許可） |
+| DELETE | `.../groups/<gid>/members/<uid>` | グループadmin / 組織owner・sys_admin | グループメンバー削除。対象が唯一の`admin`、または非公開ノートのオーナーだと409（ノートタイトルは返さない） |
 | POST | `.../groups/<gid>/leave` | グループメンバー | 自己脱退。唯一の`admin`、または非公開ノートのオーナーだと409（自分のノートなのでタイトル込みで返す） |
 
 ## ノート・タグ (`/api/organizations/<org_id>/groups/<gid>/notes`)
