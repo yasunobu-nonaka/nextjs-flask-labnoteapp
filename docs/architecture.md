@@ -29,11 +29,11 @@ app/
       __init__.py          # organizations_bp の定義。各サブパッケージの routes.py を import して登録
       permissions.py       # 組織/グループの権限チェック共通ヘルパー（check_org_permission 等）。
                             # organization/group/note/folder の各リソースから横断的に参照される
-      organization/        # 組織CRUD・組織メンバー管理（routes.py + service.py）
-      group/                # グループCRUD・グループメンバー管理・参加申請（routes.py + service.py）
-      note/                 # /api/organizations/<org_id>/groups/<group_id>/notes（routes.py + service.py + tag_service.py）
-      folder/               # /api/organizations/<org_id>/groups/<group_id>/folders（routes.py + service.py）
-      invitation/           # /api/organizations/<org_id>/invitations — メール招待送信（routes.py + service.py）
+      organization/      # 組織CRUD・組織メンバー管理（routes.py + service.py）
+      group/             # グループCRUD・グループメンバー管理・参加申請（routes.py + service.py）
+      note/              # /api/organizations/<org_id>/groups/<group_id>/notes（routes.py + service.py + tag_service.py）
+      folder/            # /api/organizations/<org_id>/groups/<group_id>/folders（routes.py + service.py）
+      invitation/        # /api/organizations/<org_id>/invitations — メール招待送信（routes.py + service.py）
   model/                   # SQLAlchemy 2.0 の Mapped / mapped_column スタイル
   schema/                  # Marshmallow スキーマ（バリデーション + シリアライズ）
   extensions/              # db, migrate, jwt, mail, cors — それぞれ独立ファイル

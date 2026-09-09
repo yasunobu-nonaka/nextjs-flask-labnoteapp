@@ -66,11 +66,11 @@ app/
       __init__.py         # defines organizations_bp; imports each subpackage's routes.py to register it
       permissions.py      # shared org/group permission-check helpers (check_org_permission etc.),
                           #   used across the organization/group/note/folder subpackages below
-      organization/       # org CRUD + org member management (routes.py + service.py)
-      group/               # group CRUD + group member management + join requests (routes.py + service.py)
-      note/                # /api/organizations/<org_id>/groups/<group_id>/notes (routes.py + service.py + tag_service.py)
-      folder/              # /api/organizations/<org_id>/groups/<group_id>/folders (routes.py + service.py)
-      invitation/          # /api/organizations/<org_id>/invitations — send email invitations (routes.py + service.py)
+      organization/      # org CRUD + org member management (routes.py + service.py)
+      group/             # group CRUD + group member management + join requests (routes.py + service.py)
+      note/              # /api/organizations/<org_id>/groups/<group_id>/notes (routes.py + service.py + tag_service.py)
+      folder/            # /api/organizations/<org_id>/groups/<group_id>/folders (routes.py + service.py)
+      invitation/        # /api/organizations/<org_id>/invitations — send email invitations (routes.py + service.py)
   model/                  # SQLAlchemy 2.0 Mapped / mapped_column style
   schema/                 # Marshmallow schemas (validation + serialisation)
   extensions/             # db, migrate, jwt, mail, cors — each in own file
