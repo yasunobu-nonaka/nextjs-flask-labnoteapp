@@ -25,16 +25,15 @@ app/
                           #             メール変更、ユーザー名変更、アカウント削除
     invitations/           # /api/invitations — トークンベースの招待受諾（GETはJWT不要）
     notifications/         # /api/notifications — アプリ内通知（参加申請の承認/却下）
-    notes/                 # note_service.py, tag_service.py（ルートなし。organizations/に移動）
-    folders/               # folder_service.py（ルートなし。organizations/に移動）
     organizations/         # /api/organizations — 組織/グループCRUD + ノート/フォルダールート
-      routes.py            # 組織ルート、グループルート、参加申請ルート
-      note_routes.py       # /api/organizations/<org_id>/groups/<group_id>/notes + 非公開ノートメンバー
-      folder_routes.py     # /api/organizations/<org_id>/groups/<group_id>/folders
-      invitation_routes.py # /api/organizations/<org_id>/invitations — メール招待送信
-      invitation_service.py
-      organization_service.py
-      group_service.py
+      __init__.py          # organizations_bp の定義。各サブパッケージの routes.py を import して登録
+      permissions.py       # 組織/グループの権限チェック共通ヘルパー（check_org_permission 等）。
+                            # organization/group/note/folder の各リソースから横断的に参照される
+      organization/        # 組織CRUD・組織メンバー管理（routes.py + service.py）
+      group/                # グループCRUD・グループメンバー管理・参加申請（routes.py + service.py）
+      note/                 # /api/organizations/<org_id>/groups/<group_id>/notes（routes.py + service.py + tag_service.py）
+      folder/               # /api/organizations/<org_id>/groups/<group_id>/folders（routes.py + service.py）
+      invitation/           # /api/organizations/<org_id>/invitations — メール招待送信（routes.py + service.py）
   model/                   # SQLAlchemy 2.0 の Mapped / mapped_column スタイル
   schema/                  # Marshmallow スキーマ（バリデーション + シリアライズ）
   extensions/              # db, migrate, jwt, mail, cors — それぞれ独立ファイル

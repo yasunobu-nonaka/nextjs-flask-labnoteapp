@@ -62,16 +62,15 @@ app/
                           #             password reset, email change, username change, account deletion
     invitations/          # /api/invitations — public token-based invitation acceptance (no JWT needed for GET)
     notifications/        # /api/notifications — in-app notifications (join request approvals/rejections)
-    notes/                # note_service.py, tag_service.py (no routes; moved to organizations/)
-    folders/              # folder_service.py (no routes; moved to organizations/)
     organizations/        # /api/organizations — org/group CRUD + note/folder routes
-      routes.py           # org routes, group routes, join request routes
-      note_routes.py      # /api/organizations/<org_id>/groups/<group_id>/notes + private note members
-      folder_routes.py    # /api/organizations/<org_id>/groups/<group_id>/folders
-      invitation_routes.py# /api/organizations/<org_id>/invitations — send email invitations
-      invitation_service.py
-      organization_service.py
-      group_service.py
+      __init__.py         # defines organizations_bp; imports each subpackage's routes.py to register it
+      permissions.py      # shared org/group permission-check helpers (check_org_permission etc.),
+                          #   used across the organization/group/note/folder subpackages below
+      organization/       # org CRUD + org member management (routes.py + service.py)
+      group/               # group CRUD + group member management + join requests (routes.py + service.py)
+      note/                # /api/organizations/<org_id>/groups/<group_id>/notes (routes.py + service.py + tag_service.py)
+      folder/              # /api/organizations/<org_id>/groups/<group_id>/folders (routes.py + service.py)
+      invitation/          # /api/organizations/<org_id>/invitations — send email invitations (routes.py + service.py)
   model/                  # SQLAlchemy 2.0 Mapped / mapped_column style
   schema/                 # Marshmallow schemas (validation + serialisation)
   extensions/             # db, migrate, jwt, mail, cors — each in own file
@@ -352,7 +351,7 @@ RBAC seed data is inserted by `app/model/seed_rbac.py`. Tests call `seed_rbac()`
 | DELETE | `/api/organizations/<id>/groups/<gid>/members/<uid>` | group admin / org sys_admin | Remove member from group; blocked if target is the sole active `admin`, or owns private notes in the group (no note titles returned — remover may lack visibility into them) |
 | POST | `/api/organizations/<id>/groups/<gid>/leave` | group member | Leave group (self); blocked if caller is the sole active `admin`, or owns private notes (titles included — it's the caller's own data) |
 
-Service functions live in `organization_service.py`, `group_service.py`, and `invitation_service.py` inside `app/api/organizations/`.
+Service functions live in `organization/service.py`, `group/service.py`, and `invitation/service.py` inside `app/api/organizations/`.
 
 #### Note & Folder routes (`/api/organizations/<id>/groups/<gid>/...`)
 
@@ -375,7 +374,7 @@ All routes require `org:read` org-level permission plus the group-level permissi
 | PATCH | `.../folders/<fid>` | `note:edit` | Rename folder |
 | DELETE | `.../folders/<fid>` | `note:delete` | Delete folder |
 
-Route implementations live in `note_routes.py` and `folder_routes.py` inside `app/api/organizations/`.
+Route implementations live in `note/routes.py` and `folder/routes.py` inside `app/api/organizations/`.
 
 ## Phase 7: Onboarding Setup Wizard (done) / Audit Log & Advanced Policies (pending)
 

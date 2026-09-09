@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from flask import abort
-
 from app.extensions import db
 from app.model import User
 from app.model.group import Group, GroupMember, GroupPolicy
 from app.model.organization import OrganizationMember
 from app.model.rbac import RoleLocal
+
+from app.api.organizations.permissions import get_any_membership
 
 
 def get_role_local(name: str) -> RoleLocal:
@@ -131,60 +131,6 @@ def get_accessible_groups(org_id: int, user_id: int) -> List[Group]:
     # 公開グループ または 所属グループのみを返す
     accessible = [g for g in groups if not g.is_private or g.id in member_group_ids]
     return accessible
-
-
-def require_group_visible(user_id: int, group: Group) -> None:
-    """プライベートグループの非メンバーには 404 を返す。403 を返さないことでグループの存在を漏洩させない。"""
-
-    if group.is_private and not check_group_membership(user_id, group.id):
-        abort(404)
-
-
-def get_group_or_404(group_id: int, org_id: int) -> Group:
-    """グループを取得する。存在しない・組織外の場合は404を返す。"""
-
-    return db.one_or_404(
-        db.select(Group).filter_by(id=group_id, organization_id=org_id)
-    )
-
-
-def get_any_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """status を問わずメンバーシップを返す（active / pending を含む）。"""
-
-    return db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id)
-    ).scalar_one_or_none()
-
-
-def check_group_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """ユーザーのアクティブなグループメンバーシップを返す。
-    active メンバーでなければ None を返す（RBAC・権限チェックに使用する）。
-    """
-
-    return db.session.execute(
-        db.select(GroupMember).filter_by(
-            user_id=user_id, group_id=group_id, status="active"
-        )
-    ).scalar_one_or_none()
-
-
-def check_group_role(user_id: int, group_id: int, required_roles: List[str]) -> bool:
-    """ユーザーが指定ロールのいずれかを持つかを確認する。"""
-
-    member = check_group_membership(user_id, group_id)
-    return member is not None and member.role.name in required_roles
-
-
-def check_group_permission(user_id: int, group_id: int, permission_code: str) -> bool:
-    """ユーザーが指定のパーミッションコードを持つかを確認する。
-
-    ロール名での判定 (check_group_role) より細粒度の権限チェックが必要な場合に使用する。
-    """
-
-    member = check_group_membership(user_id, group_id)
-    if not member or not member.role:
-        return False
-    return member.role.has_permission(permission_code)
 
 
 def count_active_group_admins(group_id: int) -> int:

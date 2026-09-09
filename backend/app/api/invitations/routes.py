@@ -1,7 +1,7 @@
 from flask import jsonify
 from flask_jwt_extended import current_user, jwt_required
 
-from app.api.organizations.invitation_service import (
+from app.api.organizations.invitation.service import (
     get_invitation_by_token,
     accept_invitation,
     build_invitation_response,

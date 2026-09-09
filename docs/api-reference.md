@@ -6,7 +6,7 @@
 - `JWT` : `@jwt_required()` のみ（ログイン済みであれば誰でも可）
 - それ以外: 必要なロール・権限
 
-ノート/フォルダーの各ルートは、実装上は `note_service.py` / `folder_service.py` を呼び出すが、URLとしては `/api/organizations/<org_id>/groups/<group_id>/...` 配下にマウントされている（Phase 3以前の個人ノート仕様だった `notes/routes.py` / `folders/routes.py` は、`notes_bp` / `folders_bp` が既に削除されimportすら失敗する壊れたデッドコードだったため削除済み）。
+ノート/フォルダー/招待の各ルートは、`backend/app/api/organizations/` 配下の `note/` `folder/` `invitation/` サブパッケージ（それぞれ `routes.py` + `service.py` を同居）に実装されているが、URLとしては同じ `organizations_bp`（`/api/organizations`）にすべてマウントされている（Phase 3以前の個人ノート仕様だった `app/api/notes/routes.py` / `app/api/folders/routes.py` は、Blueprintが既に削除されimportすら失敗する壊れたデッドコードだったため削除済み）。
 
 ## 認証 (`/api/auth`)
 
@@ -111,8 +111,11 @@
 
 ## 実装参照
 
-- 組織/グループ/参加申請ルート: `backend/app/api/organizations/routes.py`
-- ノート・非公開ノート共有ルート: `backend/app/api/organizations/note_routes.py`
-- フォルダールート: `backend/app/api/organizations/folder_routes.py`
-- 組織招待ルート: `backend/app/api/organizations/invitation_routes.py`
-- サービス層: `organization_service.py` / `group_service.py` / `invitation_service.py`（`backend/app/api/organizations/`配下）
+`backend/app/api/organizations/` 配下、リソースごとのサブパッケージに `routes.py` + `service.py` が同居している。
+
+- 組織/組織メンバールート・サービス: `organization/routes.py` / `organization/service.py`
+- グループ/グループメンバー/参加申請ルート・サービス: `group/routes.py` / `group/service.py`
+- ノート・非公開ノート共有ルート・サービス: `note/routes.py` / `note/service.py`（タグは `note/tag_service.py`）
+- フォルダールート・サービス: `folder/routes.py` / `folder/service.py`
+- 組織招待ルート・サービス: `invitation/routes.py` / `invitation/service.py`
+- 権限チェック共通ヘルパー（`check_org_permission`など、複数リソースから横断的に参照される）: `permissions.py`

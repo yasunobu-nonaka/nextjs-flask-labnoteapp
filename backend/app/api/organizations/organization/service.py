@@ -1,11 +1,11 @@
 from typing import List, Optional
 
-from flask import abort
-
 from app.extensions import db
 from app.model import User
 from app.model.organization import Organization, OrganizationMember, OrganizationPolicy
 from app.model.rbac import RoleGlobal
+
+from app.api.organizations.permissions import check_org_membership
 
 
 def get_role_global(name: str) -> RoleGlobal:
@@ -66,50 +66,6 @@ def get_organizations_for_user(user_id: int) -> List[Organization]:
     ).scalars().all()
 
     return orgs
-
-
-def get_organization_or_404(org_id: int) -> Organization:
-    """組織を取得する。存在しない場合は404を返す。"""
-
-    return db.one_or_404(
-        db.select(Organization).filter_by(id=org_id)
-    )
-
-
-def check_org_membership(user_id: int, org_id: int) -> Optional[OrganizationMember]:
-    """ユーザーの組織メンバーシップを返す。所属していなければNoneを返す。"""
-
-    return db.session.execute(
-        db.select(OrganizationMember).filter_by(user_id=user_id, organization_id=org_id)
-    ).scalar_one_or_none()
-
-
-def require_org_member(user_id: int, org_id: int) -> OrganizationMember:
-    """組織メンバーでない場合は 404 を返す。403 を返さないことで組織の存在を漏洩させない。"""
-
-    member = check_org_membership(user_id, org_id)
-    if not member:
-        abort(404)
-    return member
-
-
-def check_org_role(user_id: int, org_id: int, required_roles: List[str]) -> bool:
-    """ユーザーが指定ロールのいずれかを持つかを確認する。"""
-
-    member = check_org_membership(user_id, org_id)
-    return member is not None and member.role.name in required_roles
-
-
-def check_org_permission(user_id: int, org_id: int, permission_code: str) -> bool:
-    """ユーザーが指定のパーミッションコードを持つかを確認する。
-
-    ロール名での判定 (check_org_role) より細粒度の権限チェックが必要な場合に使用する。
-    """
-
-    member = check_org_membership(user_id, org_id)
-    if not member or not member.role:
-        return False
-    return member.role.has_permission(permission_code)
 
 
 def add_org_member(org_id: int, user_id: int, role: str = "member") -> OrganizationMember:

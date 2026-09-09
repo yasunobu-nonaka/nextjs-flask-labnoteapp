@@ -6,7 +6,7 @@ from flask import abort
 from app.extensions import db
 from app.model import Note, Tag, PrivateNoteMember
 from app.model.group import Group, GroupPolicy
-from app.api.notes.tag_service import get_or_create_tags
+from app.api.organizations.note.tag_service import get_or_create_tags
 
 
 def _private_access_filter(current_user_id: int):

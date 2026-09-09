@@ -26,7 +26,7 @@ def create_org(client, headers, name: str = "テスト組織"):
 
 def send_invitation(client, headers, org_id: int, email: str, role: str = "member"):
     """招待を送信する（メール送信はモック）。"""
-    with patch("app.api.organizations.invitation_service.mail.send"):
+    with patch("app.api.organizations.invitation.service.mail.send"):
         return client.post(
             f"/api/organizations/{org_id}/invitations",
             json={"email": email, "role": role},
@@ -54,7 +54,7 @@ class TestSendInvitation:
         """role を省略すると member になる。"""
         org_id = create_org(client, auth_headers["headers"])
 
-        with patch("app.api.organizations.invitation_service.mail.send"):
+        with patch("app.api.organizations.invitation.service.mail.send"):
             res = client.post(
                 f"/api/organizations/{org_id}/invitations",
                 json={"email": "invitee@example.com"},
@@ -84,7 +84,7 @@ class TestSendInvitation:
         """認証なしでは 401 を返す。"""
         org_id = create_org(client, auth_headers["headers"])
 
-        with patch("app.api.organizations.invitation_service.mail.send"):
+        with patch("app.api.organizations.invitation.service.mail.send"):
             res = client.post(
                 f"/api/organizations/{org_id}/invitations",
                 json={"email": "invitee@example.com"},

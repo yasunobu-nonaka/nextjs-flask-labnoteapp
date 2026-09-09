@@ -3,15 +3,12 @@ from flask_jwt_extended import current_user, jwt_required
 from marshmallow import ValidationError
 
 from app.schema.invitation_schema import InvitationCreateSchema, InvitationResponseSchema
-from app.api.organizations.organization_service import (
-    get_organization_or_404,
-    check_org_permission,
-)
-from app.api.organizations.invitation_service import (
+from app.api.organizations.permissions import get_organization_or_404, check_org_permission
+from app.api.organizations.invitation.service import (
     create_invitation,
     build_invitation_response,
 )
-from . import organizations_bp
+from .. import organizations_bp
 
 invitation_create_schema = InvitationCreateSchema()
 invitation_res_schema = InvitationResponseSchema()

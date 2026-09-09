@@ -4,12 +4,12 @@ URL: /api/organizations/<org_id>/groups/<group_id>/notes/...
 """
 import math
 
-from flask import jsonify, request
+from flask import abort, jsonify, request
 from flask_jwt_extended import jwt_required, current_user
 from marshmallow import ValidationError
 
 from app.schema import NoteCreateSchema, NoteResponseSchema, NoteShareSchema, NoteRoleUpdateSchema, NoteTransferOwnerSchema, PrivateNoteMemberSchema
-from app.api.notes.note_service import (
+from app.api.organizations.note.service import (
     get_notes_service,
     get_note_or_404_service,
     create_note_service,
@@ -21,16 +21,14 @@ from app.api.notes.note_service import (
     remove_private_note_member_service,
     transfer_note_owner_service,
 )
-from app.api.notes.tag_service import get_group_tags
-from flask import abort
+from app.api.organizations.note.tag_service import get_group_tags
 
-from app.api.organizations.organization_service import check_org_permission
-from app.api.organizations.group_service import get_group_or_404, check_group_permission
+from app.api.organizations.permissions import check_org_permission, get_group_or_404, check_group_permission
 from app.api.notifications.notification_service import (
     create_private_note_invitation_notification,
 )
 
-from . import organizations_bp
+from .. import organizations_bp
 
 create_schema = NoteCreateSchema()
 res_schema_note = NoteResponseSchema()
