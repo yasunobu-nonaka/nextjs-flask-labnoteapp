@@ -91,7 +91,7 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 |--------|-----|------|
 | user_id | Integer | PK, FK → users.id |
 | organization_id | Integer | PK, FK → organizations.id |
-| role_id | Integer | FK → roles_global.id, not null |
+| role_id | Integer | FK → organization_roles.id, not null |
 | joined_at | DateTime(tz) | default now |
 
 ### organization_policies
@@ -203,9 +203,9 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 | code | String(100) | unique, not null（例: `org:edit`, `note:read`） |
 | description | String(500) | nullable |
 
-### roles_global
+### organization_roles
 
-組織レベルのロール定義（`owner` / `sys_admin` / `user_admin` / `member`）。`permissions` は `role_global_permissions` 中間テーブル経由で多対多。
+組織レベルのロール定義（`owner` / `sys_admin` / `user_admin` / `member`）。`permissions` は `organization_role_permissions` 中間テーブル経由で多対多。
 
 | カラム | 型 | 制約 |
 |--------|-----|------|
@@ -215,7 +215,7 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 
 ### roles_local
 
-グループレベルのロール定義（`admin` / `editor` / `viewer`）。`permissions` は `role_local_permissions` 中間テーブル経由で多対多。カラム構成は `roles_global` と同じ。
+グループレベルのロール定義（`admin` / `editor` / `viewer`）。`permissions` は `role_local_permissions` 中間テーブル経由で多対多。カラム構成は `organization_roles` と同じ。
 
 ### invitations
 
@@ -228,7 +228,7 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 | email | String(254) | not null |
 | organization_id | Integer | FK → organizations.id, `ondelete="CASCADE"` |
 | invited_by_user_id | Integer | FK → users.id, `ondelete="CASCADE"` |
-| role_id | Integer | FK → roles_global.id（承認後に付与するロール） |
+| role_id | Integer | FK → organization_roles.id（承認後に付与するロール） |
 | status | String(20) | default `"pending"`（`pending` \| `accepted` \| `expired`） |
 | created_at | DateTime(tz) | default now |
 | expires_at | DateTime(tz) | default now + 7日 |
@@ -251,4 +251,4 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 - `organization_members` / `group_members` / `notes_tags` / `private_note_members` は複合主キー（中間テーブル）。
 - `tags` は `(group_id, tagname)` でユニーク制約。
 - 組織削除 → メンバー・ポリシー・グループを cascade 削除。グループ削除 → メンバー・ポリシー・ノート・フォルダー・タグを cascade 削除。フォルダー削除 → 子フォルダーとその直下のノートを cascade 削除。
-- ロールと権限は `Permission` を中心に `role_global_permissions` / `role_local_permissions` の2つの多対多テーブルで束ねられる（RBACの詳細は [domain-model.md](./domain-model.md) を参照）。
+- ロールと権限は `Permission` を中心に `organization_role_permissions` / `role_local_permissions` の2つの多対多テーブルで束ねられる（RBACの詳細は [domain-model.md](./domain-model.md) を参照）。

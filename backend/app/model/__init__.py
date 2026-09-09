@@ -1,4 +1,4 @@
-from .rbac import Permission, RoleGlobal, RoleLocal
+from .rbac import Permission, OrganizationRole, RoleLocal
 from .user import User
 from .note import Note, Tag, PrivateNoteMember
 from .folder import Folder
@@ -9,7 +9,7 @@ from .notification import Notification
 
 __all__ = [
     "Permission",
-    "RoleGlobal",
+    "OrganizationRole",
     "RoleLocal",
     "User",
     "Note",

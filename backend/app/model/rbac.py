@@ -1,8 +1,8 @@
 """
-RBACモデル。Permission（権限）・RoleGlobal（組織レベルロール）・RoleLocal（グループレベルロール）を定義する。
+RBACモデル。Permission（権限）・OrganizationRole（組織レベルロール）・RoleLocal（グループレベルロール）を定義する。
 
 Permission はシステム内のアトミックな操作権限を表す。
-RoleGlobal は組織レベルのロール（owner / sys_admin / user_admin / member）。
+OrganizationRole は組織レベルのロール（owner / sys_admin / user_admin / member）。
 RoleLocal はグループレベルのロール（admin / editor / viewer）。
 各ロールは複数の Permission を束ねたテンプレートとして機能する。
 """
@@ -19,10 +19,10 @@ from app.extensions import db
 # --- 中間テーブル ---
 
 # 組織ロールと権限の中間テーブル（多対多）
-role_global_permissions = Table(
-    "role_global_permissions",
+organization_role_permissions = Table(
+    "organization_role_permissions",
     db.metadata,
-    Column("role_global_id", Integer, ForeignKey("roles_global.id"), primary_key=True),
+    Column("organization_role_id", Integer, ForeignKey("organization_roles.id"), primary_key=True),
     Column("permission_id", Integer, ForeignKey("permissions.id"), primary_key=True),
 )
 
@@ -53,7 +53,7 @@ class Permission(db.Model):
         return f"<Permission {self.code}>"
 
 
-class RoleGlobal(db.Model):
+class OrganizationRole(db.Model):
     """組織レベルのロール定義。
 
     組織内でのユーザーの役割と権限を束ねたテンプレート。
@@ -61,7 +61,7 @@ class RoleGlobal(db.Model):
     定義済みロール: owner / sys_admin / user_admin / member
     """
 
-    __tablename__ = "roles_global"
+    __tablename__ = "organization_roles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # 例: 'owner', 'sys_admin', 'user_admin', 'member'
@@ -71,11 +71,11 @@ class RoleGlobal(db.Model):
     # このロールが持つ権限一覧（多対多）
     # selectin ローディングでアクセス時に一括取得
     permissions: Mapped[List["Permission"]] = relationship(
-        secondary=role_global_permissions, lazy="selectin"
+        secondary=organization_role_permissions, lazy="selectin"
     )
 
     def __repr__(self):
-        return f"<RoleGlobal {self.name}>"
+        return f"<OrganizationRole {self.name}>"
 
     def has_permission(self, code: str) -> bool:
         """指定パーミッションコードを持つか確認する。"""

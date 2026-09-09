@@ -7,16 +7,16 @@ from app.extensions import db, mail
 from app.model import User
 from app.model.invitation import Invitation
 from app.model.organization import Organization, OrganizationMember
-from app.model.rbac import RoleGlobal
+from app.model.rbac import OrganizationRole
 
 UTC = timezone.utc
 
 
-def get_role_global_by_name(name: str) -> RoleGlobal:
-    """ロール名から RoleGlobal を取得する。見つからなければ ValueError を送出する。"""
+def get_organization_role_by_name(name: str) -> OrganizationRole:
+    """ロール名から OrganizationRole を取得する。見つからなければ ValueError を送出する。"""
 
     role = db.session.execute(
-        db.select(RoleGlobal).filter_by(name=name)
+        db.select(OrganizationRole).filter_by(name=name)
     ).scalar_one_or_none()
     if not role:
         raise ValueError(f"ロール '{name}' が見つかりません")
@@ -44,7 +44,7 @@ def create_invitation(
         _send_invitation_email(existing, org)
         return existing
 
-    role = get_role_global_by_name(role_name)
+    role = get_organization_role_by_name(role_name)
     invitation = Invitation(
         email=email,
         organization_id=org.id,

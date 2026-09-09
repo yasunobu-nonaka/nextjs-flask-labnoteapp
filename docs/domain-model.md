@@ -12,7 +12,7 @@
 
 ## ロールと権限（RBAC）
 
-### 組織レベルのロール（`OrganizationMember.role_id → RoleGlobal`）
+### 組織レベルのロール（`OrganizationMember.role_id → OrganizationRole`）
 
 | ロール | 想定される役割 |
 |--------|----------------|

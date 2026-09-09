@@ -3,16 +3,16 @@ from typing import List, Optional
 from app.extensions import db
 from app.model import User
 from app.model.organization import Organization, OrganizationMember, OrganizationPolicy
-from app.model.rbac import RoleGlobal
+from app.model.rbac import OrganizationRole
 
 from app.api.organizations.permissions import check_org_membership
 
 
-def get_role_global(name: str) -> RoleGlobal:
-    """ロール名からRoleGlobalオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
+def get_organization_role(name: str) -> OrganizationRole:
+    """ロール名からOrganizationRoleオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
 
     role = db.session.execute(
-        db.select(RoleGlobal).filter_by(name=name)
+        db.select(OrganizationRole).filter_by(name=name)
     ).scalar_one_or_none()
     if not role:
         raise ValueError(f"組織ロール '{name}' が見つかりません")
@@ -30,7 +30,7 @@ def create_organization(name: str, user_id: int, policy_data: Optional[dict] = N
     db.session.flush()  # org.id を確定させる
 
     # 作成者をownerとして登録
-    owner_role = get_role_global("owner")
+    owner_role = get_organization_role("owner")
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org.id,
@@ -79,7 +79,7 @@ def add_org_member(org_id: int, user_id: int, role: str = "member") -> Organizat
     if not user:
         raise ValueError("ユーザーが見つかりません")
 
-    role_obj = get_role_global(role)
+    role_obj = get_organization_role(role)
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org_id,
@@ -95,7 +95,7 @@ def update_org_member_role(member: OrganizationMember, role: str) -> Organizatio
 
     if role == "owner":
         raise ValueError("ownerロールは直接付与できません")
-    role_obj = get_role_global(role)
+    role_obj = get_organization_role(role)
     member.role_id = role_obj.id
     db.session.commit()
     return member
@@ -128,8 +128,8 @@ def transfer_org_ownership(org_id: int, new_owner_user_id: int, current_owner_us
     if not new_owner:
         raise ValueError("指定されたユーザーはこの組織のメンバーではありません")
 
-    owner_role = get_role_global("owner")
-    member_role = get_role_global("member")
+    owner_role = get_organization_role("owner")
+    member_role = get_organization_role("member")
 
     current_owner.role_id = member_role.id
     new_owner.role_id = owner_role.id
