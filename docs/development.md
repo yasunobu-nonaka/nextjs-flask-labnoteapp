@@ -40,6 +40,12 @@ docker compose down
 
 ## フロントエンド（`frontend/` ディレクトリ内で実行）
 
+Docker Composeで起動する場合は `compose.yaml` の `environment` で `NEXT_PUBLIC_API_URL` が直接渡されるため以下の手順は不要。`npm run dev` をDocker外で直接動かす場合のみ、`frontend/.env.local.sample` を `frontend/.env.local` にコピーする。
+
+```bash
+cp frontend/.env.local.sample frontend/.env.local
+```
+
 ```bash
 npm run dev         # 開発サーバー
 npx tsc --noEmit    # 型チェック（出力ファイルなし）
