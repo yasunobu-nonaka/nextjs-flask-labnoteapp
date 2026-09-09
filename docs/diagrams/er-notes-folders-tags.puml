@@ -1,0 +1,70 @@
+@startuml notes_folders_tags
+skinparam backgroundColor white
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty members
+
+entity "USERS" as USERS {
+  * id : Integer <<PK>>
+  --
+  username : String(100)
+  email : String(120)
+}
+
+entity "GROUPS" as GROUPS {
+  * id : Integer <<PK>>
+  --
+  organization_id : Integer <<FK>>
+  name : String(200)
+  is_private : Boolean
+  created_at : DateTime
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "NOTES" as NOTES {
+  * id : Integer <<PK>>
+  --
+  group_id : Integer <<FK>>
+  created_by_user_id : Integer <<FK>>
+  title : String(200)
+  content_md : Text
+  is_private : Boolean
+  folder_id : Integer <<FK>>
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+entity "PRIVATE_NOTE_MEMBERS" as PRIVATE_NOTE_MEMBERS {
+  * note_id : Integer <<PK,FK>>
+  * user_id : Integer <<PK,FK>>
+  --
+  role : String(20)
+  invited_at : DateTime
+}
+
+entity "TAGS" as TAGS {
+  * id : Integer <<PK>>
+  --
+  group_id : Integer <<FK>>
+  tagname : String(20)
+}
+
+entity "FOLDERS" as FOLDERS {
+  * id : Integer <<PK>>
+  --
+  group_id : Integer <<FK>>
+  created_by_user_id : Integer <<FK>>
+  parent_id : Integer <<FK>>
+  name : String(100)
+}
+
+USERS ||--o{ PRIVATE_NOTE_MEMBERS
+GROUPS ||--o{ NOTES
+GROUPS ||--o{ FOLDERS
+GROUPS ||--o{ TAGS
+NOTES ||--o{ PRIVATE_NOTE_MEMBERS
+NOTES }o--o{ TAGS
+NOTES }o--o| FOLDERS
+FOLDERS |o--o{ FOLDERS
+@enduml

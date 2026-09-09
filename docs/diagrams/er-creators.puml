@@ -1,0 +1,55 @@
+@startuml creators
+skinparam backgroundColor white
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty members
+
+entity "USERS" as USERS {
+  * id : Integer <<PK>>
+  --
+  username : String(100)
+  email : String(120)
+}
+
+entity "ORGANIZATIONS" as ORGANIZATIONS {
+  * id : Integer <<PK>>
+  --
+  name : String(200)
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "GROUPS" as GROUPS {
+  * id : Integer <<PK>>
+  --
+  name : String(200)
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "NOTES" as NOTES {
+  * id : Integer <<PK>>
+  --
+  title : String(200)
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "FOLDERS" as FOLDERS {
+  * id : Integer <<PK>>
+  --
+  name : String(100)
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "INVITATIONS" as INVITATIONS {
+  * id : Integer <<PK>>
+  --
+  email : String(254)
+  invited_by_user_id : Integer <<FK>>
+}
+
+USERS ||--o{ ORGANIZATIONS
+USERS ||--o{ GROUPS
+USERS ||--o{ NOTES
+USERS ||--o{ FOLDERS
+USERS ||--o{ INVITATIONS
+@enduml

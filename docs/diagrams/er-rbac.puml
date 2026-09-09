@@ -1,0 +1,58 @@
+@startuml rbac
+skinparam backgroundColor white
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty members
+
+entity "ORGANIZATION_MEMBERS" as ORGANIZATION_MEMBERS {
+  * user_id : Integer <<PK,FK>>
+  * organization_id : Integer <<PK,FK>>
+  --
+  role_id : Integer <<FK>>
+  joined_at : DateTime
+}
+
+entity "INVITATIONS" as INVITATIONS {
+  * id : Integer <<PK>>
+  --
+  role_id : Integer <<FK>>
+  status : String(20)
+}
+
+entity "ROLES_GLOBAL" as ROLES_GLOBAL {
+  * id : Integer <<PK>>
+  --
+  name : String(100)
+  description : String(500)
+}
+
+entity "GROUP_MEMBERS" as GROUP_MEMBERS {
+  * user_id : Integer <<PK,FK>>
+  * group_id : Integer <<PK,FK>>
+  --
+  role_id : Integer <<FK>>
+  joined_at : DateTime
+  status : String(20)
+}
+
+entity "ROLES_LOCAL" as ROLES_LOCAL {
+  * id : Integer <<PK>>
+  --
+  name : String(100)
+  description : String(500)
+}
+
+entity "PERMISSIONS" as PERMISSIONS {
+  * id : Integer <<PK>>
+  --
+  code : String(100)
+  description : String(500)
+}
+
+ORGANIZATION_MEMBERS }o--|| ROLES_GLOBAL
+INVITATIONS }o--|| ROLES_GLOBAL
+ROLES_GLOBAL }o--o{ PERMISSIONS
+GROUP_MEMBERS }o--|| ROLES_LOCAL
+ROLES_LOCAL }o--o{ PERMISSIONS
+@enduml

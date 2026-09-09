@@ -1,0 +1,85 @@
+@startuml organization
+skinparam backgroundColor white
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty members
+
+entity "USERS" as USERS {
+  * id : Integer <<PK>>
+  --
+  username : String(100)
+  email : String(120)
+  password_hash : String(255)
+  verified : Boolean
+  reset_token_hash : String(64)
+  pending_email : String(120)
+  created_at : DateTime
+}
+
+entity "ORGANIZATIONS" as ORGANIZATIONS {
+  * id : Integer <<PK>>
+  --
+  name : String(200)
+  created_at : DateTime
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "ORGANIZATION_MEMBERS" as ORGANIZATION_MEMBERS {
+  * user_id : Integer <<PK,FK>>
+  * organization_id : Integer <<PK,FK>>
+  --
+  role_id : Integer <<FK>>
+  joined_at : DateTime
+}
+
+entity "ORGANIZATION_POLICIES" as ORGANIZATION_POLICIES {
+  * id : Integer <<PK>>
+  --
+  organization_id : Integer <<FK>>
+  allow_private_groups : Boolean
+  allow_private_notes : Boolean
+  who_can_create_groups : String(50)
+  default_join_method : String(50)
+}
+
+entity "GROUPS" as GROUPS {
+  * id : Integer <<PK>>
+  --
+  organization_id : Integer <<FK>>
+  name : String(200)
+  is_private : Boolean
+  created_at : DateTime
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "INVITATIONS" as INVITATIONS {
+  * id : Integer <<PK>>
+  --
+  token : String(36)
+  email : String(254)
+  organization_id : Integer <<FK>>
+  invited_by_user_id : Integer <<FK>>
+  role_id : Integer <<FK>>
+  status : String(20)
+  created_at : DateTime
+  expires_at : DateTime
+}
+
+entity "NOTIFICATIONS" as NOTIFICATIONS {
+  * id : Integer <<PK>>
+  --
+  user_id : Integer <<FK>>
+  message : String(500)
+  link_url : String(500)
+  is_read : Boolean
+  created_at : DateTime
+}
+
+USERS ||--o{ ORGANIZATION_MEMBERS
+USERS ||--o{ NOTIFICATIONS
+ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS
+ORGANIZATIONS ||--o| ORGANIZATION_POLICIES
+ORGANIZATIONS ||--o{ GROUPS
+ORGANIZATIONS ||--o{ INVITATIONS
+@enduml

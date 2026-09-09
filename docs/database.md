@@ -4,121 +4,58 @@ SQLAlchemy 2.0 の `Mapped` / `mapped_column` スタイルで定義されてい�
 
 ## ER図
 
-関係線の密集を避けるため、テーマごとに4枚に分けている。`GROUPS` / `NOTES` など複数の図にまたがるテーブルは、それぞれの図で見やすくするために重複して記載している。
+[PlantUML](https://plantuml.com/ja/ie-diagram)のEntity記法（`skinparam linetype ortho` + 鳥の足記法）で生成した画像。テーマごとに分けており、`GROUPS` / `NOTES` など複数の図にまたがるテーブルは、それぞれの図で見やすくするために重複して記載している。
+
+各図のPlantUMLソース（`.puml`）は画像と同じ `docs/diagrams/` に置いてあり、以下のコマンドで再生成できる。
+
+```bash
+export PLANTUML_LIMIT_SIZE=16384   # 大きい図はデフォルト上限(4096px)を超えるため必須
+plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.puml -o docs/diagrams
+```
+
+**テーブル定義やリレーションを変更した場合は、対応する `.puml` を手動で直して再生成すること**（自動連動はしていない）。
 
 ### 記法の読み方
 
-Mermaid の `erDiagram` は「鳥の足記法（crow's foot notation）」で書かれている。線の両端の記号がそれぞれの側の**多重度（何件あり得るか）**を表す。
+鳥の足記法（crow's foot notation）。線の両端の記号がそれぞれの側の**多重度（何件あり得るか）**を表す。
 
 | 記号 | 意味 |
 |------|------|
-| `\|\|` | ちょうど1件（必須） |
-| `o\|` | 0件または1件（任意） |
-| `}o` | 0件以上（任意・多数） |
-| `}\|` | 1件以上（必須・多数） |
+| 二重線 `⊣⊢` | ちょうど1件（必須） |
+| 丸＋線 `○⊢` | 0件または1件（任意） |
+| 鳥の足 `○<` | 0件以上（任意・多数） |
 
-例えば `ORGANIZATIONS \|\|--o{ GROUPS : has` は「1つの組織（`\|\|`＝ちょうど1）に対して、グループは0件以上（`o{`）」、つまり組織1件に対してグループが複数ぶら下がる1対多の関係を表す。`ROLES_GLOBAL }o--o{ PERMISSIONS` のように両端が `}o` になっている場合は多対多の関係（間に中間テーブルがある）を表す。ラベル（`: has` の部分）は関係の意味を補足するコメント。
+例えば ORGANIZATIONS と GROUPS の関係は「1つの組織（二重線＝ちょうど1）に対して、グループは0件以上（鳥の足）」、つまり組織1件に対してグループが複数ぶら下がる1対多の関係を表す。ROLES_GLOBAL と PERMISSIONS のように両端が鳥の足になっている場合は多対多の関係（間に中間テーブルがある）を表す。
 
 ### 全体像
 
-以下は全テーブルを1枚にまとめたもの。線が密集していて読みにくい部分があるので、詳細を追うときはこの下のテーマ別の図を参照。
+以下は全テーブルをカラムなし（テーブル名のみ）でまとめたもの。線が密集していて読みにくい部分があるので、詳細を追うときはこの下のテーマ別の図を参照。
 
-```mermaid
-erDiagram
-    USERS ||--o{ ORGANIZATION_MEMBERS : has
-    USERS ||--o{ GROUP_MEMBERS : has
-    USERS ||--o{ PRIVATE_NOTE_MEMBERS : has
-    USERS ||--o{ NOTIFICATIONS : receives
-
-    ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS : has
-    ORGANIZATIONS ||--o| ORGANIZATION_POLICIES : has
-    ORGANIZATIONS ||--o{ GROUPS : has
-    ORGANIZATIONS ||--o{ INVITATIONS : has
-
-    ROLES_GLOBAL ||--o{ ORGANIZATION_MEMBERS : "role of"
-    ROLES_GLOBAL ||--o{ INVITATIONS : "grants role"
-    ROLES_GLOBAL }o--o{ PERMISSIONS : "role_global_permissions"
-
-    GROUPS ||--o{ GROUP_MEMBERS : has
-    GROUPS ||--o| GROUP_POLICIES : has
-    GROUPS ||--o{ NOTES : owns
-    GROUPS ||--o{ FOLDERS : owns
-    GROUPS ||--o{ TAGS : owns
-
-    ROLES_LOCAL ||--o{ GROUP_MEMBERS : "role of"
-    ROLES_LOCAL }o--o{ PERMISSIONS : "role_local_permissions"
-
-    NOTES ||--o{ PRIVATE_NOTE_MEMBERS : "shared with"
-    NOTES }o--o{ TAGS : "notes_tags"
-    NOTES }o--o| FOLDERS : "in (nullable)"
-
-    FOLDERS o|--o{ FOLDERS : "parent/children"
-```
+![全体ER図](./diagrams/er-overview.png)
 
 ### 組織構造
 
-```mermaid
-erDiagram
-    USERS ||--o{ ORGANIZATION_MEMBERS : has
-    USERS ||--o{ NOTIFICATIONS : receives
-
-    ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS : has
-    ORGANIZATIONS ||--o| ORGANIZATION_POLICIES : has
-    ORGANIZATIONS ||--o{ GROUPS : has
-    ORGANIZATIONS ||--o{ INVITATIONS : has
-```
+![組織構造ER図](./diagrams/er-organization.png)
 
 ### グループとメンバー
 
-```mermaid
-erDiagram
-    USERS ||--o{ GROUP_MEMBERS : has
-    GROUPS ||--o{ GROUP_MEMBERS : has
-    GROUPS ||--o| GROUP_POLICIES : has
-```
+![グループとメンバーER図](./diagrams/er-group-members.png)
 
 ### ノート・フォルダー・タグ
 
-```mermaid
-erDiagram
-    USERS ||--o{ PRIVATE_NOTE_MEMBERS : has
-    GROUPS ||--o{ NOTES : owns
-    GROUPS ||--o{ FOLDERS : owns
-    GROUPS ||--o{ TAGS : owns
-
-    NOTES ||--o{ PRIVATE_NOTE_MEMBERS : "shared with"
-    NOTES }o--o{ TAGS : "notes_tags"
-    NOTES }o--o| FOLDERS : "in (nullable)"
-
-    FOLDERS o|--o{ FOLDERS : "parent/children"
-```
+![ノート・フォルダー・タグER図](./diagrams/er-notes-folders-tags.png)
 
 ### RBAC（ロール・権限）
 
 `ORGANIZATION_MEMBERS` / `GROUP_MEMBERS` / `INVITATIONS` は上の図にも登場するテーブルだが、ロールとの関係を見やすくするためこちらにも重複して記載している。
 
-```mermaid
-erDiagram
-    ORGANIZATION_MEMBERS }o--|| ROLES_GLOBAL : "has role"
-    INVITATIONS }o--|| ROLES_GLOBAL : "grants role"
-    ROLES_GLOBAL }o--o{ PERMISSIONS : "role_global_permissions"
-
-    GROUP_MEMBERS }o--|| ROLES_LOCAL : "has role"
-    ROLES_LOCAL }o--o{ PERMISSIONS : "role_local_permissions"
-```
+![RBACのER図](./diagrams/er-rbac.png)
 
 ### 作成者関係
 
 「誰がこのレコードを作成したか」を表す `created_by_user_id` / `invited_by_user_id` のFKをまとめたもの（全体像・テーマ別図では省略していたもの）。
 
-```mermaid
-erDiagram
-    USERS ||--o{ ORGANIZATIONS : creates
-    USERS ||--o{ GROUPS : creates
-    USERS ||--o{ NOTES : creates
-    USERS ||--o{ FOLDERS : creates
-    USERS ||--o{ INVITATIONS : invites
-```
+![作成者関係のER図](./diagrams/er-creators.png)
 
 ## テーブル定義
 
