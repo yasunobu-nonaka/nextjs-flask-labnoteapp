@@ -12,6 +12,8 @@ __pycache__/
 # node
 node_modules/
 
+# scratch (frontendテスト・学習用)
+scratch/
 
 # env
 .env
