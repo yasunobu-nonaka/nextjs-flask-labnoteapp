@@ -1,20 +1,20 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from flask import abort
-
 from app.extensions import db
 from app.model import User
 from app.model.group import Group, GroupMember, GroupPolicy
 from app.model.organization import OrganizationMember
-from app.model.rbac import RoleLocal
+from app.model.rbac import GroupRole
+
+from app.api.organizations.permissions import get_any_membership
 
 
-def get_role_local(name: str) -> RoleLocal:
-    """ロール名からRoleLocalオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
+def get_group_role(name: str) -> GroupRole:
+    """ロール名からGroupRoleオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
 
     role = db.session.execute(
-        db.select(RoleLocal).filter_by(name=name)
+        db.select(GroupRole).filter_by(name=name)
     ).scalar_one_or_none()
     if not role:
         raise ValueError(f"グループロール '{name}' が見つかりません")
@@ -70,7 +70,7 @@ def create_group(
     db.session.flush()  # group.id を確定させる
 
     # 作成者をadminとして登録
-    admin_role = get_role_local("admin")
+    admin_role = get_group_role("admin")
     member = GroupMember(
         user_id=user_id,
         group_id=group.id,
@@ -94,7 +94,7 @@ def create_group(
         for m in initial_members:
             if m["user_id"] == user_id:
                 continue
-            role_obj = get_role_local(m.get("role", "editor"))
+            role_obj = get_group_role(m.get("role", "editor"))
             db.session.add(
                 GroupMember(
                     user_id=m["user_id"],
@@ -133,74 +133,20 @@ def get_accessible_groups(org_id: int, user_id: int) -> List[Group]:
     return accessible
 
 
-def require_group_visible(user_id: int, group: Group) -> None:
-    """プライベートグループの非メンバーには 404 を返す。403 を返さないことでグループの存在を漏洩させない。"""
-
-    if group.is_private and not check_group_membership(user_id, group.id):
-        abort(404)
-
-
-def get_group_or_404(group_id: int, org_id: int) -> Group:
-    """グループを取得する。存在しない・組織外の場合は404を返す。"""
-
-    return db.one_or_404(
-        db.select(Group).filter_by(id=group_id, organization_id=org_id)
-    )
-
-
-def get_any_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """status を問わずメンバーシップを返す（active / pending を含む）。"""
-
-    return db.session.execute(
-        db.select(GroupMember).filter_by(user_id=user_id, group_id=group_id)
-    ).scalar_one_or_none()
-
-
-def check_group_membership(user_id: int, group_id: int) -> Optional[GroupMember]:
-    """ユーザーのアクティブなグループメンバーシップを返す。
-    active メンバーでなければ None を返す（RBAC・権限チェックに使用する）。
-    """
-
-    return db.session.execute(
-        db.select(GroupMember).filter_by(
-            user_id=user_id, group_id=group_id, status="active"
-        )
-    ).scalar_one_or_none()
-
-
-def check_group_role(user_id: int, group_id: int, required_roles: List[str]) -> bool:
-    """ユーザーが指定ロールのいずれかを持つかを確認する。"""
-
-    member = check_group_membership(user_id, group_id)
-    return member is not None and member.role.name in required_roles
-
-
-def check_group_permission(user_id: int, group_id: int, permission_code: str) -> bool:
-    """ユーザーが指定のパーミッションコードを持つかを確認する。
-
-    ロール名での判定 (check_group_role) より細粒度の権限チェックが必要な場合に使用する。
-    """
-
-    member = check_group_membership(user_id, group_id)
-    if not member or not member.role:
-        return False
-    return member.role.has_permission(permission_code)
-
-
 def count_active_group_admins(group_id: int) -> int:
     """グループのアクティブなadminロールメンバー数を返す。最後の1人の脱退防止に使う。"""
     from sqlalchemy import func
-    from app.model.rbac import RoleLocal
+    from app.model.rbac import GroupRole
 
     return (
         db.session.execute(
             db.select(func.count())
             .select_from(GroupMember)
-            .join(RoleLocal, GroupMember.role_id == RoleLocal.id)
+            .join(GroupRole, GroupMember.role_id == GroupRole.id)
             .filter(
                 GroupMember.group_id == group_id,
                 GroupMember.status == "active",
-                RoleLocal.name == "admin",
+                GroupRole.name == "admin",
             )
         ).scalar()
         or 0
@@ -218,7 +164,7 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
         if existing.status == "active":
             raise ValueError("ユーザーはすでにこのグループのメンバーです")
         # pending → active に昇格（管理者が直接追加した場合）
-        role_obj = get_role_local(role)
+        role_obj = get_group_role(role)
         existing.status = "active"
         existing.role_id = role_obj.id
         db.session.commit()
@@ -228,7 +174,7 @@ def add_group_member(group_id: int, user_id: int, role: str = "editor") -> Group
     if not user:
         raise ValueError("ユーザーが見つかりません")
 
-    role_obj = get_role_local(role)
+    role_obj = get_group_role(role)
     member = GroupMember(
         user_id=user_id,
         group_id=group_id,
@@ -261,7 +207,7 @@ def request_to_join(group: Group, user_id: int) -> Tuple[GroupMember, str]:
     if join_method == "invite_only":
         raise ValueError("invite_only")
 
-    role_obj = get_role_local("editor")
+    role_obj = get_group_role("editor")
     new_status = "active" if join_method == "open" else "pending"
 
     if existing and existing.status == "rejected":
@@ -367,7 +313,7 @@ def cancel_join_request(group_id: int, user_id: int) -> None:
 def update_group_member_role(member: GroupMember, role: str) -> GroupMember:
     """グループメンバーのロールを変更する。"""
 
-    role_obj = get_role_local(role)
+    role_obj = get_group_role(role)
     member.role_id = role_obj.id
     db.session.commit()
     return member

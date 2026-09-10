@@ -7,17 +7,16 @@ from flask_jwt_extended import jwt_required, current_user
 from marshmallow import ValidationError
 
 from app.schema import FolderCreateSchema, FolderRenameSchema, FolderResponseSchema
-from app.api.folders.folder_service import (
+from app.api.organizations.folder.service import (
     get_folders_service,
     get_folder_or_404_service,
     create_folder_service,
     rename_folder_service,
     delete_folder_service,
 )
-from app.api.organizations.organization_service import check_org_permission
-from app.api.organizations.group_service import get_group_or_404, check_group_permission
+from app.api.organizations.permissions import get_group_or_404, check_org_permission, check_group_permission
 
-from . import organizations_bp
+from .. import organizations_bp
 
 create_schema = FolderCreateSchema()
 rename_schema = FolderRenameSchema()

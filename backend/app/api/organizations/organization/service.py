@@ -1,18 +1,18 @@
 from typing import List, Optional
 
-from flask import abort
-
 from app.extensions import db
 from app.model import User
 from app.model.organization import Organization, OrganizationMember, OrganizationPolicy
-from app.model.rbac import RoleGlobal
+from app.model.rbac import OrganizationRole
+
+from app.api.organizations.permissions import check_org_membership
 
 
-def get_role_global(name: str) -> RoleGlobal:
-    """ロール名からRoleGlobalオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
+def get_organization_role(name: str) -> OrganizationRole:
+    """ロール名からOrganizationRoleオブジェクトを取得する。存在しない場合はValueErrorを送出する。"""
 
     role = db.session.execute(
-        db.select(RoleGlobal).filter_by(name=name)
+        db.select(OrganizationRole).filter_by(name=name)
     ).scalar_one_or_none()
     if not role:
         raise ValueError(f"組織ロール '{name}' が見つかりません")
@@ -30,7 +30,7 @@ def create_organization(name: str, user_id: int, policy_data: Optional[dict] = N
     db.session.flush()  # org.id を確定させる
 
     # 作成者をownerとして登録
-    owner_role = get_role_global("owner")
+    owner_role = get_organization_role("owner")
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org.id,
@@ -68,50 +68,6 @@ def get_organizations_for_user(user_id: int) -> List[Organization]:
     return orgs
 
 
-def get_organization_or_404(org_id: int) -> Organization:
-    """組織を取得する。存在しない場合は404を返す。"""
-
-    return db.one_or_404(
-        db.select(Organization).filter_by(id=org_id)
-    )
-
-
-def check_org_membership(user_id: int, org_id: int) -> Optional[OrganizationMember]:
-    """ユーザーの組織メンバーシップを返す。所属していなければNoneを返す。"""
-
-    return db.session.execute(
-        db.select(OrganizationMember).filter_by(user_id=user_id, organization_id=org_id)
-    ).scalar_one_or_none()
-
-
-def require_org_member(user_id: int, org_id: int) -> OrganizationMember:
-    """組織メンバーでない場合は 404 を返す。403 を返さないことで組織の存在を漏洩させない。"""
-
-    member = check_org_membership(user_id, org_id)
-    if not member:
-        abort(404)
-    return member
-
-
-def check_org_role(user_id: int, org_id: int, required_roles: List[str]) -> bool:
-    """ユーザーが指定ロールのいずれかを持つかを確認する。"""
-
-    member = check_org_membership(user_id, org_id)
-    return member is not None and member.role.name in required_roles
-
-
-def check_org_permission(user_id: int, org_id: int, permission_code: str) -> bool:
-    """ユーザーが指定のパーミッションコードを持つかを確認する。
-
-    ロール名での判定 (check_org_role) より細粒度の権限チェックが必要な場合に使用する。
-    """
-
-    member = check_org_membership(user_id, org_id)
-    if not member or not member.role:
-        return False
-    return member.role.has_permission(permission_code)
-
-
 def add_org_member(org_id: int, user_id: int, role: str = "member") -> OrganizationMember:
     """組織にメンバーを追加する。すでに所属している場合はValueErrorを送出する。"""
 
@@ -123,7 +79,7 @@ def add_org_member(org_id: int, user_id: int, role: str = "member") -> Organizat
     if not user:
         raise ValueError("ユーザーが見つかりません")
 
-    role_obj = get_role_global(role)
+    role_obj = get_organization_role(role)
     member = OrganizationMember(
         user_id=user_id,
         organization_id=org_id,
@@ -139,7 +95,7 @@ def update_org_member_role(member: OrganizationMember, role: str) -> Organizatio
 
     if role == "owner":
         raise ValueError("ownerロールは直接付与できません")
-    role_obj = get_role_global(role)
+    role_obj = get_organization_role(role)
     member.role_id = role_obj.id
     db.session.commit()
     return member
@@ -172,8 +128,8 @@ def transfer_org_ownership(org_id: int, new_owner_user_id: int, current_owner_us
     if not new_owner:
         raise ValueError("指定されたユーザーはこの組織のメンバーではありません")
 
-    owner_role = get_role_global("owner")
-    member_role = get_role_global("member")
+    owner_role = get_organization_role("owner")
+    member_role = get_organization_role("member")
 
     current_owner.role_id = member_role.id
     new_owner.role_id = owner_role.id

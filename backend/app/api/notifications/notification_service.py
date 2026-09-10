@@ -3,14 +3,14 @@ from typing import List
 from app.extensions import db
 from app.model.group import GroupMember
 from app.model.notification import Notification
-from app.model.rbac import RoleLocal
+from app.model.rbac import GroupRole
 
 
 def get_join_request_notifications(user_id: int) -> List[dict]:
     """ログインユーザーがグループ admin を務めるグループへの参加申請を一括取得して通知リストとして返す。
 
     対象グループ:
-    - ユーザーが group admin（RoleLocal.name='admin'）として active 所属しているグループ
+    - ユーザーが group admin（GroupRole.name='admin'）として active 所属しているグループ
 
     2クエリで完結する（N+1 なし）。
     """
@@ -18,11 +18,11 @@ def get_join_request_notifications(user_id: int) -> List[dict]:
     # 1. ユーザーが admin を持つグループ ID を取得する
     admin_group_ids = db.session.execute(
         db.select(GroupMember.group_id)
-        .join(RoleLocal, GroupMember.role_id == RoleLocal.id)
+        .join(GroupRole, GroupMember.role_id == GroupRole.id)
         .filter(
             GroupMember.user_id == user_id,
             GroupMember.status == "active",
-            RoleLocal.name == "admin",
+            GroupRole.name == "admin",
         )
     ).scalars().all()
 

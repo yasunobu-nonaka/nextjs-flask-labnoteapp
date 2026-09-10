@@ -1,6 +1,6 @@
 """
 RBACシステムのテスト。
-Permission・RoleGlobal・RoleLocal のシードデータ検証と、
+Permission・OrganizationRole・GroupRole のシードデータ検証と、
 パーミッションチェック関数の動作を検証する。
 """
 
@@ -8,7 +8,7 @@ import pytest
 from conftest import register_user, login_and_get_token
 from app.extensions import db
 from app.model import User
-from app.model.rbac import Permission, RoleGlobal, RoleLocal
+from app.model.rbac import Permission, OrganizationRole, GroupRole
 
 
 def register_and_get_headers(client, username: str, email: str, password: str = "password1234"):
@@ -58,7 +58,7 @@ class TestRbacSeedData:
         with app.app_context():
             for role_name in ["owner", "sys_admin", "user_admin", "member"]:
                 role = db.session.execute(
-                    db.select(RoleGlobal).filter_by(name=role_name)
+                    db.select(OrganizationRole).filter_by(name=role_name)
                 ).scalar_one_or_none()
                 assert role is not None, f"組織ロール '{role_name}' がDBに存在しない"
 
@@ -67,20 +67,20 @@ class TestRbacSeedData:
         with app.app_context():
             for role_name in ["admin", "editor", "viewer"]:
                 role = db.session.execute(
-                    db.select(RoleLocal).filter_by(name=role_name)
+                    db.select(GroupRole).filter_by(name=role_name)
                 ).scalar_one_or_none()
                 assert role is not None, f"グループロール '{role_name}' がDBに存在しない"
 
 
 ###############################################
-#  RoleGlobal パーミッション検証
+#  OrganizationRole パーミッション検証
 ###############################################
-class TestRoleGlobalPermissions:
+class TestOrganizationRolePermissions:
     def test_owner_has_all_org_permissions(self, app):
         """ownerは全ての組織パーミッションを持つ。"""
         with app.app_context():
             owner = db.session.execute(
-                db.select(RoleGlobal).filter_by(name="owner")
+                db.select(OrganizationRole).filter_by(name="owner")
             ).scalar_one()
 
             assert owner.has_permission("org:read")
@@ -96,7 +96,7 @@ class TestRoleGlobalPermissions:
         """sys_adminはorg:deleteを持たない。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleGlobal).filter_by(name="sys_admin")
+                db.select(OrganizationRole).filter_by(name="sys_admin")
             ).scalar_one()
             assert not role.has_permission("org:delete")
 
@@ -104,7 +104,7 @@ class TestRoleGlobalPermissions:
         """user_adminはorg:editを持たない（設定変更不可）。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleGlobal).filter_by(name="user_admin")
+                db.select(OrganizationRole).filter_by(name="user_admin")
             ).scalar_one()
             assert not role.has_permission("org:edit")
             assert not role.has_permission("org:member_role_assign")
@@ -113,7 +113,7 @@ class TestRoleGlobalPermissions:
         """memberはorg:readとorg:group_createのみを持つ。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleGlobal).filter_by(name="member")
+                db.select(OrganizationRole).filter_by(name="member")
             ).scalar_one()
             assert role.has_permission("org:read")
             assert role.has_permission("org:group_create")
@@ -123,14 +123,14 @@ class TestRoleGlobalPermissions:
 
 
 ###############################################
-#  RoleLocal パーミッション検証
+#  GroupRole パーミッション検証
 ###############################################
-class TestRoleLocalPermissions:
+class TestGroupRolePermissions:
     def test_admin_has_all_group_permissions(self, app):
         """グループadminは全てのグループパーミッションを持つ。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleLocal).filter_by(name="admin")
+                db.select(GroupRole).filter_by(name="admin")
             ).scalar_one()
 
             assert role.has_permission("group:read")
@@ -148,7 +148,7 @@ class TestRoleLocalPermissions:
         """editorはグループ設定・メンバー管理権限を持たない。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleLocal).filter_by(name="editor")
+                db.select(GroupRole).filter_by(name="editor")
             ).scalar_one()
             assert not role.has_permission("group:edit")
             assert not role.has_permission("group:delete")
@@ -158,7 +158,7 @@ class TestRoleLocalPermissions:
         """editorはノートの全CRUD権限を持つ。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleLocal).filter_by(name="editor")
+                db.select(GroupRole).filter_by(name="editor")
             ).scalar_one()
             assert role.has_permission("note:create")
             assert role.has_permission("note:read")
@@ -169,7 +169,7 @@ class TestRoleLocalPermissions:
         """viewerはgroup:readとnote:readのみを持つ。"""
         with app.app_context():
             role = db.session.execute(
-                db.select(RoleLocal).filter_by(name="viewer")
+                db.select(GroupRole).filter_by(name="viewer")
             ).scalar_one()
             assert role.has_permission("group:read")
             assert role.has_permission("note:read")

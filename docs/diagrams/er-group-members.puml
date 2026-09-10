@@ -1,0 +1,48 @@
+@startuml group_members
+skinparam backgroundColor white
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty members
+
+entity "USERS" as USERS {
+  * id : Integer <<PK>>
+  --
+  username : String(100)
+  email : String(120)
+}
+
+entity "GROUPS" as GROUPS {
+  * id : Integer <<PK>>
+  --
+  organization_id : Integer <<FK>>
+  name : String(200)
+  is_private : Boolean
+  created_at : DateTime
+  created_by_user_id : Integer <<FK>>
+}
+
+entity "GROUP_MEMBERS" as GROUP_MEMBERS {
+  * user_id : Integer <<PK,FK>>
+  * group_id : Integer <<PK,FK>>
+  --
+  role_id : Integer <<FK>>
+  joined_at : DateTime
+  status : String(20)
+  approved_at : DateTime
+  rejected_at : DateTime
+}
+
+entity "GROUP_POLICIES" as GROUP_POLICIES {
+  * id : Integer <<PK>>
+  --
+  group_id : Integer <<FK>>
+  allow_private_notes : Boolean
+  join_method : String(50)
+  is_notes_visible_to_org : Boolean
+}
+
+USERS ||--o{ GROUP_MEMBERS
+GROUPS ||--o{ GROUP_MEMBERS
+GROUPS ||--o| GROUP_POLICIES
+@enduml

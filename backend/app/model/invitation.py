@@ -49,9 +49,9 @@ class Invitation(db.Model):
     invited_by_user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    # 承認後に付与するロール（RoleGlobal の id）
+    # 承認後に付与するロール（OrganizationRole の id）
     role_id: Mapped[int] = mapped_column(
-        ForeignKey("roles_global.id"), nullable=False
+        ForeignKey("organization_roles.id"), nullable=False
     )
     # 招待の状態: pending（未承認）/ accepted（承認済み）/ expired（期限切れ）
     status: Mapped[str] = mapped_column(
@@ -69,7 +69,7 @@ class Invitation(db.Model):
     invited_by: Mapped["User"] = relationship(  # type: ignore[name-defined]  # noqa: F821
         foreign_keys=[invited_by_user_id], viewonly=True
     )
-    role: Mapped["RoleGlobal"] = relationship(viewonly=True)  # type: ignore[name-defined]  # noqa: F821
+    role: Mapped["OrganizationRole"] = relationship(viewonly=True)  # type: ignore[name-defined]  # noqa: F821
 
     def is_valid(self) -> bool:
         """トークンが有効（pending かつ期限内）かどうかを返す。

@@ -7,11 +7,11 @@ RBACの初期データ（権限・ロール）のシード関数。
 """
 
 from app.extensions import db
-from app.model.rbac import Permission, RoleGlobal, RoleLocal
+from app.model.rbac import Permission, OrganizationRole, GroupRole
 
 # --- 権限定義 ---
 
-# 組織レベルの権限（RoleGlobal で使用）
+# 組織レベルの権限（OrganizationRole で使用）
 ORG_PERMISSIONS = [
     ("org:read",               "組織情報の閲覧"),
     ("org:edit",               "組織名・ポリシーの変更"),
@@ -23,7 +23,7 @@ ORG_PERMISSIONS = [
     ("org:group_manage_any",   "任意グループの管理（組織管理者権限）"),
 ]
 
-# グループレベルの権限（RoleLocal で使用）
+# グループレベルの権限（GroupRole で使用）
 GROUP_PERMISSIONS = [
     ("group:read",               "グループ情報の閲覧"),
     ("group:edit",               "グループ名・ポリシーの変更"),
@@ -39,7 +39,7 @@ GROUP_PERMISSIONS = [
 
 # --- ロール定義 ---
 
-# 組織ロール（RoleGlobal）と付与する権限コードのマッピング
+# 組織ロール（OrganizationRole）と付与する権限コードのマッピング
 ORG_ROLE_DEFINITIONS = {
     "owner": {
         "description": "組織の作成者。全権を持つ。",
@@ -74,7 +74,7 @@ ORG_ROLE_DEFINITIONS = {
     },
 }
 
-# グループロール（RoleLocal）と付与する権限コードのマッピング
+# グループロール（GroupRole）と付与する権限コードのマッピング
 GROUP_ROLE_DEFINITIONS = {
     "admin": {
         "description": "グループ管理者。グループ設定・メンバー管理・ノート全操作が可能。",
@@ -119,26 +119,26 @@ def seed_rbac() -> None:
 
     db.session.flush()  # Permission.id を確定させる
 
-    # --- Step 2: 組織ロール（RoleGlobal）の作成 ---
+    # --- Step 2: 組織ロール（OrganizationRole）の作成 ---
     for role_name, defn in ORG_ROLE_DEFINITIONS.items():
         role = db.session.execute(
-            db.select(RoleGlobal).filter_by(name=role_name)
+            db.select(OrganizationRole).filter_by(name=role_name)
         ).scalar_one_or_none()
         if not role:
-            role = RoleGlobal(
+            role = OrganizationRole(
                 name=role_name,
                 description=defn["description"],
                 permissions=[perm_by_code[c] for c in defn["permissions"]],
             )
             db.session.add(role)
 
-    # --- Step 3: グループロール（RoleLocal）の作成 ---
+    # --- Step 3: グループロール（GroupRole）の作成 ---
     for role_name, defn in GROUP_ROLE_DEFINITIONS.items():
         role = db.session.execute(
-            db.select(RoleLocal).filter_by(name=role_name)
+            db.select(GroupRole).filter_by(name=role_name)
         ).scalar_one_or_none()
         if not role:
-            role = RoleLocal(
+            role = GroupRole(
                 name=role_name,
                 description=defn["description"],
                 permissions=[perm_by_code[c] for c in defn["permissions"]],

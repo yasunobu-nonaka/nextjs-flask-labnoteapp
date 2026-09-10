@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.model.rbac import RoleLocal  # noqa: F401
+from app.model.rbac import GroupRole  # noqa: F401
 
 from app.extensions import db
 
@@ -68,7 +68,7 @@ class Group(db.Model):
 
 
 class GroupMember(db.Model):
-    """グループとユーザーの中間テーブル。RoleLocal FK でロール（役割）を持つ。
+    """グループとユーザーの中間テーブル。GroupRole FK でロール（役割）を持つ。
 
     status: 'active'（正式メンバー）| 'pending'（参加申請中）
     """
@@ -78,9 +78,9 @@ class GroupMember(db.Model):
     # 複合主キー
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), primary_key=True)
-    # Phase 2: 文字列ロールを RoleLocal FK に変更
+    # Phase 2: 文字列ロールを GroupRole FK に変更
     # member.role.name で 'admin'|'editor'|'viewer' を取得
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles_local.id"), nullable=False)
+    role_id: Mapped[int] = mapped_column(ForeignKey("group_roles.id"), nullable=False)
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc
     )
@@ -95,7 +95,7 @@ class GroupMember(db.Model):
     user: Mapped["User"] = relationship(back_populates="group_memberships")
     group: Mapped["Group"] = relationship(back_populates="members")
     # joined ローディングでリクエストごとの追加クエリを避ける
-    role: Mapped["RoleLocal"] = relationship(foreign_keys=[role_id], lazy="joined")
+    role: Mapped["GroupRole"] = relationship(foreign_keys=[role_id], lazy="joined")
 
     def __repr__(self):
         role_name = self.role.name if self.role else "?"
