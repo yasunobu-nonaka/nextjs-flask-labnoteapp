@@ -43,4 +43,5 @@
 - [database.md](./database.md) — テーブル定義・ER図・制約
 - [api-reference.md](./api-reference.md) — API ルート一覧
 - [development.md](./development.md) — セットアップ・コマンド・マイグレーション手順
+- [testing.md](./testing.md) — 各テストファイルの内容一覧
 - [roadmap.md](./roadmap.md) — フェーズ計画

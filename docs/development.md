@@ -66,6 +66,8 @@ pytest tests/test_notes.py::test_fn   # 単一テスト
 
 `TestingConfig` によりインメモリSQLiteに接続するため、Dockerの `db` サービスを起動していなくてもテストできる。`conftest.py` が `.env.development` を読み込み、`db.create_all()` 後に `seed_rbac()` でRBACのシードデータを投入する。
 
+各テストファイルが何をカバーしているかは [testing.md](./testing.md) を参照。
+
 ## データベースマイグレーション
 
 **マイグレーションはDockerコンテナ内で実行する必要がある**（DBホスト `db` はDockerネットワーク内からしか到達できないため）。
