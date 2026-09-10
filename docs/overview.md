@@ -42,6 +42,7 @@
 - [domain-model.md](./domain-model.md) — Organization / Group / Role / Permission などのドメイン概念
 - [database.md](./database.md) — テーブル定義・ER図・制約
 - [api-reference.md](./api-reference.md) — API ルート一覧
+- [security.md](./security.md) — セキュリティ設計（認証・非公開リソースの秘匿・権限ロックアウト防止など）
 - [development.md](./development.md) — セットアップ・コマンド・マイグレーション手順
 - [testing.md](./testing.md) — 各テストファイルの内容一覧
 - [roadmap.md](./roadmap.md) — フェーズ計画
