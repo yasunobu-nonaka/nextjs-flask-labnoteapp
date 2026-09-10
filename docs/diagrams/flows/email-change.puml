@@ -1,0 +1,38 @@
+@startuml email_change_flow
+title メールアドレス変更フロー
+skinparam backgroundColor white
+skinparam defaultFontSize 16
+
+|ユーザー|
+start
+:新しいメールアドレスを入力（ログイン中）\nPATCH /api/auth/me/email;
+
+|バックエンド|
+if (同一メール / 既に使用中?) then (yes)
+  :400 / 409エラー;
+  stop
+else (no)
+endif
+:pending_email に新アドレスを保存\n(email はまだ変更しない);
+:generate_email_change_token(new_email)\n署名付きトークンを発行\n(salt="email-change");
+:確認メールを新アドレス宛に送信\n/verify-email-change/{token};
+
+|ユーザー|
+:新アドレス宛メールのリンクをクリック;
+
+|バックエンド|
+:GET /api/auth/verify-email-change/<token>;
+:verify_email_change_token(token)\n署名・有効期限(30分)を検証;
+
+if (トークン有効?) then (yes)
+  :pending_email に一致するユーザーを検索;
+  if (その間に他ユーザーが同じメールを使用?) then (yes)
+    :409エラー;
+  else (no)
+    :email を新アドレスに更新\npending_email をクリア;
+  endif
+else (no)
+  :400エラー;
+endif
+stop
+@enduml

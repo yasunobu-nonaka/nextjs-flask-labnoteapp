@@ -55,6 +55,10 @@ RBACのシードデータは `app/model/seed_rbac.py` で投入される。テ�
 | `request` | 参加申請 → グループ管理者が承認/却下 |
 | `invite_only` | 招待された場合のみ参加可能 |
 
+詳細なフロー（承認・拒否・キャンセル・拒否後の再申請を含む）は以下を参照。
+
+![グループ参加フロー](./diagrams/flows/group-join.png)
+
 組織への参加は、組織管理者によるメールアドレス指定の招待（`Invitation` モデル、トークンベース）を通じて行われる。招待の状態は `pending` / `accepted` / `expired`。
 
 参加申請の承認・却下は `Notification` モデル経由でアプリ内通知として申請者に届く。

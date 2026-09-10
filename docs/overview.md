@@ -25,8 +25,8 @@
 
 | レイヤー | 技術 |
 |---------|------|
-| フロントエンド | Next.js 16 (App Router) / React 19 / TypeScript |
-| バックエンド | Flask / SQLAlchemy 2.0 / Marshmallow |
+| フロントエンド | Next.js 16 (App Router) / React 19 / TypeScript / Tailwind CSS / react-hook-form + zod / @uiw/react-md-editor |
+| バックエンド | Flask / Flask-SQLAlchemy（SQLAlchemy 2.0） / Flask-Migrate（Alembic） / Marshmallow / Flask-CORS / Flask-Mail |
 | データベース | PostgreSQL 16（本番）/ SQLite（テスト） |
 | 認証 | Flask-JWT-Extended（アクセストークン + リフレッシュトークン） |
 | フロントエンドテスト | Jest / React Testing Library / MSW |
@@ -42,6 +42,7 @@
 - [domain-model.md](./domain-model.md) — Organization / Group / Role / Permission などのドメイン概念
 - [database.md](./database.md) — テーブル定義・ER図・制約
 - [api-reference.md](./api-reference.md) — API ルート一覧
+- [security.md](./security.md) — セキュリティ設計（認証・非公開リソースの秘匿・権限ロックアウト防止など）
 - [development.md](./development.md) — セットアップ・コマンド・マイグレーション手順
 - [testing.md](./testing.md) — 各テストファイルの内容一覧
 - [roadmap.md](./roadmap.md) — フェーズ計画

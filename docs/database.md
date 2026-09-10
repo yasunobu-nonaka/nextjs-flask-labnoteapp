@@ -6,14 +6,19 @@ SQLAlchemy 2.0 の `Mapped` / `mapped_column` スタイルで定義されてい�
 
 [PlantUML](https://plantuml.com/ja/ie-diagram)のEntity記法（`skinparam linetype ortho` + 鳥の足記法）で生成した画像。テーマごとに分けており、`GROUPS` / `NOTES` など複数の図にまたがるテーブルは、それぞれの図で見やすくするために重複して記載している。
 
-各図のPlantUMLソース（`.puml`）は画像と同じ `docs/diagrams/` に置いてあり、以下のコマンドで再生成できる。`plantuml` コマンドが無ければ事前にインストールする（macOSは `brew install plantuml`。Java実行環境が必要で、Homebrew経由なら依存関係として自動的に入る）。
+`docs/diagrams/`配下は図の種類ごとにサブフォルダーで分けている。
+
+- `docs/diagrams/er/` — このページのER図（Entity記法）
+- `docs/diagrams/flows/` — [security.md](./security.md)・[domain-model.md](./domain-model.md)で使っているフローチャート（アクティビティ図）
+
+各図のPlantUMLソース（`.puml`）は画像と同じフォルダに置いてあり、以下のコマンドで再生成できる（`<フォルダー>`は`er`または`flows`）。`plantuml` コマンドが無ければ事前にインストールする（macOSは `brew install plantuml`。Java実行環境が必要で、Homebrew経由なら依存関係として自動的に入る）。
 
 ```bash
 export PLANTUML_LIMIT_SIZE=16384   # 大きい図はデフォルト上限(4096px)を超えるため必須
-plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.puml -o docs/diagrams
+plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<フォルダー>/<ファイル名>.puml -o docs/diagrams/<フォルダー>
 ```
 
-**テーブル定義やリレーションを変更した場合は、対応する `.puml` を手動で直して再生成すること**（自動連動はしていない）。
+**テーブル定義・リレーション・フロー自体を変更した場合は、対応する `.puml` を手動で直して再生成すること**（自動連動はしていない）。
 
 ### 記法の読み方
 
@@ -31,31 +36,31 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<ファイル名>.pu
 
 以下は全テーブルをカラムなし（テーブル名のみ）でまとめたもの。線が密集していて読みにくい部分があるので、詳細を追うときはこの下のテーマ別の図を参照。
 
-![全体ER図](./diagrams/er-overview.png)
+![全体ER図](./diagrams/er/overview.png)
 
 ### 組織構造
 
-![組織構造ER図](./diagrams/er-organization.png)
+![組織構造ER図](./diagrams/er/organization.png)
 
 ### グループとメンバー
 
-![グループとメンバーER図](./diagrams/er-group-members.png)
+![グループとメンバーER図](./diagrams/er/group-members.png)
 
 ### ノート・フォルダー・タグ
 
-![ノート・フォルダー・タグER図](./diagrams/er-notes-folders-tags.png)
+![ノート・フォルダー・タグER図](./diagrams/er/notes-folders-tags.png)
 
 ### RBAC（ロール・権限）
 
 `ORGANIZATION_MEMBERS` / `GROUP_MEMBERS` / `INVITATIONS` は上の図にも登場するテーブルだが、ロールとの関係を見やすくするためこちらにも重複して記載している。
 
-![RBACのER図](./diagrams/er-rbac.png)
+![RBACのER図](./diagrams/er/rbac.png)
 
 ### 作成者関係
 
 「誰がこのレコードを作成したか」を表す `created_by_user_id` / `invited_by_user_id` のFKをまとめたもの（全体像・テーマ別図では省略していたもの）。
 
-![作成者関係のER図](./diagrams/er-creators.png)
+![作成者関係のER図](./diagrams/er/creators.png)
 
 ## テーブル定義
 

@@ -1,0 +1,60 @@
+@startuml group_join_flow
+title グループ参加フロー
+skinparam backgroundColor white
+skinparam defaultFontSize 16
+
+|申請者|
+start
+:POST .../groups/{gid}/join;
+
+|バックエンド|
+if (組織メンバー?) then (no)
+  :404;
+  stop
+else (yes)
+endif
+
+if (既にactive?) then (yes)
+  :409「すでにメンバーです」;
+  stop
+elseif (既にpending?) then (yes)
+  :409「参加申請中です」;
+  stop
+else (no)
+endif
+
+if (join_method は?) then (invite_only)
+  :403「招待制です」;
+  stop
+elseif (open)
+  :GroupMember を\nstatus=active で登録;
+  :即時参加完了;
+  stop
+else (request)
+  :GroupMember を\nstatus=pending で登録\n(拒否後の再申請なら既存レコードを更新);
+endif
+
+|申請者|
+:承認/拒否を待つ\n(この間 DELETE .../join で\n自分からキャンセル可能);
+
+|グループadmin|
+:参加申請一覧を確認\nGET .../join-requests;
+:PATCH .../join-requests/{uid}\nで承認 or 拒否;
+
+if (どちらを選択?) then (承認)
+  |バックエンド|
+  :status=active に更新\napproved_at を記録;
+  :申請者に承認通知;
+  |申請者|
+  :グループメンバーとして利用開始;
+  stop
+else (拒否)
+  |バックエンド|
+  :status=rejected に更新\nrejected_at を記録;
+  :申請者に拒否通知;
+  |申請者|
+  :再度参加申請が可能\n(次回 join 時に既存レコードを更新);
+  stop
+endif
+
+@enduml

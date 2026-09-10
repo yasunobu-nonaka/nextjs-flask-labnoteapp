@@ -1,0 +1,50 @@
+@startuml account_deletion_flow
+title アカウント削除フロー（DELETE /api/auth/me）
+skinparam backgroundColor white
+skinparam defaultFontSize 16
+
+|ユーザー|
+start
+:アカウント削除をリクエスト;
+
+|バックエンド|
+if (いずれかの組織で\nowner ロールを持つ?) then (yes)
+  :409\n「オーナーを移譲するか\n組織を削除してから」;
+  stop
+else (no)
+endif
+
+if (いずれかの組織で\nmember 以外のロール\n(sys_admin/user_admin)を持つ?) then (yes)
+  :409\n「ロールを変更してから」;
+  stop
+else (no)
+endif
+
+if (いずれかのグループで\nadmin ロールを持つ?) then (yes)
+  :409\n「管理者を変更してから」;
+  stop
+else (no)
+endif
+
+if (非公開ノートの\nオーナーである?) then (yes)
+  :409\n「オーナーを移譲・削除してから」;
+  stop
+else (no)
+endif
+
+if (作成した未削除の\nノートが残っている?) then (yes)
+  :409\n「ノートを削除してから」;
+  stop
+else (no)
+endif
+
+if (作成した未削除の\nフォルダーが残っている?) then (yes)
+  :409\n「フォルダーを削除してから」;
+  stop
+else (no)
+endif
+
+:PrivateNoteMember /\nGroupMember /\nOrganizationMember\nレコードを削除;
+:ユーザーを削除;
+stop
+@enduml
