@@ -343,3 +343,47 @@ class TestFolderDelete:
         )
 
         assert res.status_code == 404
+
+
+#############################################
+# tests for cross-group IDOR
+#############################################
+class TestCrossGroupFolderAccessReturns404:
+    """自分の org_id/group_id はそのままに、他グループの folder_id へすり替えてアクセスした場合の
+    IDOR 対策の検証。攻撃者は自分自身のグループでは正規の admin 権限を持つ点が、
+    test_non_member_cannot_* 系のテスト（無関係な非メンバー）と異なる。
+    """
+
+    def _setup_victim_and_attacker(self, client, auth_headers):
+        org1_id, group1_id = setup_org_and_group(client, auth_headers["headers"])
+        folder_id = create_folder(
+            client, auth_headers["headers"], org1_id, group1_id, "Secret Folder"
+        ).get_json()["id"]
+
+        register_user(client, username="crossgroup_folder_attacker", email="crossgroup_folder_attacker@example.com")
+        attacker_token = login_and_get_token(client, identifier="crossgroup_folder_attacker@example.com")
+        attacker_headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {attacker_token}",
+        }
+        org2_id, group2_id = setup_org_and_group(client, attacker_headers)
+
+        return folder_id, org2_id, group2_id, attacker_headers
+
+    def test_rename_folder_with_mismatched_group_id_returns_404(self, client, auth_headers):
+        """自グループのadminが、他グループのfolder_idを指定して改名しようとすると404。"""
+        folder_id, org2_id, group2_id, attacker_headers = self._setup_victim_and_attacker(client, auth_headers)
+
+        res = client.patch(
+            folders_url(org2_id, group2_id, folder_id),
+            json={"name": "乗っ取り"},
+            headers=attacker_headers,
+        )
+        assert res.status_code == 404
+
+    def test_delete_folder_with_mismatched_group_id_returns_404(self, client, auth_headers):
+        """自グループのadminが、他グループのfolder_idを指定して削除しようとすると404。"""
+        folder_id, org2_id, group2_id, attacker_headers = self._setup_victim_and_attacker(client, auth_headers)
+
+        res = client.delete(folders_url(org2_id, group2_id, folder_id), headers=attacker_headers)
+        assert res.status_code == 404

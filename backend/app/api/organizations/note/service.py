@@ -7,6 +7,7 @@ from app.extensions import db
 from app.model import Note, Tag, PrivateNoteMember
 from app.model.group import Group, GroupPolicy
 from app.api.organizations.note.tag_service import get_or_create_tags
+from app.api.organizations.permissions import check_group_membership
 
 
 def _private_access_filter(current_user_id: int):
@@ -306,6 +307,11 @@ def add_private_note_member_service(
     )
     if existing:
         abort(409, description="すでに共有済みのユーザーです")
+
+    # 招待先がノートの属するグループのアクティブメンバーであることを確認する
+    # （グループ外のユーザーIDを直接指定して共有できてしまうのを防ぐ）
+    if not check_group_membership(invitee_user_id, note.group_id):
+        abort(400, description="招待先はこのグループのメンバーではありません")
 
     new_member = PrivateNoteMember(note_id=note.id, user_id=invitee_user_id, role=role)
     db.session.add(new_member)
