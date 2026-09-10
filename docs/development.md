@@ -79,6 +79,15 @@ docker exec flask-backend-api flask db upgrade
 
 モデルを追加・変更した後は、APIの動作確認をする前に必ずマイグレーションを生成・適用すること。
 
+## CI
+
+GitHub Actions（`.github/workflows/`）で、`main`ブランチへのpush/PR時に該当ディレクトリの変更があった場合のみ自動実行される。
+
+| ワークフロー | トリガー | 内容 |
+|------------|---------|------|
+| `backend-test.yml` | `backend/**` の変更 | `pytest`（全テスト） |
+| `frontend-ci.yml` | `frontend/**` の変更 | `typecheck`ジョブ（`tsc --noEmit` + ESLint）と`test`ジョブ（`jest`、全テスト）を並列実行 |
+
 ## コンテナ名
 
 `compose.yaml` で定義されているコンテナ名（`docker exec` 等で使用）。

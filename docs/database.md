@@ -6,7 +6,7 @@ SQLAlchemy 2.0 の `Mapped` / `mapped_column` スタイルで定義されてい�
 
 [PlantUML](https://plantuml.com/ja/ie-diagram)のEntity記法（`skinparam linetype ortho` + 鳥の足記法）で生成した画像。テーマごとに分けており、`GROUPS` / `NOTES` など複数の図にまたがるテーブルは、それぞれの図で見やすくするために重複して記載している。
 
-各図のPlantUMLソース（`.puml`）は画像と同じ `docs/diagrams/` に置いてあり、以下のコマンドで再生成できる。
+各図のPlantUMLソース（`.puml`）は画像と同じ `docs/diagrams/` に置いてあり、以下のコマンドで再生成できる。`plantuml` コマンドが無ければ事前にインストールする（macOSは `brew install plantuml`。Java実行環境が必要で、Homebrew経由なら依存関係として自動的に入る）。
 
 ```bash
 export PLANTUML_LIMIT_SIZE=16384   # 大きい図はデフォルト上限(4096px)を超えるため必須
