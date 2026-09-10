@@ -1,0 +1,33 @@
+@startuml email_verification_flow
+title メール確認フロー
+skinparam backgroundColor white
+skinparam defaultFontSize 16
+
+|ユーザー|
+start
+:登録フォームを送信;
+
+|バックエンド|
+:User作成\n(verified=false);
+:generate_email_verification_token(email)\n署名付きトークンを発行\n(salt="email-verification");
+:確認メール送信\n/verify-email/{token};
+
+|ユーザー|
+:メール内のリンクをクリック;
+
+|バックエンド|
+:GET /api/auth/verify/<token>;
+:verify_email_verification_token(token)\n署名・有効期限(30分)を検証;
+
+if (トークン有効?) then (yes)
+  if (既に verified=true?) then (yes)
+    :「既に確認済み」を返す;
+  else (no)
+    :verified = true に更新;
+    :確認完了を返す;
+  endif
+else (no)
+  :400エラー\n「有効期限切れ/無効」;
+endif
+stop
+@enduml
