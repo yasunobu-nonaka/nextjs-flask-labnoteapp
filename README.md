@@ -54,7 +54,7 @@ See [docs/development.md](docs/development.md) for environment variable details,
 - Python / Flask（軽量なWSGIフレームワーク。認証・DB・バリデーション等のエコシステムが充実）
 - Flask-SQLAlchemy（O/Rマッパー） / Flask-Migrate（Alembicによるマイグレーション）
 - Marshmallow（バリデーション・シリアライズ）
-- Flask-JWT-Extended（認証） / Flask-Mail（確認メール・招待メール等）
+- Flask-JWT-Extended（認証） / Flask-Mail（確認メール・招待メール等） / Flask-CORS（CORS設定）
 - pytest（テスト）
 
 **Database**

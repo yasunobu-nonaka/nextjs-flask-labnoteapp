@@ -25,8 +25,8 @@
 
 | レイヤー | 技術 |
 |---------|------|
-| フロントエンド | Next.js 16 (App Router) / React 19 / TypeScript |
-| バックエンド | Flask / SQLAlchemy 2.0 / Marshmallow |
+| フロントエンド | Next.js 16 (App Router) / React 19 / TypeScript / Tailwind CSS / react-hook-form + zod / @uiw/react-md-editor |
+| バックエンド | Flask / Flask-SQLAlchemy（SQLAlchemy 2.0） / Flask-Migrate（Alembic） / Marshmallow / Flask-CORS / Flask-Mail |
 | データベース | PostgreSQL 16（本番）/ SQLite（テスト） |
 | 認証 | Flask-JWT-Extended（アクセストークン + リフレッシュトークン） |
 | フロントエンドテスト | Jest / React Testing Library / MSW |
