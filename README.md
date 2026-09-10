@@ -60,3 +60,7 @@ See [docs/development.md](docs/development.md) for environment variable details,
 **Database**
 
 - PostgreSQL 16（Docker） / SQLite（テスト時）
+
+## License
+
+[MIT](./LICENSE)
