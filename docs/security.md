@@ -23,9 +23,9 @@
 
 | フロー | 図 |
 |--------|-----|
-| メール確認 | ![メール確認フロー](./diagrams/flow-email-verification.png) |
-| メールアドレス変更 | ![メールアドレス変更フロー](./diagrams/flow-email-change.png) |
-| パスワードリセット | ![パスワードリセットフロー](./diagrams/flow-password-reset.png) |
+| メール確認 | ![メール確認フロー](./diagrams/flows/email-verification.png) |
+| メールアドレス変更 | ![メールアドレス変更フロー](./diagrams/flows/email-change.png) |
+| パスワードリセット | ![パスワードリセットフロー](./diagrams/flows/password-reset.png) |
 
 ⚠️ **既知の不整合**: メール確認メールの文面は「有効期限は1時間」と案内しているが（`send_verification_email`）、実際の検証関数`verify_email_verification_token`のデフォルト`expiration`は1800秒（30分）。案内文と実際の期限がズレている。
 
@@ -64,6 +64,10 @@
 - グループの`admin`である
 - 非公開ノートのオーナーである
 - 作成した未削除のノート・フォルダーが残っている（FK制約のため）
+
+判定は上から順にチェックされ、最初に該当した条件で即座に409を返す。
+
+![アカウント削除フロー](./diagrams/flows/account-deletion.png)
 
 いずれも「アカウント削除によって組織・グループ・ノートの管理者やオーナーが突然消える」事態を防ぐためのガード。
 
