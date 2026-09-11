@@ -8,8 +8,12 @@
 - パスワードは平文保存せず、werkzeugの`generate_password_hash`/`check_password_hash`でハッシュ化して`users.password_hash`に保存
 - パスワード変更は2段階（`POST /api/auth/me/password/verify`で現在のパスワードを事前検証 → `PATCH /api/auth/me/password`で変更）
 - `POST /api/auth/login`は、ユーザーが存在しない場合でもダミーハッシュに対して`check_password_hash`を実行してから401を返す（`check_password_and_get_tokens`）。存在するユーザーへの試行だけハッシュ比較のコストがかかると、応答時間の差からユーザー名/メールアドレスの登録有無が推測できてしまう（タイミング攻撃）ため、存在有無に関わらず同じ処理コストになるよう揃えている
+- ブルートフォース対策として`Flask-Limiter`を導入し、IPアドレス単位でレート制限を適用（`app/extensions/limiter.py`）。上限超過時は`429`を統一フォーマット（`{"message": "..."}`）で返す（`create_app`の`errorhandler(429)`）。ルートごとの性質に応じてしきい値を分けている。
+  - `POST /api/auth/login`：`5 per minute`（パスワードの誤入力によるタイプミスは妨げず、自動化された連続試行を抑える一般的な目安）
+  - `POST /api/auth/forgot-password`：`3 per hour`（実際にメールを送信するため、乱用による受信者へのメール爆撃・送信基盤の消費を防ぐ目的で`/login`より厳しめ）
+  - `POST /api/auth/reset-password`：`5 per hour`（トークン自体の推測困難性が主な防御線であり、レート制限は多重防御。メール送信は伴わないため`/forgot-password`よりはやや緩め）
 
-⚠️ **既知の残存リスク**: 上記はログイン試行1回あたりの応答時間を揃えるものであり、ブルートフォース攻撃そのもの（大量の試行を高速に繰り返すこと）への対策ではない。`/api/auth/login`にはレート制限（Flask-Limiter等）が未導入で、この点は別途対応が必要。
+⚠️ **既知の残存リスク**: レート制限のストレージは`Flask-Limiter`のデフォルトであるインメモリカウンタを使用している。本番でマルチワーカー構成（Gunicorn等）にした場合、ワーカーごとにカウンタが別々になり実質的な制限回数がワーカー数倍緩くなる。共有ストア（Redis等）は未導入で、スケールする前提なら別途対応が必要。
 
 ## トークンベースのメールフロー
 

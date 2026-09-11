@@ -18,7 +18,7 @@ from app.schema import (
     PasswordChangeSchema,
     PasswordVerifySchema,
 )
-from app.extensions import db
+from app.extensions import db, limiter
 from app.services.mail_service import (
     send_verification_email,
     send_password_reset_email,
@@ -140,9 +140,9 @@ def get_me_status():
         {
             "email": current_user.email,
             "verified": current_user.verified,
-            "created_at": current_user.created_at.isoformat()
-            if current_user.created_at
-            else None,
+            "created_at": (
+                current_user.created_at.isoformat() if current_user.created_at else None
+            ),
         }
     )
 
@@ -175,6 +175,7 @@ def resend_verification():
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("5 per minute")
 def login():
     # 入力値受け取り
     user_input = request.get_json()
@@ -483,6 +484,7 @@ def verify_email_change(token):
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
+@limiter.limit("3 per hour")
 def forgot_password():
     # メールアドレスの存在を確認
     user_input = request.get_json()
@@ -553,6 +555,7 @@ def verify_reset_password_token_endpoint(token):
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
+@limiter.limit("5 per hour")
 def reset_password():
     # 入力のバリデーション
     user_input = request.get_json()

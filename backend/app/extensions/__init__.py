@@ -3,3 +3,4 @@ from .migrate import migrate
 from .jwt import jwt
 from .mail import mail
 from .cors import cors
+from .limiter import limiter

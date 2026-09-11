@@ -448,16 +448,11 @@ class TestCheckPasswordTimingSafety:
 class TestLoginRateLimiting:
     """ログインAPIへのレート制限（ブルートフォース対策）の検証。
 
-    現状 Flask-Limiter 等のレート制限が未導入のため、このテストは意図的に
-    xfail(strict=True) にしている。対策を実装したら @pytest.mark.xfail を
-    外し、通常のリグレッションテストとして扱うこと（strict=True のため、
-    対策を入れた後にマーカーを外し忘れると XPASS 扱いで CI が失敗する）。
+    Flask-Limiter導入（`@limiter.limit("5 per minute")`）により、以前は
+    xfail(strict=True) だったこのテストが実際に通るようになったため、
+    通常のリグレッションテストに昇格させた。
     """
 
-    @pytest.mark.xfail(
-        reason="ログインAPIにレート制限が未実装で、大量の連続ログイン失敗がすべて401のまま通ってしまう（ブルートフォース攻撃に対する防御がない）",
-        strict=True,
-    )
     def test_repeated_failed_logins_are_rate_limited(self, client):
         """同一アカウントへの大量のログイン失敗試行に対し、いずれ429が返ることを期待する。"""
         register_user(client)
