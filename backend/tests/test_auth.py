@@ -246,47 +246,60 @@ class TestEmailVerification:
 class TestResendVerification:
     """認証メール再送信のテスト"""
 
-    def test_resend_verification_success(self, client, test_user):
-        """未認証ユーザーへの再送信が成功する。"""
-        # test_user はデフォルトで verified=False
+    def test_resend_verification_success(self, client):
+        """未認証ユーザー自身への再送信が成功する。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
         response = client.post(
-            "/api/auth/resend-verification", json={"email": test_user.email}
+            "/api/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
         assert response.status_code == 200
         assert "再送信しました" in response.get_json()["message"]
 
-    def test_resend_verification_missing_email(self, client):
-        """メールアドレスなしの再送信テスト"""
-        response = client.post("/api/auth/resend-verification", json={})
+    def test_resend_verification_no_token_failed(self, client):
+        """未ログインでは401になる。"""
+        response = client.post("/api/auth/resend-verification")
 
-        assert response.status_code == 400
-        assert (
-            response.get_json()["errors"]["email"][0]
-            == "メールアドレスを入力してください"
-        )
-
-    def test_resend_verification_nonexistent_user(self, client):
-        """存在しないユーザーの再送信テスト"""
-        response = client.post(
-            "/api/auth/resend-verification", json={"email": "doesnotexist@example.com"}
-        )
-
-        assert response.status_code == 404
-        assert "ユーザーが見つかりません" in response.get_json()["error"]
+        assert response.status_code == 401
 
     def test_resend_verification_already_verified(self, client, test_user):
-        """既に認証済みユーザーの再送信テスト"""
+        """既に認証済みユーザー自身の再送信テスト"""
         test_user.verified = True
-
         db.session.commit()
 
+        token = login_user(client).get_json()["access_token"]
+
         response = client.post(
-            "/api/auth/resend-verification", json={"email": "testuser@example.com"}
+            "/api/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
         assert response.status_code == 200
         assert "既に認証済み" in response.get_json()["message"]
+
+    def test_resend_verification_ignores_email_in_body(self, client):
+        """リクエストボディにメールアドレスを含めても無視され、常にログイン中の
+        ユーザー自身にのみ送信される（他人宛に確認メールを送りつける手段として
+        使えないことの確認）。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
+        register_user(client, username="other", email="other@example.com")
+
+        with patch("app.api.auth.routes.send_verification_email") as mock_send:
+            mock_send.return_value = True
+
+            response = client.post(
+                "/api/auth/resend-verification",
+                json={"email": "other@example.com"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert response.status_code == 200
+        mock_send.assert_called_once_with("testuser@example.com")
 
 
 #############################################

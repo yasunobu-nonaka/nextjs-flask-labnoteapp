@@ -148,26 +148,22 @@ def get_me_status():
 
 
 @auth_bp.route("/resend-verification", methods=["POST"])
+@jwt_required()
 def resend_verification():
-    """認証メール再送信エンドポイント"""
-    user_input = request.get_json()
+    """認証メール再送信エンドポイント。ログイン中のユーザー自身にのみ再送信する。
 
-    try:
-        validated_user_input = email_schema.load(user_input)
-    except ValidationError as err:
-        return jsonify({"message": "validation error", "errors": err.messages}), 400
-
-    email = validated_user_input["email"]
-    user = get_user_by_email(email)
-
-    if not user:
-        return jsonify({"error": "ユーザーが見つかりません"}), 404
-
-    if user.verified:
+    以前はリクエストボディのメールアドレスで任意のユーザーを指定でき、
+    存在しなければ404・存在すれば200（かつ実際にメール送信）という応答の
+    違いから、認証不要でメールアドレスの登録有無を判定できてしまっていた
+    （存在有無オラクル）。`/me/status`と同様、current_user 固定にすることで
+    他人のメールアドレスを調べる／他人宛に確認メールを送りつける手段として
+    使えないようにしている。
+    """
+    if current_user.verified:
         return jsonify({"message": "このアカウントは既に認証済みです"}), 200
 
     # 認証メールを再送信
-    if send_verification_email(email):
+    if send_verification_email(current_user.email):
         return jsonify({"message": "確認メールを再送信しました"}), 200
     else:
         return jsonify({"error": "メール送信に失敗しました"}), 500
