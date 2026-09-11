@@ -11,7 +11,7 @@ from app.services.mail_service import (
     generate_email_change_token,
     hash_token,
 )
-from app.api.auth.auth_service import get_user_by_email
+from app.api.auth.auth_service import get_user_by_email, check_password_and_get_tokens
 from app.extensions import db
 from app.model import (
     User,
@@ -403,6 +403,43 @@ class TestUserLogin:
 
         assert "access_token" not in res.get_json()
         assert res.status_code == 401
+
+
+#############################################
+# tests for login timing side-channel
+#############################################
+class TestCheckPasswordTimingSafety:
+    """存在しないユーザーへのログイン試行でも、実在ユーザーと同じコストの
+    パスワードハッシュ比較が行われることを確認する。
+
+    以前は `if user and user.check_password(password)` の短絡評価により、
+    ユーザーが存在しない場合はハッシュ比較自体がスキップされ、応答時間の
+    違いからユーザー名/メールアドレスの存在有無が推測できてしまっていた。
+    """
+
+    def test_dummy_hash_check_runs_when_user_is_none(self):
+        """user が None でも check_password_hash が1回呼ばれる。"""
+        with patch("app.api.auth.auth_service.check_password_hash") as mock_check:
+            mock_check.return_value = False
+
+            access_token, refresh_token = check_password_and_get_tokens(
+                None, "irrelevant-password"
+            )
+
+        assert access_token is None
+        assert refresh_token is None
+        mock_check.assert_called_once()
+
+    def test_login_with_nonexistent_user_still_returns_401(self, client):
+        """ダミーハッシュ比較を挟んでも、存在しないユーザーへのログインは
+        従来通り401で失敗する（挙動そのものは変わらないことの確認）。"""
+        res = client.post(
+            "/api/auth/login",
+            json={"identifier": "nobody", "password": "whatever1234"},
+        )
+
+        assert res.status_code == 401
+        assert "access_token" not in res.get_json()
 
 
 #############################################

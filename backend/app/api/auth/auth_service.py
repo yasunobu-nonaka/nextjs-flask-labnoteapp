@@ -1,9 +1,17 @@
 from sqlalchemy import or_
 from flask_jwt_extended import create_access_token, create_refresh_token
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 from app.model import User
 from app.api.auth.exception import UsernameAlreadyExistsError, EmailAlreadyExistsError
+
+# ユーザーが存在しない場合でも check_password_hash を1回実行するためのダミーハッシュ。
+# 実在するユーザーへのログイン試行（ハッシュ比較あり）と存在しないユーザーへの
+# 試行（比較なしで即失敗）とで応答時間に差が出ると、その差を測定するだけで
+# ユーザー名/メールアドレスの登録有無が推測できてしまう（タイミング攻撃）。
+# モジュール読み込み時に一度だけ生成し、値そのものに意味はない。
+_DUMMY_PASSWORD_HASH = generate_password_hash("dummy-password-for-timing-safety")
 
 
 def get_user_by_username(username):
@@ -69,8 +77,15 @@ def verify_user(user):
 
 
 def check_password_and_get_tokens(user, password):
-    # パスワード照合
-    if user and user.check_password(password):
+    # パスワード照合。user が None の場合もダミーハッシュとの比較を行い、
+    # 存在するユーザーへの試行と同じ処理コストにする（タイミング攻撃対策）。
+    if user:
+        password_ok = user.check_password(password)
+    else:
+        check_password_hash(_DUMMY_PASSWORD_HASH, password)
+        password_ok = False
+
+    if password_ok:
         # アクセストークンとリフレッシュトークンを発行
         access_token = create_access_token(identity=user)
         refresh_token = create_refresh_token(identity=user)
