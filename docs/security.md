@@ -12,6 +12,8 @@
   - `POST /api/auth/login`：`5 per minute; 20 per hour; 100 per day`
   - `POST /api/auth/forgot-password`：`3 per hour; 10 per day`（実際にメールを送信するため、乱用による受信者へのメール爆撃・送信基盤の消費を防ぐ目的で`/login`より厳しめ）
   - `POST /api/auth/reset-password`：`5 per hour; 20 per day`（トークン自体の推測困難性が主な防御線であり、レート制限は多重防御。メール送信は伴わないため`/forgot-password`よりはやや緩め）
+  - `POST /api/auth/me/password/verify`・`PATCH /api/auth/me/password`：`5 per minute; 20 per hour; 100 per day`（`/login`と同じ）。この2つは`@jwt_required()`だが、JWTアクセストークンが漏洩・盗用された場合に`/login`のレート制限を経由せず本人の現在のパスワードを直接総当たりできる経路になるため、`/login`と同じ基準で保護している
+  - `PATCH /api/auth/me/email`：`3 per hour; 10 per day`（`/forgot-password`と同じ）。指定した`new_email`が未登録なら実際にそのアドレスへ確認メールを送信するため、ログイン済みの（使い捨てで良い）任意のアカウントから第三者のメールアドレスへメール爆撃ができてしまう。加えて409/200の応答の違いでメールアドレスの登録有無も分かってしまうが、こちらは「入力したメールアドレスが既に使われているか」をユーザーに伝える必要があるUX上の要件（`/register`・`/me/username`と同種のトレードオフ）のため、応答自体は統一せず、実害の大きい送信側の頻度をレート制限で抑える方針とした
 
   短期（分単位）の制限だけだと、1分あたりの上限ぎりぎりで延々と継続する低速な攻撃（例：`/login`に1分4回ずつを何時間も継続）を防げないため、中期（時間単位）・長期（日単位）の制限を重ね掛けしている。Flask-Limiterはウィンドウが経過するごとに解除される固定ウィンドウ方式で、違反を重ねるほど待機時間が伸びていく指数バックオフ的な機能は持たないため、複数の固定ウィンドウを併用する形で近い効果を狙っている。
 

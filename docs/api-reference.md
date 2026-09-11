@@ -21,9 +21,9 @@
 | POST | `/api/auth/resend-verification` | JWT | ログイン中のユーザー自身に確認メールを再送（`current_user`固定。以前はリクエストボディで任意のメールアドレスを指定でき、404/200の違いから登録有無が判別できる上、実在ユーザーには実際にメールを送信できてしまっていたため修正） |
 | DELETE | `/api/auth/me` | JWT | アカウント削除。組織で`owner`/`member`以外のロールを持つ、グループの`admin`である、非公開ノートのオーナーである、作成したノート/フォルダが残っている、のいずれかに該当すると409を返しブロックする |
 | PATCH | `/api/auth/me/username` | JWT | ユーザー名変更 |
-| POST | `/api/auth/me/password/verify` | JWT | 現在のパスワードを検証（変更前の事前確認） |
-| PATCH | `/api/auth/me/password` | JWT | パスワード変更 |
-| PATCH | `/api/auth/me/email` | JWT | メールアドレス変更申請（確認メール送信） |
+| POST | `/api/auth/me/password/verify` | JWT | 現在のパスワードを検証（変更前の事前確認）。JWT漏洩時に`/login`を経由せず現パスワードを総当たりされる経路になるため、IPアドレス単位で`5 per minute; 20 per hour; 100 per day`のレート制限あり（超過時429） |
+| PATCH | `/api/auth/me/password` | JWT | パスワード変更。`/me/password/verify`と同じ理由で同じレート制限あり |
+| PATCH | `/api/auth/me/email` | JWT | メールアドレス変更申請（確認メール送信）。指定したメールアドレスが未登録なら実際にそのアドレスへメール送信されるため、`/forgot-password`と同様の乱用防止目的でIPアドレス単位で`3 per hour; 10 per day`のレート制限あり（超過時429） |
 | GET | `/api/auth/verify-email-change/<token>` | — | メールアドレス変更の確認 |
 | POST | `/api/auth/forgot-password` | — | パスワードリセットメール送信。IPアドレス単位で`3 per hour; 10 per day`のレート制限あり（超過時429） |
 | GET | `/api/auth/reset-password/<token>` | — | リセットトークンの検証 |

@@ -386,8 +386,14 @@ def update_me_username():
 
 @auth_bp.route("/me/password/verify", methods=["POST"])
 @jwt_required()
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def verify_me_password():
-    """パスワード変更フロー step 1: 現在のパスワードが正しいか検証する"""
+    """パスワード変更フロー step 1: 現在のパスワードが正しいか検証する。
+
+    JWTが漏洩・盗用された場合、/login のレート制限を経由せずに本人の
+    現在のパスワードを直接総当たりされる経路になり得るため、/login と
+    同じ基準でレート制限をかけている。
+    """
     try:
         data = password_verify_schema.load(request.get_json())
     except ValidationError as err:
@@ -401,8 +407,14 @@ def verify_me_password():
 
 @auth_bp.route("/me/password", methods=["PATCH"])
 @jwt_required()
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def update_me_password():
-    """ログイン中のユーザーのパスワードを変更する"""
+    """ログイン中のユーザーのパスワードを変更する。
+
+    /me/password/verify と同じ current_password チェックを行い、成功すると
+    即座にパスワードが書き換わるため、こちらも /login と同じ基準で
+    レート制限をかけている。
+    """
     try:
         data = password_change_schema.load(request.get_json())
     except ValidationError as err:
@@ -417,8 +429,15 @@ def update_me_password():
 
 @auth_bp.route("/me/email", methods=["PATCH"])
 @jwt_required()
+@limiter.limit("3 per hour; 10 per day")
 def update_me_email():
-    """ログイン中のユーザーのメールアドレス変更を開始する（確認メール送信）"""
+    """ログイン中のユーザーのメールアドレス変更を開始する（確認メール送信）。
+
+    指定した new_email が未登録の場合は実際に確認メールを送信するため、
+    ログイン済みユーザーが任意のメールアドレス宛にメールを送りつけられて
+    しまう（かつ409/200の違いでメールアドレスの登録有無も分かる）。
+    /forgot-password と同種のリスクとして同じ基準でレート制限をかけている。
+    """
     try:
         data = email_update_schema.load(request.get_json())
     except ValidationError as err:
