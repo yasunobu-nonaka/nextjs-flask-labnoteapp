@@ -15,10 +15,10 @@
 | POST | `/api/auth/register` | — | ユーザー登録 |
 | GET | `/api/auth/verify/<token>` | — | 登録時のメール確認 |
 | POST | `/api/auth/resend-verification` | — | 確認メール再送 |
-| GET | `/api/auth/user/status` | — | メール確認状態の確認 |
 | POST | `/api/auth/login` | — | ログイン。アクセストークン＋リフレッシュトークンを返す |
 | POST | `/api/auth/refresh` | refresh JWT | アクセストークンを再発行 |
 | GET | `/api/auth/me` | JWT | 現在のユーザー情報を取得。`needs_onboarding`（組織未所属なら true）を含む |
+| GET | `/api/auth/me/status` | JWT | ログイン中のユーザー自身のメール確認状態を取得（`current_user`固定。旧`/api/auth/user/status`は任意のメールアドレスをクエリパラメータで指定でき、認証不要で存在有無を確認できてしまっていたため、他の`/me/*`と同じ形に改めた） |
 | DELETE | `/api/auth/me` | JWT | アカウント削除。組織で`owner`/`member`以外のロールを持つ、グループの`admin`である、非公開ノートのオーナーである、作成したノート/フォルダが残っている、のいずれかに該当すると409を返しブロックする |
 | PATCH | `/api/auth/me/username` | JWT | ユーザー名変更 |
 | POST | `/api/auth/me/password/verify` | JWT | 現在のパスワードを検証（変更前の事前確認） |

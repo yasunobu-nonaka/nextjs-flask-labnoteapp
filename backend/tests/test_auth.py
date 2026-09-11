@@ -490,26 +490,43 @@ class TestTokenRefresh:
 # tests for user status
 #############################################
 class TestUserStatus:
-    def test_get_user_status(self, client, test_user):
-        res = client.get(f"/api/auth/user/status?email={test_user.email}")
+    def test_get_user_status(self, client):
+        """ログイン中のユーザー自身の確認状態を取得できる。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
+        res = client.get(
+            "/api/auth/me/status",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         data = res.get_json()
         assert res.status_code == 200
-        assert data["email"] == test_user.email
-        assert data["verified"] == test_user.verified
+        assert data["email"] == "testuser@example.com"
+        assert "verified" in data
         assert "created_at" in data
 
-    def test_get_user_status_missing_email(self, client):
-        res = client.get("/api/auth/user/status")
+    def test_get_user_status_no_token_failed(self, client):
+        """未ログインでは401になる。"""
+        res = client.get("/api/auth/me/status")
 
-        assert res.status_code == 400
-        assert res.get_json()["error"] == "メールアドレスが必要です"
+        assert res.status_code == 401
 
-    def test_get_user_status_nonexistent_user(self, client):
-        res = client.get("/api/auth/user/status?email=nobody@example.com")
+    def test_get_user_status_ignores_email_query_param(self, client):
+        """email クエリパラメータを渡しても無視され、常に自分自身の情報のみ返る
+        （他人のメールアドレスの登録状況を調べる手段として使えないことの確認）。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
 
-        assert res.status_code == 404
-        assert "ユーザーが見つかりません" in res.get_json()["error"]
+        register_user(client, username="other", email="other@example.com")
+
+        res = client.get(
+            "/api/auth/me/status?email=other@example.com",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert res.status_code == 200
+        assert res.get_json()["email"] == "testuser@example.com"
 
 
 #############################################

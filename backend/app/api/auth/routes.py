@@ -125,24 +125,24 @@ def verify_email(token):
     return jsonify({"message": "メールアドレスが確認されました！"}), 200
 
 
-@auth_bp.route("/user/status", methods=["GET"])
-def check_verification_status():
-    """認証状態確認エンドポイント"""
-    email = request.args.get("email")
+@auth_bp.route("/me/status", methods=["GET"])
+@jwt_required()
+def get_me_status():
+    """ログイン中のユーザー自身のメール確認状態を返す。
 
-    if not email:
-        return jsonify({"error": "メールアドレスが必要です"}), 400
-
-    user = get_user_by_email(email)
-
-    if not user:
-        return jsonify({"error": "ユーザーが見つかりません"}), 404
-
+    以前は `/user/status` としてクエリパラメータで任意のメールアドレスを
+    指定でき、認証不要でアカウントの存在有無・検証状態・作成日時を誰でも
+    取得できてしまっていた（メールアドレス列挙オラクル）。現在は他の
+    `/me/*` エンドポイント群と同様、current_user 固定のパスに改め、
+    他人のメールアドレスの登録状況を調べる手段として使えないようにしている。
+    """
     return jsonify(
         {
-            "email": user.email,
-            "verified": user.verified,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "email": current_user.email,
+            "verified": current_user.verified,
+            "created_at": current_user.created_at.isoformat()
+            if current_user.created_at
+            else None,
         }
     )
 
