@@ -500,15 +500,19 @@ def forgot_password():
     email = validated_user_input["email"]
     user = get_user_by_email(email)
 
+    # メールアドレス列挙を防ぐため、登録済み・未登録どちらでも同一のレスポンス
+    # （メッセージ文言・付随フィールドの有無）を返す。
+    enumeration_safe_response = (
+        jsonify(
+            {
+                "message": "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
+            }
+        ),
+        200,
+    )
+
     if not user:
-        return (
-            jsonify(
-                {
-                    "message": "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
-                }
-            ),
-            200,
-        )
+        return enumeration_safe_response
 
     # トークンを生成してハッシュをDBに保存（一回限り使用のため）
     token = generate_reset_password_token(user.email)
@@ -517,15 +521,7 @@ def forgot_password():
 
     # トークン付きURLをメールで送付
     if send_password_reset_email(user.email, token):
-        return (
-            jsonify(
-                {
-                    "message": "パスワードリセット用のメールを送信しました。",
-                    "username": user.username,
-                }
-            ),
-            200,
-        )
+        return enumeration_safe_response
     else:
         return jsonify({"error": "パスワードリセット用メールの送信に失敗しました"}), 500
 

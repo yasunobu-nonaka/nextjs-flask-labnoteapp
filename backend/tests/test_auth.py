@@ -526,8 +526,11 @@ class TestPasswordReset:
 
         assert res.status_code == 200
         assert (
-            res.get_json()["message"] == "パスワードリセット用のメールを送信しました。"
+            res.get_json()["message"]
+            == "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
         )
+        # メールアドレス列挙防止のため、登録済みメールであることを示す付随情報を含めない
+        assert "username" not in res.get_json()
 
     def test_forgot_password_nonexisting_email(self, client):
         """存在しないメールアドレスでのリクエストテスト"""
@@ -538,6 +541,24 @@ class TestPasswordReset:
         # セキュリティのため、成功したかのように応答する
         assert res.status_code == 200
         assert "パスワードリセット用のメールを送信しました" in res.get_json()["message"]
+
+    def test_forgot_password_response_identical_for_existing_and_nonexisting_email(
+        self, client, test_user
+    ):
+        """メールアドレス列挙を防ぐため、登録済み/未登録でレスポンス本文が完全に一致する。
+
+        以前は登録済みの場合だけメッセージ文言が異なり、かつ username フィールドが
+        付随していたため、レスポンス本文を見ればアカウントの有無が判別できてしまっていた。
+        """
+        res_existing = client.post(
+            "/api/auth/forgot-password", json={"email": test_user.email}
+        )
+        res_nonexisting = client.post(
+            "/api/auth/forgot-password", json={"email": "nonexistent@example.com"}
+        )
+
+        assert res_existing.status_code == res_nonexisting.status_code == 200
+        assert res_existing.get_json() == res_nonexisting.get_json()
 
     def test_forgot_password_missing_email(self, client):
         """メールアドレスなしのリクエストテスト"""
