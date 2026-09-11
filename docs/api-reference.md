@@ -14,7 +14,7 @@
 |--------|------|------|------|
 | POST | `/api/auth/register` | — | ユーザー登録 |
 | GET | `/api/auth/verify/<token>` | — | 登録時のメール確認 |
-| POST | `/api/auth/login` | — | ログイン。アクセストークン＋リフレッシュトークンを返す。IPアドレス単位で`5 per minute`のレート制限あり（超過時429） |
+| POST | `/api/auth/login` | — | ログイン。アクセストークン＋リフレッシュトークンを返す。IPアドレス単位で`5 per minute; 20 per hour; 100 per day`のレート制限あり（超過時429） |
 | POST | `/api/auth/refresh` | refresh JWT | アクセストークンを再発行 |
 | GET | `/api/auth/me` | JWT | 現在のユーザー情報を取得。`needs_onboarding`（組織未所属なら true）を含む |
 | GET | `/api/auth/me/status` | JWT | ログイン中のユーザー自身のメール確認状態を取得（`current_user`固定。旧`/api/auth/user/status`は任意のメールアドレスをクエリパラメータで指定でき、認証不要で存在有無を確認できてしまっていたため、他の`/me/*`と同じ形に改めた） |
@@ -25,10 +25,10 @@
 | PATCH | `/api/auth/me/password` | JWT | パスワード変更 |
 | PATCH | `/api/auth/me/email` | JWT | メールアドレス変更申請（確認メール送信） |
 | GET | `/api/auth/verify-email-change/<token>` | — | メールアドレス変更の確認 |
-| POST | `/api/auth/forgot-password` | — | パスワードリセットメール送信。IPアドレス単位で`3 per hour`のレート制限あり（超過時429） |
+| POST | `/api/auth/forgot-password` | — | パスワードリセットメール送信。IPアドレス単位で`3 per hour; 10 per day`のレート制限あり（超過時429） |
 | GET | `/api/auth/reset-password/<token>` | — | リセットトークンの検証 |
 | POST | `/api/auth/reset-password/validate-token` | — | リセットトークンの検証（JSONボディ版） |
-| POST | `/api/auth/reset-password` | — | リセットトークンで新パスワードを設定。IPアドレス単位で`5 per hour`のレート制限あり（超過時429） |
+| POST | `/api/auth/reset-password` | — | リセットトークンで新パスワードを設定。IPアドレス単位で`5 per hour; 20 per day`のレート制限あり（超過時429） |
 
 ## 招待 (`/api/invitations`)
 

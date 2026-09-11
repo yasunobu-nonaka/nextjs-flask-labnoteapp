@@ -175,7 +175,7 @@ def resend_verification():
 
 
 @auth_bp.route("/login", methods=["POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def login():
     # 入力値受け取り
     user_input = request.get_json()
@@ -484,7 +484,7 @@ def verify_email_change(token):
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
-@limiter.limit("3 per hour")
+@limiter.limit("3 per hour; 10 per day")
 def forgot_password():
     # メールアドレスの存在を確認
     user_input = request.get_json()
@@ -555,7 +555,7 @@ def verify_reset_password_token_endpoint(token):
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
-@limiter.limit("5 per hour")
+@limiter.limit("5 per hour; 20 per day")
 def reset_password():
     # 入力のバリデーション
     user_input = request.get_json()
