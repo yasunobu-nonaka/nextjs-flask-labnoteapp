@@ -39,6 +39,18 @@ def create_app(config_name="development"):
             429,
         )
 
+    @app.after_request
+    def set_security_headers(response):
+        # JSON APIとしての最低限の衛生管理用ヘッダー。
+        # CSP等のブラウザ描画に関わるポリシーはHTMLを返すフロントエンド（Next.js）側で設定する。
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+        return response
+
     app.register_blueprint(api_bp)
 
     return app
