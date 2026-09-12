@@ -30,6 +30,7 @@ from app.services.mail_service import (
     verify_email_change_token,
     send_email_change_confirmation,
 )
+from app.services.turnstile_service import verify_turnstile_token
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
     get_user_by_email,
@@ -64,6 +65,13 @@ password_verify_schema = PasswordVerifySchema()
 def register():
     # 入力値受け取り
     user_input = request.get_json()
+    turnstile_token = user_input.pop("turnstile_token", None)
+
+    if not verify_turnstile_token(turnstile_token, request.remote_addr):
+        return (
+            jsonify({"message": "認証チェックに失敗しました。もう一度お試しください"}),
+            403,
+        )
 
     # 入力のバリデーション
     try:
@@ -179,6 +187,13 @@ def resend_verification():
 def login():
     # 入力値受け取り
     user_input = request.get_json()
+    turnstile_token = user_input.pop("turnstile_token", None)
+
+    if not verify_turnstile_token(turnstile_token, request.remote_addr):
+        return (
+            jsonify({"message": "認証チェックに失敗しました。もう一度お試しください"}),
+            403,
+        )
 
     # 入力のバリデーション
     try:

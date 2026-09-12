@@ -6,6 +6,7 @@ import type { UseFormRegisterReturn, FieldError } from "react-hook-form";
 import Link from "next/link";
 import { useState } from "react";
 import { z } from "zod";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 const schema = z
   .object({
@@ -36,6 +37,8 @@ type FormValues = z.infer<typeof schema>;
 export default function RegisterPage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const {
     register,
@@ -53,12 +56,18 @@ export default function RegisterPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, turnstile_token: turnstileToken }),
         },
       );
       const json = await res.json();
 
-      if (res.status === 400 && json.errors) {
+      // Turnstileトークンは1回使い切りのため、結果に関わらずウィジェットを作り直す
+      setTurnstileResetKey((k) => k + 1);
+      setTurnstileToken(null);
+
+      if (res.status === 403) {
+        setGlobalError("認証チェックに失敗しました。もう一度お試しください");
+      } else if (res.status === 400 && json.errors) {
         for (const [field, messages] of Object.entries(json.errors) as [
           keyof FormValues,
           string[],
@@ -127,6 +136,11 @@ export default function RegisterPage() {
             type="password"
             autoComplete="new-password"
             error={errors.confirm}
+          />
+
+          <TurnstileWidget
+            key={turnstileResetKey}
+            onToken={setTurnstileToken}
           />
 
           {globalError && <p className="text-sm text-red-500">{globalError}</p>}
