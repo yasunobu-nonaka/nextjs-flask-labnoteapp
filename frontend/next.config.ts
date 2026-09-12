@@ -21,6 +21,8 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // レスポンスに X-Powered-By: Next.js を付与しない（フレームワークの偵察情報を渡さない）
+  poweredByHeader: false,
   async headers() {
     return [
       {
@@ -37,6 +39,18 @@ const nextConfig: NextConfig = {
             value: "max-age=31536000; includeSubDomains",
           },
           { key: "Content-Security-Policy", value: csp },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "Origin-Agent-Cluster", value: "?1" },
+          {
+            key: "X-Permitted-Cross-Domain-Policies",
+            value: "none",
+          },
+          {
+            key: "Permissions-Policy",
+            value:
+              "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+          },
         ],
       },
     ];
