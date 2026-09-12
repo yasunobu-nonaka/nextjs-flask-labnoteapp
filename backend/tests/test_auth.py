@@ -178,6 +178,26 @@ class TestUserRegistration:
         )
         assert res.status_code == 400
 
+    def test_register_ignores_turnstile_token_field(self, client):
+        """turnstile_token をボディに含めても、未知のフィールドとして400にならない。
+
+        RegistrationSchema には turnstile_token が定義されておらず、
+        marshmallow のデフォルト設定（unknown=RAISE）では未定義フィールドが
+        あると400になる。ルート側で事前に pop していることを確認する。
+        """
+        res = client.post(
+            "/api/auth/register",
+            json={
+                "username": "testuser",
+                "email": "testuser@example.com",
+                "password": "testuser1234",
+                "confirm": "testuser1234",
+                "turnstile_token": "dummy-token",
+            },
+        )
+
+        assert res.status_code == 201
+
 
 #############################################
 # tests for Email verification
@@ -403,6 +423,27 @@ class TestUserLogin:
 
         assert "access_token" not in res.get_json()
         assert res.status_code == 401
+
+    def test_login_ignores_turnstile_token_field(self, client):
+        """turnstile_token をボディに含めても、未知のフィールドとして400にならない。
+
+        LoginSchema には turnstile_token が定義されておらず、marshmallow の
+        デフォルト設定（unknown=RAISE）では未定義フィールドがあると400になる。
+        ルート側で事前に pop していることを確認する。
+        """
+        register_user(client)
+
+        res = client.post(
+            "/api/auth/login",
+            json={
+                "identifier": "testuser",
+                "password": "testuser1234",
+                "turnstile_token": "dummy-token",
+            },
+        )
+
+        assert res.status_code == 200
+        assert "access_token" in res.get_json()
 
 
 #############################################
