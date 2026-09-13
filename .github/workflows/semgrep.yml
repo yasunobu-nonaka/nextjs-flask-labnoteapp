@@ -1,0 +1,26 @@
+name: Semgrep SAST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      # 導入初回のため --error は付けず、まず検出結果を確認できる状態にする。
+      # 内容を見た上でブロッキング（--error を付けて失敗させる）に切り替える。
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --config=p/flask \
+            --config=p/react
