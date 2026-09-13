@@ -34,8 +34,8 @@
 
 | Method | Path | 認証 | 説明 |
 |--------|------|------|------|
-| GET | `/api/invitations/<token>` | — | トークンから招待詳細を取得 |
-| POST | `/api/invitations/<token>/accept` | JWT | 招待を承諾して組織に参加。招待先メールアドレスとログインユーザーのメールアドレスが一致しない場合は403 |
+| GET | `/api/invitations/<token>` | — | トークンから招待詳細を取得。IPアドレス単位で`10 per hour; 30 per day`のレート制限あり（超過時429） |
+| POST | `/api/invitations/<token>/accept` | JWT | 招待を承諾して組織に参加。招待先メールアドレスとログインユーザーのメールアドレスが一致しない場合は403。IPアドレス単位で`10 per hour; 30 per day`のレート制限あり（超過時429） |
 
 ## 通知 (`/api/notifications`)
 
