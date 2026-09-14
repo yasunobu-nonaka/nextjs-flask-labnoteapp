@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import Flask, jsonify
 
 from app.api import api_bp
@@ -27,6 +29,28 @@ def create_app(config_name="development"):
     def user_lookup_callback(_jwt_header, jwt_data):
         identity = jwt_data["sub"]
         return db.session.get(User, identity)
+
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(_jwt_header, jwt_data):
+        """トークン発行時刻(iat)がユーザーのtokens_valid_afterより前なら失効済みとする。
+
+        個別トークンをブロックリストに登録する方式ではなく、ユーザー単位で
+        「この時刻より前に発行されたトークンは全部無効」という基準を持たせる
+        ことで、ログアウト・パスワード変更時に発行済みの全トークン
+        （盗まれた可能性のあるものも含む）を一括で失効させられるようにしている。
+        """
+        user = db.session.get(User, int(jwt_data["sub"]))
+        if user is None or user.tokens_valid_after is None:
+            return False
+        issued_at = datetime.fromtimestamp(jwt_data["iat"], tz=timezone.utc)
+        # SQLite（テスト環境）はtimezone-awareなdatetimeを保存してもnaiveで
+        # 返してくるため、常にUTCとして扱って比較できるよう補正する
+        # （常にUTCで書き込んでいるため補正して問題ない。他の場所の
+        # created_at_jstプロパティと同じ対処）
+        tokens_valid_after = user.tokens_valid_after
+        if tokens_valid_after.tzinfo is None:
+            tokens_valid_after = tokens_valid_after.replace(tzinfo=timezone.utc)
+        return issued_at < tokens_valid_after
 
     @app.errorhandler(429)
     def ratelimit_handler(e):

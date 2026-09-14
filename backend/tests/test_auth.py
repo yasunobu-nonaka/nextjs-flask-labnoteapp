@@ -573,6 +573,81 @@ class TestTokenRefresh:
 
 
 #############################################
+# tests for logout / token revocation
+#############################################
+class TestLogout:
+    """ログアウトによるトークン失効（tokens_valid_after）の検証。
+
+    以前はフロントエンドが localStorage を消すだけで、サーバー側では
+    何も無効化していなかった。トークンが漏洩していた場合、ログアウトしても
+    漏洩済みのトークンがそのまま使え続けてしまう問題があったため対応した。
+    """
+
+    def test_logout_revokes_the_access_token_used_to_call_it(self, client):
+        """ログアウトに使ったアクセストークン自身が、以後のリクエストで拒否される。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        logout_res = client.post("/api/auth/logout", headers=headers)
+        assert logout_res.status_code == 200
+
+        res = client.get("/api/organizations", headers=headers)
+        assert res.status_code == 401
+
+    def test_logout_revokes_the_refresh_token_too(self, client):
+        """ログアウト後、同じユーザーのリフレッシュトークンも使えなくなる。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        assert res.status_code == 401
+
+    def test_login_again_after_logout_issues_a_working_token(self, client):
+        """ログアウト後に再度ログインすれば、新しいトークンは問題なく使える。"""
+        import time
+
+        register_user(client)
+        first_login = login_user(client)
+        client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {first_login.get_json()['access_token']}"},
+        )
+
+        # JWTのiatは秒単位の精度しかないため、ログアウトと同じ秒内で再ログイン
+        # すると新トークンのiatが失効基準時刻より前に見えてしまう可能性がある。
+        # 実際のユーザー操作では起こり得ない待ち時間だが、テストを安定させるため
+        # 1秒待ってから再ログインする（test_new_forgot_password_invalidates_old_token
+        # と同じ対処）。
+        time.sleep(1)
+
+        second_login = login_user(client)
+        new_access_token = second_login.get_json()["access_token"]
+
+        res = client.get(
+            "/api/organizations",
+            headers={"Authorization": f"Bearer {new_access_token}"},
+        )
+        assert res.status_code == 200
+
+    def test_logout_without_token_fails(self, client):
+        """トークンなしでログアウトエンドポイントを叩くと401になる。"""
+        res = client.post("/api/auth/logout")
+        assert res.status_code == 401
+
+
+#############################################
 # tests for user status
 #############################################
 class TestUserStatus:
@@ -1183,6 +1258,28 @@ class TestUpdatePassword:
             json={"identifier": "testuser@example.com", "password": "newpassword1234"},
         )
         assert login_res.status_code == 200
+
+    def test_update_password_revokes_previously_issued_tokens(self, client, auth_headers):
+        """パスワード変更前に発行されていたトークンは、変更後は使えなくなる。
+
+        パスワード漏洩を疑って変更したのに、既に盗まれているかもしれない
+        トークンがそのまま有効というのでは意味がないため、変更時点までに
+        発行された全トークンを失効させる仕様になっている。
+        """
+        old_headers = auth_headers["headers"]
+
+        client.patch(
+            "/api/auth/me/password",
+            headers=old_headers,
+            json={
+                "current_password": "testuser1234",
+                "password": "newpassword1234",
+                "confirm": "newpassword1234",
+            },
+        )
+
+        res = client.get("/api/organizations", headers=old_headers)
+        assert res.status_code == 401
 
     def test_update_password_wrong_current_returns_401(self, client, auth_headers):
         """誤った現在のパスワードは 401 になる。"""

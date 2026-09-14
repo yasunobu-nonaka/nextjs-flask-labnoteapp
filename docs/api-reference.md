@@ -16,19 +16,20 @@
 | GET | `/api/auth/verify/<token>` | — | 登録時のメール確認 |
 | POST | `/api/auth/login` | — | ログイン。アクセストークン＋リフレッシュトークンを返す。IPアドレス単位で`5 per minute; 20 per hour; 100 per day`のレート制限あり（超過時429） |
 | POST | `/api/auth/refresh` | refresh JWT | アクセストークンを再発行 |
+| POST | `/api/auth/logout` | JWT | ログアウト。`users.tokens_valid_after`を現在時刻に更新し、それ以前に発行された全トークン（アクセス・リフレッシュとも、他端末の分も含む）を失効させる |
 | GET | `/api/auth/me` | JWT | 現在のユーザー情報を取得。`needs_onboarding`（組織未所属なら true）を含む |
 | GET | `/api/auth/me/status` | JWT | ログイン中のユーザー自身のメール確認状態を取得（`current_user`固定。旧`/api/auth/user/status`は任意のメールアドレスをクエリパラメータで指定でき、認証不要で存在有無を確認できてしまっていたため、他の`/me/*`と同じ形に改めた） |
 | POST | `/api/auth/resend-verification` | JWT | ログイン中のユーザー自身に確認メールを再送（`current_user`固定。以前はリクエストボディで任意のメールアドレスを指定でき、404/200の違いから登録有無が判別できる上、実在ユーザーには実際にメールを送信できてしまっていたため修正） |
 | DELETE | `/api/auth/me` | JWT | アカウント削除。組織で`owner`/`member`以外のロールを持つ、グループの`admin`である、非公開ノートのオーナーである、作成したノート/フォルダが残っている、のいずれかに該当すると409を返しブロックする |
 | PATCH | `/api/auth/me/username` | JWT | ユーザー名変更 |
 | POST | `/api/auth/me/password/verify` | JWT | 現在のパスワードを検証（変更前の事前確認）。JWT漏洩時に`/login`を経由せず現パスワードを総当たりされる経路になるため、IPアドレス単位で`5 per minute; 20 per hour; 100 per day`のレート制限あり（超過時429） |
-| PATCH | `/api/auth/me/password` | JWT | パスワード変更。`/me/password/verify`と同じ理由で同じレート制限あり |
+| PATCH | `/api/auth/me/password` | JWT | パスワード変更。`/me/password/verify`と同じ理由で同じレート制限あり。変更時点までに発行された全トークンを失効させる（`tokens_valid_after`） |
 | PATCH | `/api/auth/me/email` | JWT | メールアドレス変更申請（確認メール送信）。指定したメールアドレスが未登録なら実際にそのアドレスへメール送信されるため、`/forgot-password`と同様の乱用防止目的でIPアドレス単位で`3 per hour; 10 per day`のレート制限あり（超過時429） |
 | GET | `/api/auth/verify-email-change/<token>` | — | メールアドレス変更の確認 |
 | POST | `/api/auth/forgot-password` | — | パスワードリセットメール送信。IPアドレス単位で`3 per hour; 10 per day`のレート制限あり（超過時429） |
 | GET | `/api/auth/reset-password/<token>` | — | リセットトークンの検証 |
 | POST | `/api/auth/reset-password/validate-token` | — | リセットトークンの検証（JSONボディ版） |
-| POST | `/api/auth/reset-password` | — | リセットトークンで新パスワードを設定。IPアドレス単位で`5 per hour; 20 per day`のレート制限あり（超過時429） |
+| POST | `/api/auth/reset-password` | — | リセットトークンで新パスワードを設定。IPアドレス単位で`5 per hour; 20 per day`のレート制限あり（超過時429）。設定時点までに発行された全トークンを失効させる（`tokens_valid_after`） |
 
 ## 招待 (`/api/invitations`)
 

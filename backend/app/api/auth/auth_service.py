@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import or_
 from flask_jwt_extended import create_access_token, create_refresh_token
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -126,6 +128,10 @@ def update_username(user, new_username):
 
 def update_user_password(user, new_password):
     user.set_password(new_password)
+    # パスワード変更時点までに発行された全トークンを失効させる。
+    # /me/password（認証済み変更）・/reset-password（トークンによるリセット）の
+    # どちらの経路でもここを通るため、両方で自動的に保護される。
+    user.tokens_valid_after = datetime.now(timezone.utc)
     db.session.commit()
 
     return user

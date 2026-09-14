@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import jsonify, request
 from flask_jwt_extended import (
     jwt_required,
@@ -230,6 +232,22 @@ def refresh():
         return jsonify({"message": "ユーザーが見つかりません"}), 404
     new_access_token = create_access_token(identity=user)
     return jsonify(access_token=new_access_token)
+
+
+@auth_bp.route("/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    """ログアウト。発行済みの全トークン（アクセス・リフレッシュとも）を失効させる。
+
+    以前はフロントエンドが localStorage を消すだけで、サーバー側では
+    何も無効化していなかった。トークンが漏洩していた場合（XSS・端末盗難等）、
+    ログアウトしても漏洩済みのトークンはそのまま使え続けてしまっていたため、
+    current_user.tokens_valid_after を現在時刻に更新し、このユーザーが
+    それ以前に発行された全トークンを以後拒否されるようにする。
+    """
+    current_user.tokens_valid_after = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({"message": "ログアウトしました"}), 200
 
 
 #########################################################
