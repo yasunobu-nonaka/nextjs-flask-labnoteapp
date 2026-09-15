@@ -383,6 +383,49 @@ class TestNoteIndex:
 
         assert res.status_code == 404
 
+    def test_pending_join_request_member_cannot_list_notes(self, client, auth_headers):
+        """参加申請が pending 中のユーザーは、承認前は active メンバー同様にノート一覧を見られない。
+
+        check_group_membership は status='active' のみを対象とするため、
+        pending/rejected なメンバーシップ行が存在するだけでは note:read が
+        通ってしまわないことを確認する。グループは非公開ではない（存在自体は
+        組織内に公開されている）ため、404 ではなく 403 が返る。
+        """
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        create_note(client, auth_headers["headers"], org_id, group_id, "Note 1", "c")
+
+        # join_method を 'request' にし、承認待ち(pending)の参加申請を作る
+        client.patch(
+            f"/api/organizations/{org_id}/groups/{group_id}",
+            json={"policy": {"join_method": "request"}},
+            headers=auth_headers["headers"],
+        )
+
+        register_user(client, username="pending_joiner", email="pending_joiner@example.com")
+        token = login_and_get_token(client, identifier="pending_joiner@example.com")
+        pending_headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+        res_me = client.get("/api/auth/me", headers=pending_headers)
+        pending_user_id = res_me.get_json()["id"]
+
+        # グループ参加には組織メンバーである必要がある
+        client.post(
+            f"/api/organizations/{org_id}/members",
+            json={"user_id": pending_user_id, "role": "member"},
+            headers=auth_headers["headers"],
+        )
+
+        join_res = client.post(
+            f"/api/organizations/{org_id}/groups/{group_id}/join",
+            headers=pending_headers,
+        )
+        assert join_res.get_json()["member"]["status"] == "pending"
+
+        res = client.get(notes_url(org_id, group_id), headers=pending_headers)
+        assert res.status_code == 403
+
 
 #############################################
 # tests for note detail
@@ -555,6 +598,64 @@ class TestNoteDelete:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
         )
 
+        assert res.status_code == 404
+
+
+#############################################
+# tests for cross-group IDOR
+#############################################
+class TestCrossGroupNoteAccessReturns404:
+    """自分の org_id/group_id はそのままに、他グループの note_id へすり替えてアクセスした場合の
+    IDOR 対策の検証。
+
+    test_non_member_cannot_* 系のテストは「その組織/グループに一切所属していない
+    ユーザー」が権限チェック層で弾かれることを確認するのに対し、ここでの攻撃者は
+    自分自身の組織・グループでは正規の admin 権限を持つ点が異なる。権限チェックを
+    通過した後、note_id と group_id の組み合わせがサーバー側で正しく検証されているか
+    （get_note_or_404_service の filter_by(id=note_id, group_id=group_id)）を確認する。
+    """
+
+    def _setup_victim_and_attacker(self, client, auth_headers):
+        """被害者側（org1/group1/note）と、別組織を持つ攻撃者側のヘッダーを用意する。"""
+        org1_id, group1_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_note(
+            client, auth_headers["headers"], org1_id, group1_id, "Secret Note", "content"
+        ).get_json()["note"]["id"]
+
+        register_user(client, username="crossgroup_attacker", email="crossgroup_attacker@example.com")
+        attacker_token = login_and_get_token(client, identifier="crossgroup_attacker@example.com")
+        attacker_headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {attacker_token}",
+        }
+        # 攻撃者自身は別の組織・グループの admin（正規の note:read/edit/delete 権限を持つ）
+        org2_id, group2_id = setup_org_and_group(client, attacker_headers)
+
+        return note_id, org2_id, group2_id, attacker_headers
+
+    def test_get_note_with_mismatched_group_id_returns_404(self, client, auth_headers):
+        """自グループのadminが、自分のorg_id/group_idはそのままに他グループのnote_idを参照すると404。"""
+        note_id, org2_id, group2_id, attacker_headers = self._setup_victim_and_attacker(client, auth_headers)
+
+        res = client.get(notes_url(org2_id, group2_id, note_id), headers=attacker_headers)
+        assert res.status_code == 404
+
+    def test_edit_note_with_mismatched_group_id_returns_404(self, client, auth_headers):
+        """自グループのadminが、他グループのnote_idを指定して更新しようとすると404。"""
+        note_id, org2_id, group2_id, attacker_headers = self._setup_victim_and_attacker(client, auth_headers)
+
+        res = client.patch(
+            notes_url(org2_id, group2_id, note_id),
+            json={"title": "乗っ取り"},
+            headers=attacker_headers,
+        )
+        assert res.status_code == 404
+
+    def test_delete_note_with_mismatched_group_id_returns_404(self, client, auth_headers):
+        """自グループのadminが、他グループのnote_idを指定して削除しようとすると404。"""
+        note_id, org2_id, group2_id, attacker_headers = self._setup_victim_and_attacker(client, auth_headers)
+
+        res = client.delete(notes_url(org2_id, group2_id, note_id), headers=attacker_headers)
         assert res.status_code == 404
 
 
@@ -744,6 +845,33 @@ class TestPrivateNotes:
             headers=headers2,
         )
         assert res.status_code == 403
+
+    def test_cannot_share_private_note_with_non_group_member(self, client, auth_headers):
+        """共有先の user_id がノートの属するグループのメンバーでない場合は 400 になる。
+
+        グループ外の任意のユーザーIDを直接指定してプライベートノートに
+        アクセスさせられてしまわないことを確認する。
+        """
+        org_id, group_id = setup_org_and_group(client, auth_headers["headers"])
+        note_id = create_private_note(
+            client, auth_headers["headers"], org_id, group_id, "秘密のノート"
+        ).get_json()["note"]["id"]
+
+        # グループには所属しない（別の組織にも属さない）ユーザー
+        register_user(client, username="outsider_share", email="outsider_share@example.com")
+        token = login_and_get_token(client, identifier="outsider_share@example.com")
+        res_me = client.get(
+            "/api/auth/me",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        )
+        outsider_id = res_me.get_json()["id"]
+
+        res = client.post(
+            notes_url(org_id, group_id, note_id) + "/members",
+            json={"user_id": outsider_id, "role": "viewer"},
+            headers=auth_headers["headers"],
+        )
+        assert res.status_code == 400
 
     def test_allow_private_notes_false_rejects_creation(self, client, auth_headers):
         """グループポリシーで allow_private_notes=False のときプライベートノート作成を拒否する。"""

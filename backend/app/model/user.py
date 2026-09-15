@@ -31,6 +31,12 @@ class User(db.Model):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc  # UTCで保存
     )
+    # これより前に発行された JWT を無効として扱うための基準時刻。
+    # ログアウト・パスワード変更のたびに現在時刻へ更新することで、
+    # 発行済みトークン（漏洩した可能性のあるものも含む）を一括で失効させる。
+    tokens_valid_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # リレーション
     # Phase 3: notes/tags/folders は Group 所有に移行したため削除

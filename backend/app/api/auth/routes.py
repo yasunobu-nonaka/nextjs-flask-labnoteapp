@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import jsonify, request
 from flask_jwt_extended import (
     jwt_required,
@@ -18,7 +20,7 @@ from app.schema import (
     PasswordChangeSchema,
     PasswordVerifySchema,
 )
-from app.extensions import db
+from app.extensions import db, limiter
 from app.services.mail_service import (
     send_verification_email,
     send_password_reset_email,
@@ -30,6 +32,7 @@ from app.services.mail_service import (
     verify_email_change_token,
     send_email_change_confirmation,
 )
+from app.services.turnstile_service import verify_turnstile_token
 from app.api.auth.auth_service import (
     get_user_by_username_or_email,
     get_user_by_email,
@@ -64,6 +67,13 @@ password_verify_schema = PasswordVerifySchema()
 def register():
     # 入力値受け取り
     user_input = request.get_json()
+    turnstile_token = user_input.pop("turnstile_token", None)
+
+    if not verify_turnstile_token(turnstile_token, request.remote_addr):
+        return (
+            jsonify({"message": "認証チェックに失敗しました。もう一度お試しください"}),
+            403,
+        )
 
     # 入力のバリデーション
     try:
@@ -125,49 +135,45 @@ def verify_email(token):
     return jsonify({"message": "メールアドレスが確認されました！"}), 200
 
 
-@auth_bp.route("/user/status", methods=["GET"])
-def check_verification_status():
-    """認証状態確認エンドポイント"""
-    email = request.args.get("email")
+@auth_bp.route("/me/status", methods=["GET"])
+@jwt_required()
+def get_me_status():
+    """ログイン中のユーザー自身のメール確認状態を返す。
 
-    if not email:
-        return jsonify({"error": "メールアドレスが必要です"}), 400
-
-    user = get_user_by_email(email)
-
-    if not user:
-        return jsonify({"error": "ユーザーが見つかりません"}), 404
-
+    以前は `/user/status` としてクエリパラメータで任意のメールアドレスを
+    指定でき、認証不要でアカウントの存在有無・検証状態・作成日時を誰でも
+    取得できてしまっていた（メールアドレス列挙オラクル）。現在は他の
+    `/me/*` エンドポイント群と同様、current_user 固定のパスに改め、
+    他人のメールアドレスの登録状況を調べる手段として使えないようにしている。
+    """
     return jsonify(
         {
-            "email": user.email,
-            "verified": user.verified,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "email": current_user.email,
+            "verified": current_user.verified,
+            "created_at": (
+                current_user.created_at.isoformat() if current_user.created_at else None
+            ),
         }
     )
 
 
 @auth_bp.route("/resend-verification", methods=["POST"])
+@jwt_required()
 def resend_verification():
-    """認証メール再送信エンドポイント"""
-    user_input = request.get_json()
+    """認証メール再送信エンドポイント。ログイン中のユーザー自身にのみ再送信する。
 
-    try:
-        validated_user_input = email_schema.load(user_input)
-    except ValidationError as err:
-        return jsonify({"message": "validation error", "errors": err.messages}), 400
-
-    email = validated_user_input["email"]
-    user = get_user_by_email(email)
-
-    if not user:
-        return jsonify({"error": "ユーザーが見つかりません"}), 404
-
-    if user.verified:
+    以前はリクエストボディのメールアドレスで任意のユーザーを指定でき、
+    存在しなければ404・存在すれば200（かつ実際にメール送信）という応答の
+    違いから、認証不要でメールアドレスの登録有無を判定できてしまっていた
+    （存在有無オラクル）。`/me/status`と同様、current_user 固定にすることで
+    他人のメールアドレスを調べる／他人宛に確認メールを送りつける手段として
+    使えないようにしている。
+    """
+    if current_user.verified:
         return jsonify({"message": "このアカウントは既に認証済みです"}), 200
 
     # 認証メールを再送信
-    if send_verification_email(email):
+    if send_verification_email(current_user.email):
         return jsonify({"message": "確認メールを再送信しました"}), 200
     else:
         return jsonify({"error": "メール送信に失敗しました"}), 500
@@ -179,9 +185,17 @@ def resend_verification():
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def login():
     # 入力値受け取り
     user_input = request.get_json()
+    turnstile_token = user_input.pop("turnstile_token", None)
+
+    if not verify_turnstile_token(turnstile_token, request.remote_addr):
+        return (
+            jsonify({"message": "認証チェックに失敗しました。もう一度お試しください"}),
+            403,
+        )
 
     # 入力のバリデーション
     try:
@@ -218,6 +232,22 @@ def refresh():
         return jsonify({"message": "ユーザーが見つかりません"}), 404
     new_access_token = create_access_token(identity=user)
     return jsonify(access_token=new_access_token)
+
+
+@auth_bp.route("/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    """ログアウト。発行済みの全トークン（アクセス・リフレッシュとも）を失効させる。
+
+    以前はフロントエンドが localStorage を消すだけで、サーバー側では
+    何も無効化していなかった。トークンが漏洩していた場合（XSS・端末盗難等）、
+    ログアウトしても漏洩済みのトークンはそのまま使え続けてしまっていたため、
+    current_user.tokens_valid_after を現在時刻に更新し、このユーザーが
+    それ以前に発行された全トークンを以後拒否されるようにする。
+    """
+    current_user.tokens_valid_after = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({"message": "ログアウトしました"}), 200
 
 
 #########################################################
@@ -389,8 +419,14 @@ def update_me_username():
 
 @auth_bp.route("/me/password/verify", methods=["POST"])
 @jwt_required()
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def verify_me_password():
-    """パスワード変更フロー step 1: 現在のパスワードが正しいか検証する"""
+    """パスワード変更フロー step 1: 現在のパスワードが正しいか検証する。
+
+    JWTが漏洩・盗用された場合、/login のレート制限を経由せずに本人の
+    現在のパスワードを直接総当たりされる経路になり得るため、/login と
+    同じ基準でレート制限をかけている。
+    """
     try:
         data = password_verify_schema.load(request.get_json())
     except ValidationError as err:
@@ -404,8 +440,14 @@ def verify_me_password():
 
 @auth_bp.route("/me/password", methods=["PATCH"])
 @jwt_required()
+@limiter.limit("5 per minute; 20 per hour; 100 per day")
 def update_me_password():
-    """ログイン中のユーザーのパスワードを変更する"""
+    """ログイン中のユーザーのパスワードを変更する。
+
+    /me/password/verify と同じ current_password チェックを行い、成功すると
+    即座にパスワードが書き換わるため、こちらも /login と同じ基準で
+    レート制限をかけている。
+    """
     try:
         data = password_change_schema.load(request.get_json())
     except ValidationError as err:
@@ -420,8 +462,15 @@ def update_me_password():
 
 @auth_bp.route("/me/email", methods=["PATCH"])
 @jwt_required()
+@limiter.limit("3 per hour; 10 per day")
 def update_me_email():
-    """ログイン中のユーザーのメールアドレス変更を開始する（確認メール送信）"""
+    """ログイン中のユーザーのメールアドレス変更を開始する（確認メール送信）。
+
+    指定した new_email が未登録の場合は実際に確認メールを送信するため、
+    ログイン済みユーザーが任意のメールアドレス宛にメールを送りつけられて
+    しまう（かつ409/200の違いでメールアドレスの登録有無も分かる）。
+    /forgot-password と同種のリスクとして同じ基準でレート制限をかけている。
+    """
     try:
         data = email_update_schema.load(request.get_json())
     except ValidationError as err:
@@ -487,6 +536,7 @@ def verify_email_change(token):
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
+@limiter.limit("3 per hour; 10 per day")
 def forgot_password():
     # メールアドレスの存在を確認
     user_input = request.get_json()
@@ -500,15 +550,19 @@ def forgot_password():
     email = validated_user_input["email"]
     user = get_user_by_email(email)
 
+    # メールアドレス列挙を防ぐため、登録済み・未登録どちらでも同一のレスポンス
+    # （メッセージ文言・付随フィールドの有無）を返す。
+    enumeration_safe_response = (
+        jsonify(
+            {
+                "message": "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
+            }
+        ),
+        200,
+    )
+
     if not user:
-        return (
-            jsonify(
-                {
-                    "message": "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
-                }
-            ),
-            200,
-        )
+        return enumeration_safe_response
 
     # トークンを生成してハッシュをDBに保存（一回限り使用のため）
     token = generate_reset_password_token(user.email)
@@ -517,15 +571,7 @@ def forgot_password():
 
     # トークン付きURLをメールで送付
     if send_password_reset_email(user.email, token):
-        return (
-            jsonify(
-                {
-                    "message": "パスワードリセット用のメールを送信しました。",
-                    "username": user.username,
-                }
-            ),
-            200,
-        )
+        return enumeration_safe_response
     else:
         return jsonify({"error": "パスワードリセット用メールの送信に失敗しました"}), 500
 
@@ -561,6 +607,7 @@ def verify_reset_password_token_endpoint(token):
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
+@limiter.limit("5 per hour; 20 per day")
 def reset_password():
     # 入力のバリデーション
     user_input = request.get_json()

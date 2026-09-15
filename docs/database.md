@@ -76,6 +76,7 @@ plantuml -tpng -SdefaultFontSize=20 -Sdpi=300 docs/diagrams/<フォルダー>/<�
 | reset_token_hash | String(64) | nullable |
 | pending_email | String(120) | nullable（メールアドレス変更申請中の新アドレス） |
 | created_at | DateTime(tz) | default now (UTC) |
+| tokens_valid_after | DateTime(tz) | nullable（これより前に発行されたJWTを失効扱いにする基準時刻。ログアウト・パスワード変更時に更新） |
 
 ### organizations
 

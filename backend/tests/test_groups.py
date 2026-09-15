@@ -675,3 +675,57 @@ class TestNonMemberGroupAccessReturns404:
             headers=org_member_headers,
         )
         assert res.status_code == 404
+
+
+###############################################
+#  クロス組織IDORテスト
+###############################################
+class TestCrossOrganizationGroupAccessReturns404:
+    """org_id と group_id の親子整合性（group.organization_id == org_id）の検証。
+
+    攻撃者は「どこにも所属していない非メンバー」ではなく、自分自身の組織では
+    正規のオーナー権限を持つユーザーである点が非メンバーテストと異なる。
+    自分のorg_idはそのままに、他組織の実在するgroup_idだけを差し替えて
+    URLパスに組み合わせた場合に404となるか（IDのすり替えを弾けるか）を確認する。
+    """
+
+    def _setup_two_orgs(self, client, auth_headers):
+        """org1（既存ユーザー所有）とorg2（攻撃者所有）、org1配下のgroup1を用意する。"""
+        org1_id = create_org(client, auth_headers["headers"], "組織1")["id"]
+        group1_id = create_group(client, auth_headers["headers"], org1_id).get_json()["group"]["id"]
+
+        attacker_headers = register_and_get_headers(client, "crossorg_attacker", "crossorg_attacker@example.com")
+        org2_id = create_org(client, attacker_headers, "組織2")["id"]
+
+        return org1_id, group1_id, org2_id, attacker_headers
+
+    def test_get_group_with_mismatched_org_id_returns_404(self, client, auth_headers):
+        """org2のオーナーが、org1配下の実在group_idをorg2のURLパスで参照すると404になる。"""
+        org1_id, group1_id, org2_id, attacker_headers = self._setup_two_orgs(client, auth_headers)
+
+        res = client.get(
+            f"/api/organizations/{org2_id}/groups/{group1_id}",
+            headers=attacker_headers,
+        )
+        assert res.status_code == 404
+
+    def test_update_group_with_mismatched_org_id_returns_404(self, client, auth_headers):
+        """org2のオーナーが、org1配下の実在group_idをorg2のURLパスで更新しようとすると404になる。"""
+        org1_id, group1_id, org2_id, attacker_headers = self._setup_two_orgs(client, auth_headers)
+
+        res = client.patch(
+            f"/api/organizations/{org2_id}/groups/{group1_id}",
+            json={"name": "乗っ取り"},
+            headers=attacker_headers,
+        )
+        assert res.status_code == 404
+
+    def test_delete_group_with_mismatched_org_id_returns_404(self, client, auth_headers):
+        """org2のオーナーが、org1配下の実在group_idをorg2のURLパスで削除しようとすると404になる。"""
+        org1_id, group1_id, org2_id, attacker_headers = self._setup_two_orgs(client, auth_headers)
+
+        res = client.delete(
+            f"/api/organizations/{org2_id}/groups/{group1_id}",
+            headers=attacker_headers,
+        )
+        assert res.status_code == 404

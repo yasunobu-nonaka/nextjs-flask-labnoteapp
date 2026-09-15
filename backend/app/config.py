@@ -16,6 +16,10 @@ class Config:
     # リフレッシュトークン：長命（新しいアクセストークンの取得のみに使う）
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
+    # Cloudflare Turnstile
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY")
+    TURNSTILE_ENABLED = True
+
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
     MAIL_MAX_EMAILS = None
     MAIL_ASCII_ATTACHMENTS = False
@@ -56,6 +60,9 @@ class TestingConfig(Config):
     DEBUG = True
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///test.db"
+
+    # TestingConfig
+    TURNSTILE_ENABLED = False  # テストでは外部APIを叩かない
 
     # テスト環境では実際のメール送信を抑制
     MAIL_SUPPRESS_SEND = True  # メールを実際には送信しない

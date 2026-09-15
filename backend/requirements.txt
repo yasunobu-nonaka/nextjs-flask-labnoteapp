@@ -17,6 +17,12 @@ Flask-CORS==6.0.1
 # mail
 Flask-Mail==0.10.0
 
+# Rate Limiter
+Flask-Limiter==4.1.1
+
+# Requests
+requests==2.34.2
+
 # Test
 pytest==9.0.3
 

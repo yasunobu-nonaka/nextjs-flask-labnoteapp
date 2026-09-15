@@ -1,6 +1,7 @@
 from flask import jsonify
 from flask_jwt_extended import current_user, jwt_required
 
+from app.extensions import limiter
 from app.api.organizations.invitation.service import (
     get_invitation_by_token,
     accept_invitation,
@@ -10,6 +11,7 @@ from . import invitations_bp
 
 
 @invitations_bp.route("/<token>", methods=["GET"])
+@limiter.limit("10 per hour; 30 per day")
 def get_invitation(token: str):
     """招待トークンの詳細を返す。認証不要（招待受け入れページの表示用）。"""
 
@@ -25,6 +27,7 @@ def get_invitation(token: str):
 
 @invitations_bp.route("/<token>/accept", methods=["POST"])
 @jwt_required()
+@limiter.limit("10 per hour; 30 per day")
 def accept_invitation_route(token: str):
     """招待を承認してログインユーザーを組織に追加する。"""
 

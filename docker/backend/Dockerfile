@@ -14,6 +14,9 @@ COPY backend/requirements.txt .
 RUN pip install -r requirements.txt
 COPY backend .
 
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 5000
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]

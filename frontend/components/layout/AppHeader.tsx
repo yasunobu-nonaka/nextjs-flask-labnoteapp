@@ -222,8 +222,15 @@ export default function AppHeader({
     setIsBellOpen(false);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     if (confirmBeforeLeave && !confirmBeforeLeave()) return;
+    // サーバー側にも発行済みトークンの失効を伝える。ネットワークエラー等で
+    // 失敗しても、クライアント側のログアウト（トークン破棄）自体は必ず行う。
+    try {
+      await authFetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // 無視して続行
+    }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem(LAST_SEEN_KEY);

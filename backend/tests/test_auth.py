@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from conftest import register_user, login_user
 from app.services.mail_service import (
     generate_email_verification_token,
@@ -9,7 +11,7 @@ from app.services.mail_service import (
     generate_email_change_token,
     hash_token,
 )
-from app.api.auth.auth_service import get_user_by_email
+from app.api.auth.auth_service import get_user_by_email, check_password_and_get_tokens
 from app.extensions import db
 from app.model import (
     User,
@@ -176,6 +178,26 @@ class TestUserRegistration:
         )
         assert res.status_code == 400
 
+    def test_register_ignores_turnstile_token_field(self, client):
+        """turnstile_token をボディに含めても、未知のフィールドとして400にならない。
+
+        RegistrationSchema には turnstile_token が定義されておらず、
+        marshmallow のデフォルト設定（unknown=RAISE）では未定義フィールドが
+        あると400になる。ルート側で事前に pop していることを確認する。
+        """
+        res = client.post(
+            "/api/auth/register",
+            json={
+                "username": "testuser",
+                "email": "testuser@example.com",
+                "password": "testuser1234",
+                "confirm": "testuser1234",
+                "turnstile_token": "dummy-token",
+            },
+        )
+
+        assert res.status_code == 201
+
 
 #############################################
 # tests for Email verification
@@ -244,47 +266,60 @@ class TestEmailVerification:
 class TestResendVerification:
     """認証メール再送信のテスト"""
 
-    def test_resend_verification_success(self, client, test_user):
-        """未認証ユーザーへの再送信が成功する。"""
-        # test_user はデフォルトで verified=False
+    def test_resend_verification_success(self, client):
+        """未認証ユーザー自身への再送信が成功する。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
         response = client.post(
-            "/api/auth/resend-verification", json={"email": test_user.email}
+            "/api/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
         assert response.status_code == 200
         assert "再送信しました" in response.get_json()["message"]
 
-    def test_resend_verification_missing_email(self, client):
-        """メールアドレスなしの再送信テスト"""
-        response = client.post("/api/auth/resend-verification", json={})
+    def test_resend_verification_no_token_failed(self, client):
+        """未ログインでは401になる。"""
+        response = client.post("/api/auth/resend-verification")
 
-        assert response.status_code == 400
-        assert (
-            response.get_json()["errors"]["email"][0]
-            == "メールアドレスを入力してください"
-        )
-
-    def test_resend_verification_nonexistent_user(self, client):
-        """存在しないユーザーの再送信テスト"""
-        response = client.post(
-            "/api/auth/resend-verification", json={"email": "doesnotexist@example.com"}
-        )
-
-        assert response.status_code == 404
-        assert "ユーザーが見つかりません" in response.get_json()["error"]
+        assert response.status_code == 401
 
     def test_resend_verification_already_verified(self, client, test_user):
-        """既に認証済みユーザーの再送信テスト"""
+        """既に認証済みユーザー自身の再送信テスト"""
         test_user.verified = True
-
         db.session.commit()
 
+        token = login_user(client).get_json()["access_token"]
+
         response = client.post(
-            "/api/auth/resend-verification", json={"email": "testuser@example.com"}
+            "/api/auth/resend-verification",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
         assert response.status_code == 200
         assert "既に認証済み" in response.get_json()["message"]
+
+    def test_resend_verification_ignores_email_in_body(self, client):
+        """リクエストボディにメールアドレスを含めても無視され、常にログイン中の
+        ユーザー自身にのみ送信される（他人宛に確認メールを送りつける手段として
+        使えないことの確認）。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
+        register_user(client, username="other", email="other@example.com")
+
+        with patch("app.api.auth.routes.send_verification_email") as mock_send:
+            mock_send.return_value = True
+
+            response = client.post(
+                "/api/auth/resend-verification",
+                json={"email": "other@example.com"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert response.status_code == 200
+        mock_send.assert_called_once_with("testuser@example.com")
 
 
 #############################################
@@ -389,6 +424,94 @@ class TestUserLogin:
         assert "access_token" not in res.get_json()
         assert res.status_code == 401
 
+    def test_login_ignores_turnstile_token_field(self, client):
+        """turnstile_token をボディに含めても、未知のフィールドとして400にならない。
+
+        LoginSchema には turnstile_token が定義されておらず、marshmallow の
+        デフォルト設定（unknown=RAISE）では未定義フィールドがあると400になる。
+        ルート側で事前に pop していることを確認する。
+        """
+        register_user(client)
+
+        res = client.post(
+            "/api/auth/login",
+            json={
+                "identifier": "testuser",
+                "password": "testuser1234",
+                "turnstile_token": "dummy-token",
+            },
+        )
+
+        assert res.status_code == 200
+        assert "access_token" in res.get_json()
+
+
+#############################################
+# tests for login timing side-channel
+#############################################
+class TestCheckPasswordTimingSafety:
+    """存在しないユーザーへのログイン試行でも、実在ユーザーと同じコストの
+    パスワードハッシュ比較が行われることを確認する。
+
+    以前は `if user and user.check_password(password)` の短絡評価により、
+    ユーザーが存在しない場合はハッシュ比較自体がスキップされ、応答時間の
+    違いからユーザー名/メールアドレスの存在有無が推測できてしまっていた。
+    """
+
+    def test_dummy_hash_check_runs_when_user_is_none(self):
+        """user が None でも check_password_hash が1回呼ばれる。"""
+        with patch("app.api.auth.auth_service.check_password_hash") as mock_check:
+            mock_check.return_value = False
+
+            access_token, refresh_token = check_password_and_get_tokens(
+                None, "irrelevant-password"
+            )
+
+        assert access_token is None
+        assert refresh_token is None
+        mock_check.assert_called_once()
+
+    def test_login_with_nonexistent_user_still_returns_401(self, client):
+        """ダミーハッシュ比較を挟んでも、存在しないユーザーへのログインは
+        従来通り401で失敗する（挙動そのものは変わらないことの確認）。"""
+        res = client.post(
+            "/api/auth/login",
+            json={"identifier": "nobody", "password": "whatever1234"},
+        )
+
+        assert res.status_code == 401
+        assert "access_token" not in res.get_json()
+
+
+#############################################
+# tests for login brute-force protection
+#############################################
+class TestLoginRateLimiting:
+    """ログインAPIへのレート制限（ブルートフォース対策）の検証。
+
+    Flask-Limiter導入（`@limiter.limit("5 per minute")`）により、以前は
+    xfail(strict=True) だったこのテストが実際に通るようになったため、
+    通常のリグレッションテストに昇格させた。
+    """
+
+    def test_repeated_failed_logins_are_rate_limited(self, client):
+        """同一アカウントへの大量のログイン失敗試行に対し、いずれ429が返ることを期待する。"""
+        register_user(client)
+
+        responses = [
+            client.post(
+                "/api/auth/login",
+                json={"identifier": "testuser", "password": f"wrongpassword{i}"},
+            )
+            for i in range(20)
+        ]
+
+        # レート制限があれば、しきい値を超えた時点で 429 (Too Many Requests) が返るはず
+        assert any(res.status_code == 429 for res in responses), (
+            "20回連続でログインに失敗しても429が一度も返らなかった"
+            "（レート制限/アカウントロックアウトが実装されていない）"
+        )
+
 
 #############################################
 # tests for token refresh
@@ -450,29 +573,121 @@ class TestTokenRefresh:
 
 
 #############################################
+# tests for logout / token revocation
+#############################################
+class TestLogout:
+    """ログアウトによるトークン失効（tokens_valid_after）の検証。
+
+    以前はフロントエンドが localStorage を消すだけで、サーバー側では
+    何も無効化していなかった。トークンが漏洩していた場合、ログアウトしても
+    漏洩済みのトークンがそのまま使え続けてしまう問題があったため対応した。
+    """
+
+    def test_logout_revokes_the_access_token_used_to_call_it(self, client):
+        """ログアウトに使ったアクセストークン自身が、以後のリクエストで拒否される。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        logout_res = client.post("/api/auth/logout", headers=headers)
+        assert logout_res.status_code == 200
+
+        res = client.get("/api/organizations", headers=headers)
+        assert res.status_code == 401
+
+    def test_logout_revokes_the_refresh_token_too(self, client):
+        """ログアウト後、同じユーザーのリフレッシュトークンも使えなくなる。"""
+        register_user(client)
+        login_res = login_user(client)
+        access_token = login_res.get_json()["access_token"]
+        refresh_token = login_res.get_json()["refresh_token"]
+
+        client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        res = client.post(
+            "/api/auth/refresh",
+            headers={"Authorization": f"Bearer {refresh_token}"},
+        )
+        assert res.status_code == 401
+
+    def test_login_again_after_logout_issues_a_working_token(self, client):
+        """ログアウト後に再度ログインすれば、新しいトークンは問題なく使える。"""
+        import time
+
+        register_user(client)
+        first_login = login_user(client)
+        client.post(
+            "/api/auth/logout",
+            headers={"Authorization": f"Bearer {first_login.get_json()['access_token']}"},
+        )
+
+        # JWTのiatは秒単位の精度しかないため、ログアウトと同じ秒内で再ログイン
+        # すると新トークンのiatが失効基準時刻より前に見えてしまう可能性がある。
+        # 実際のユーザー操作では起こり得ない待ち時間だが、テストを安定させるため
+        # 1秒待ってから再ログインする（test_new_forgot_password_invalidates_old_token
+        # と同じ対処）。
+        time.sleep(1)
+
+        second_login = login_user(client)
+        new_access_token = second_login.get_json()["access_token"]
+
+        res = client.get(
+            "/api/organizations",
+            headers={"Authorization": f"Bearer {new_access_token}"},
+        )
+        assert res.status_code == 200
+
+    def test_logout_without_token_fails(self, client):
+        """トークンなしでログアウトエンドポイントを叩くと401になる。"""
+        res = client.post("/api/auth/logout")
+        assert res.status_code == 401
+
+
+#############################################
 # tests for user status
 #############################################
 class TestUserStatus:
-    def test_get_user_status(self, client, test_user):
-        res = client.get(f"/api/auth/user/status?email={test_user.email}")
+    def test_get_user_status(self, client):
+        """ログイン中のユーザー自身の確認状態を取得できる。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
+
+        res = client.get(
+            "/api/auth/me/status",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         data = res.get_json()
         assert res.status_code == 200
-        assert data["email"] == test_user.email
-        assert data["verified"] == test_user.verified
+        assert data["email"] == "testuser@example.com"
+        assert "verified" in data
         assert "created_at" in data
 
-    def test_get_user_status_missing_email(self, client):
-        res = client.get("/api/auth/user/status")
+    def test_get_user_status_no_token_failed(self, client):
+        """未ログインでは401になる。"""
+        res = client.get("/api/auth/me/status")
 
-        assert res.status_code == 400
-        assert res.get_json()["error"] == "メールアドレスが必要です"
+        assert res.status_code == 401
 
-    def test_get_user_status_nonexistent_user(self, client):
-        res = client.get("/api/auth/user/status?email=nobody@example.com")
+    def test_get_user_status_ignores_email_query_param(self, client):
+        """email クエリパラメータを渡しても無視され、常に自分自身の情報のみ返る
+        （他人のメールアドレスの登録状況を調べる手段として使えないことの確認）。"""
+        register_user(client)
+        token = login_user(client).get_json()["access_token"]
 
-        assert res.status_code == 404
-        assert "ユーザーが見つかりません" in res.get_json()["error"]
+        register_user(client, username="other", email="other@example.com")
+
+        res = client.get(
+            "/api/auth/me/status?email=other@example.com",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert res.status_code == 200
+        assert res.get_json()["email"] == "testuser@example.com"
 
 
 #############################################
@@ -489,8 +704,11 @@ class TestPasswordReset:
 
         assert res.status_code == 200
         assert (
-            res.get_json()["message"] == "パスワードリセット用のメールを送信しました。"
+            res.get_json()["message"]
+            == "パスワードリセット用のメールを送信しました（登録済みのメールアドレスの場合）"
         )
+        # メールアドレス列挙防止のため、登録済みメールであることを示す付随情報を含めない
+        assert "username" not in res.get_json()
 
     def test_forgot_password_nonexisting_email(self, client):
         """存在しないメールアドレスでのリクエストテスト"""
@@ -501,6 +719,24 @@ class TestPasswordReset:
         # セキュリティのため、成功したかのように応答する
         assert res.status_code == 200
         assert "パスワードリセット用のメールを送信しました" in res.get_json()["message"]
+
+    def test_forgot_password_response_identical_for_existing_and_nonexisting_email(
+        self, client, test_user
+    ):
+        """メールアドレス列挙を防ぐため、登録済み/未登録でレスポンス本文が完全に一致する。
+
+        以前は登録済みの場合だけメッセージ文言が異なり、かつ username フィールドが
+        付随していたため、レスポンス本文を見ればアカウントの有無が判別できてしまっていた。
+        """
+        res_existing = client.post(
+            "/api/auth/forgot-password", json={"email": test_user.email}
+        )
+        res_nonexisting = client.post(
+            "/api/auth/forgot-password", json={"email": "nonexistent@example.com"}
+        )
+
+        assert res_existing.status_code == res_nonexisting.status_code == 200
+        assert res_existing.get_json() == res_nonexisting.get_json()
 
     def test_forgot_password_missing_email(self, client):
         """メールアドレスなしのリクエストテスト"""
@@ -1022,6 +1258,28 @@ class TestUpdatePassword:
             json={"identifier": "testuser@example.com", "password": "newpassword1234"},
         )
         assert login_res.status_code == 200
+
+    def test_update_password_revokes_previously_issued_tokens(self, client, auth_headers):
+        """パスワード変更前に発行されていたトークンは、変更後は使えなくなる。
+
+        パスワード漏洩を疑って変更したのに、既に盗まれているかもしれない
+        トークンがそのまま有効というのでは意味がないため、変更時点までに
+        発行された全トークンを失効させる仕様になっている。
+        """
+        old_headers = auth_headers["headers"]
+
+        client.patch(
+            "/api/auth/me/password",
+            headers=old_headers,
+            json={
+                "current_password": "testuser1234",
+                "password": "newpassword1234",
+                "confirm": "newpassword1234",
+            },
+        )
+
+        res = client.get("/api/organizations", headers=old_headers)
+        assert res.status_code == 401
 
     def test_update_password_wrong_current_returns_401(self, client, auth_headers):
         """誤った現在のパスワードは 401 になる。"""
